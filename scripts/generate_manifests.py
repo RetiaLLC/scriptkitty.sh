@@ -100,7 +100,11 @@ def main() -> int:
             "product_line": profile.get("product_line", ""),
             "model": profile.get("model", ""),
             "mcu": mcu,
+            "radio": profile.get("radio", ""),
             "version": str(profile.get("version", "")),
+            "description": profile.get("description", ""),
+            "program_url": profile.get("program_url", ""),
+            "addons": profile.get("addons", []) or [],
             "flow": flow,
             "manifest": f"{pid}.json",
         })

@@ -7,6 +7,8 @@ version: "2.7.18"
 radio: rfm95
 description: "Meshtastic 2.7.18 for the ESP32-S3 Bluetooth Nugget with the RFM95 LoRa backpack."
 program_url: https://meshtastic.org/
+addons:
+  - "RFM95 LoRa backpack"
 
 provenance:
   binary_source: static
