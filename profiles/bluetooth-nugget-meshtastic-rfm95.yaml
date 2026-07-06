@@ -1,0 +1,16 @@
+id: bluetooth-nugget-meshtastic-rfm95
+display_name: "Bluetooth Nugget + RFM95 Backpack Meshtastic"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget + LoRa"
+mcu: esp32-s3
+version: "2.7.18"
+radio: rfm95
+description: "Meshtastic 2.7.18 for the ESP32-S3 Bluetooth Nugget with the RFM95 LoRa backpack."
+program_url: https://meshtastic.org/
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-esp32s3/bluetooth_nugget_meshtastic.bin

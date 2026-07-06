@@ -98,6 +98,7 @@ def main() -> int:
             "id": pid,
             "name": profile.get("display_name", pid),
             "product_line": profile.get("product_line", ""),
+            "model": profile.get("model", ""),
             "mcu": mcu,
             "version": str(profile.get("version", "")),
             "flow": flow,

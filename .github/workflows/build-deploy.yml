@@ -190,8 +190,14 @@ jobs:
           mkdir -p site
           cp -r web/* site/ 2>/dev/null || true      # your static app (flash/terminal/etc.)
           mkdir -p site/firmware
-          # Only overwrite firmware that was rebuilt this run; leave the rest intact
-          # by first restoring the currently-published tree, then layering new builds.
+          # static profiles: prebuilt 0x0 images committed under firmware/ (imported
+          # from the nugget.dev catalog). Lay these down first...
+          if [ -d firmware ]; then
+            find firmware -maxdepth 1 -type f \( -name '*.bin' -o -name '*.uf2' \) -print0 \
+              | while IFS= read -r -d '' f; do cp "$f" "site/firmware/$(basename "$f")"; done
+            ( cd site/firmware && for f in *.bin *.uf2; do [ -e "$f" ] && sha256sum "$f" > "$f.sha256"; done ) 2>/dev/null || true
+          fi
+          # ...then layer freshly-built ci/release artifacts on top (they win on id clash).
           if [ -d _fw ]; then
             find _fw -type f \( -name '*.bin' -o -name '*.uf2' -o -name '*.sha256' \) -print0 \
               | while IFS= read -r -d '' f; do

@@ -1,0 +1,14 @@
+id: bluetooth-nugget-ble-spammer
+display_name: "BLE Spammer"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+description: "Bluetooth monitor and BLE spam detector for the ESP32-S3 Bluetooth Nugget."
+program_url: https://github.com/ryan-richards/Nugget-BLE-Spam-Detector
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-esp32s3/BLE_Spam.bin

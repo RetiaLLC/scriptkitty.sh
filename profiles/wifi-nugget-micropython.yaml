@@ -1,0 +1,14 @@
+id: wifi-nugget-micropython
+display_name: "MicroPython"
+product_line: wifi-nugget
+model: "WiFi Nugget"
+mcu: esp8266
+description: "Current, working MicroPython binary for the ESP8266 WiFi Nugget."
+program_url: https://micropython.org/download/esp8266/
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries/micropython.bin

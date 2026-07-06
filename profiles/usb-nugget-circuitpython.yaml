@@ -1,0 +1,14 @@
+id: usb-nugget-circuitpython
+display_name: "CircuitPython"
+product_line: usb-nugget
+model: "USB Nugget"
+mcu: esp32-s2
+description: "Current, working CircuitPython base image for the USB Nugget (Rubber Nugget)."
+program_url: https://github.com/RetiaLLC/RubberNugget-CircuitPython
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-usb/CircuitPython.bin

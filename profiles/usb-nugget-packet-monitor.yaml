@@ -1,0 +1,14 @@
+id: usb-nugget-packet-monitor
+display_name: "Packet Monitor"
+product_line: usb-nugget
+model: "USB Nugget"
+mcu: esp32-s2
+description: "A GUI & serial tool to monitor Wi-Fi packets on the ESP32-S2 USB Nugget."
+program_url: https://github.com/RetiaLLC/Nugget-Packet-Monitor
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-usb/PacketMonitor.bin

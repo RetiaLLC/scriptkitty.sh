@@ -1,0 +1,14 @@
+id: usb-nugget-wled
+display_name: "WLED"
+product_line: usb-nugget
+model: "USB Nugget"
+mcu: esp32-s2
+description: "WLED webserver to control NeoPixel LEDs on the USB Nugget."
+program_url: https://github.com/Aircoookie/WLED
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-usb/wled_flash_dump.bin

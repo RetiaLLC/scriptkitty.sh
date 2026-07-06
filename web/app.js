@@ -18,6 +18,15 @@ const MCU_LABEL = {
   "rp2040": "RP2040",
 };
 
+// Product lines, in display order, with a friendly heading + subtitle.
+const LINES = [
+  ["usb-nugget", "USB Nugget", "ESP32-S2 USB attack platform"],
+  ["wifi-nugget", "WiFi Nugget", "ESP8266 Wi-Fi hacking tool"],
+  ["bluetooth-nugget", "Bluetooth Nugget", "ESP32-S3 Bluetooth / LoRa platform"],
+  ["nibble", "Nibble", "ESP32-S3 Meshtastic / Meshcore boards"],
+  ["pusheen", "Pusheen", "ESP8266 cat-lamp"],
+];
+
 init();
 
 async function init() {
@@ -35,23 +44,46 @@ async function init() {
     renderEmpty();
     return;
   }
+
+  // group by product_line, preserving LINES order then any unknown lines
+  const byLine = new Map();
+  for (const t of targets) {
+    const key = t.product_line || "other";
+    if (!byLine.has(key)) byLine.set(key, []);
+    byLine.get(key).push(t);
+  }
+  const order = [...LINES.map((l) => l[0]), ...[...byLine.keys()].filter((k) => !LINES.some((l) => l[0] === k))];
+
   targetsEl.replaceChildren();
-  for (const t of targets) targetsEl.append(renderCard(t));
+  for (const key of order) {
+    const items = byLine.get(key);
+    if (!items || !items.length) continue;
+    const meta = LINES.find((l) => l[0] === key);
+    const section = document.createElement("section");
+    section.className = "line-section";
+    const head = document.createElement("div");
+    head.className = "line-head";
+    head.innerHTML = `<h2>${meta ? meta[1] : key}</h2>` + (meta ? `<span>${meta[2]}</span>` : "");
+    section.append(head);
+    const grid = document.createElement("div");
+    grid.className = "targets";
+    for (const t of items) grid.append(renderCard(t));
+    section.append(grid);
+    targetsEl.append(section);
+  }
 }
 
 function renderCard(t) {
   const node = tpl.content.cloneNode(true);
   node.querySelector(".card-name").textContent = t.name || t.id;
   node.querySelector(".mcu").textContent = MCU_LABEL[t.mcu] || t.mcu;
+  node.querySelector(".model").textContent = t.model || "—";
   node.querySelector(".version").textContent = t.version ? `v${t.version}` : "—";
-  const flowEl = node.querySelector(".flow");
   const actionEl = node.querySelector(".card-action");
 
   if (t.flow === "uf2") {
-    flowEl.textContent = "UF2 / BOOTSEL";
     renderUf2(actionEl, t);
   } else {
-    flowEl.textContent = "Web Serial";
     renderEsp(actionEl, t);
   }
   return node;

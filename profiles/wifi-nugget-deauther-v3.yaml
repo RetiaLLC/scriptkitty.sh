@@ -1,0 +1,14 @@
+id: wifi-nugget-deauther-v3
+display_name: "Advanced Deauther V3 (no screen)"
+product_line: wifi-nugget
+model: "WiFi Nugget"
+mcu: esp8266
+description: "The Wi-Fi Deauther V3 by @spacehuhn, a Wi-Fi scanning & attack platform for the ESP8266."
+program_url: https://github.com/RetiaLLC/esp8266_deauther
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries/esp8266_deauther_V3.bin

@@ -1,0 +1,14 @@
+id: pusheen-guardian
+display_name: "Pusheen Guardian Wi-Fi Jamming Detector"
+product_line: pusheen
+model: "Pusheen"
+mcu: esp8266
+description: "Wi-Fi Deauth & Disassociation detector for the ESP8266 Pusheen."
+program_url: https://github.com/skickar/DeauthDetector
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries/GUARDIAN_PUSHEEN.bin

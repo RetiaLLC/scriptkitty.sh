@@ -1,0 +1,16 @@
+id: nibble-screen-connect-meshcore-repeater
+display_name: "Nibble Screen Connect Meshcore Repeater"
+product_line: nibble
+model: "Nibble Screen Connect"
+mcu: esp32-s3
+version: "1.9.1"
+radio: sx1262
+description: "Meshcore 1.9.1 repeater for the Nibble Screen Connect (green board)."
+program_url: https://meshcore.co.uk/
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-esp32s3/nibble_meshcore_repeater.bin

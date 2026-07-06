@@ -1,0 +1,14 @@
+id: usb-nugget-badusb
+display_name: "USB Nugget"
+product_line: usb-nugget
+model: "USB Nugget"
+mcu: esp32-s2
+description: "A versatile USB attack platform that lets you hack computers in seconds."
+program_url: https://github.com/RetiaLLC/USB-Nugget
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-usb/USBNugget.bin

@@ -12,11 +12,23 @@ served at the default `https://<owner>.github.io/<repo>/` Pages URL.
 ```
 web/                     static app served at the site root (index.html + assets)
   vendor/esp-web-tools/  vendored ESP Web Tools 10.2.1 (no runtime CDN)
-profiles/                one Board Profile per flashable target
+profiles/                one Board Profile per flashable target (23 at launch)
+firmware/                prebuilt 0x0 images for static profiles (imported from nugget.dev)
 scripts/                 build/validate/plan/fetch/manifest helpers
 projects/                source for binary_source: ci profiles (compiled in CI)
 .github/workflows/       pr-validate.yml (PRs) + build-deploy.yml (main/cron)
 ```
+
+## Launch catalog
+
+The site launches with the current **nugget.dev** program list reproduced as
+profiles (imported from `RetiaLLC/esp-web-flasher-wifi-nugget`), grouped by product
+line: **USB Nugget** (ESP32-S2), **WiFi Nugget** + **Pusheen** (ESP8266),
+**Bluetooth Nugget** + **Nibble** (ESP32-S3). Every image is an already-merged
+single file flashed at `0x0`, so it maps straight to one ESP Web Tools part at
+offset 0. These launch profiles use `binary_source: static` with a documented
+`exception`; the plan is to migrate the Meshtastic/Meshcore builds to pinned
+`release` fetches and the authored firmware to in-CI `ci` builds over time.
 
 ## The two workflows
 

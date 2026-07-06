@@ -1,0 +1,14 @@
+id: pusheen-wled
+display_name: "Pusheen WLED"
+product_line: pusheen
+model: "Pusheen"
+mcu: esp8266
+description: "WLED customized for the Pusheen cat lamp."
+program_url: https://wled.me
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries/pusheen_wled.bin

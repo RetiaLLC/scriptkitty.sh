@@ -1,0 +1,16 @@
+id: nibble-og-s3-meshtastic
+display_name: "Meshtastic 2.7.23 - Open Source Nibble (ESP32-S3)"
+product_line: nibble
+model: "Nibble OG (S3)"
+mcu: esp32-s3
+version: "2.7.23"
+radio: rfm95
+description: "Meshtastic 2.7.23 for the Open Source Nibble on the Waveshare S3 Zero with RFM95."
+program_url: https://github.com/retiallc/nibble
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-esp32s3/Meshtastic-v2.7.23.NibbleEsp32s3.bin

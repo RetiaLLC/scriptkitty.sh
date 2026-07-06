@@ -1,0 +1,15 @@
+id: nibble-connect-meshtastic
+display_name: "Nibble Connect Meshtastic (SX1262)"
+product_line: nibble
+model: "Nibble Connect"
+mcu: esp32-s3
+radio: sx1262
+description: "Meshtastic for the Nibble Connect (purple board, Seeed SX1262)."
+program_url: https://meshtastic.org/
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  imported_from:
+    repo: RetiaLLC/esp-web-flasher-wifi-nugget
+    path: js/binaries-esp32s3/nibble_firmware_meshtastic.bin

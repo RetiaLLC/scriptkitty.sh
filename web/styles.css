@@ -56,6 +56,13 @@ body {
 
 /* targets grid */
 main { flex: 1 0 auto; padding-bottom: 3rem; }
+.line-section { margin-bottom: 2.5rem; }
+.line-head {
+  display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: 1.15rem;
+}
+.line-head h2 { margin: 0; font-size: 1.35rem; letter-spacing: -0.01em; }
+.line-head span { color: var(--muted); font-family: var(--mono); font-size: .8rem; }
 .targets {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
