@@ -96,6 +96,14 @@ body {
   font: inherit; text-decoration: underline; padding: 0 0 0 .4rem;
 }
 
+.flash-options {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed var(--border);
+}
+.opt-label {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); font-weight: 700;
+}
 .flash-speed { font-size: .8rem; color: var(--muted); }
 .flash-speed select {
   background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);

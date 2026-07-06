@@ -332,9 +332,11 @@ function clearDetection(rerender) {
 }
 
 // --- flashing via vendored esptool-js ----------------------------------------
-async function flashProfile(t) {
+async function flashProfile(t, opts) {
   if (!HAS_SERIAL) return;
-  const baud = parseInt(baudSel.value, 10) || 460800;
+  opts = opts || {};
+  const baud = opts.baud || parseInt(baudSel.value, 10) || 230400;
+  const eraseAll = opts.erase != null ? opts.erase : !!(eraseChk && eraseChk.checked);
 
   let mod;
   try { mod = await loadEsptool(); }
@@ -354,15 +356,15 @@ async function flashProfile(t) {
     const chipName = await loader.main();
     const mcu = mapChip(chipName);
     if (mcu && mcu !== t.mcu) {
-      throw new Error(`This board is ${chipName}, but "${t.name}" is built for ${MCU_LABEL[t.mcu] || t.mcu}.`);
+      const err = new Error(`This board is ${chipName}, but "${t.name}" is built for ${MCU_LABEL[t.mcu] || t.mcu}.`);
+      err.mismatch = true;
+      throw err;
     }
     setFlashStatus("Downloading firmware…");
     const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
     if (!resp.ok) throw new Error(`Couldn't fetch firmware (HTTP ${resp.status}).`);
     const data = loader.ui8ToBstr(new Uint8Array(await resp.arrayBuffer()));
-    const eraseAll = !!(eraseChk && eraseChk.checked);
-    if (eraseAll) setFlashStatus("Erasing flash…");
-    setFlashStatus(`Writing at ${baud} baud…`);
+    setFlashStatus(eraseAll ? "Erasing flash, then writing…" : `Writing at ${baud} baud…`);
     await loader.writeFlash({
       fileArray: [{ data, address: 0 }],
       flashSize: "keep", flashMode: "keep", flashFreq: "keep",
@@ -373,10 +375,21 @@ async function flashProfile(t) {
     await loader.after("hard_reset");
     showFlashSuccess(t);
   } catch (e) {
-    showFlashError(t, e && e.message ? e.message : String(e));
-  } finally {
+    const msg = e && e.message ? e.message : String(e);
     try { await transport.disconnect(); } catch {}
+    // High baud over Web Serial can corrupt data on some USB adapters and esptool-js
+    // doesn't retry a bad block. If a write (not a chip mismatch) failed above 115200,
+    // automatically retry the whole flash at the reliable 115200 rate.
+    const writeFail = !e.mismatch && /flash|status|seq|timeout|write|packet|slip/i.test(msg);
+    if (writeFail && baud > 115200 && !opts.fellBack) {
+      setFlashStatus(`Speed ${baud} failed mid-write — retrying at the reliable 115200 rate…`);
+      await new Promise((r) => setTimeout(r, 600));
+      return flashProfile(t, { baud: 115200, erase: eraseAll, fellBack: true });
+    }
+    showFlashError(t, msg, opts.fellBack);
+    return;
   }
+  try { await transport.disconnect(); } catch {}
 }
 
 let overlayEl = null;
@@ -428,12 +441,15 @@ function showFlashSuccess(t) {
     btnEl("button", "btn secondary", "Done", { onclick: closeFlash }),
   );
 }
-function showFlashError(t, msg) {
+function showFlashError(t, msg, fellBack) {
   const o = ensureOverlay();
   o.className = "flash-overlay state-err";
   o.querySelector(".flash-title").textContent = "Flashing failed";
   o.querySelector(".flash-bar").style.display = "none";
-  setFlashStatus(`${msg}  If this keeps happening, lower the Speed setting and make sure the board is in download mode (see Flashing help), then retry.`);
+  const hint = fellBack
+    ? "  This failed even at the reliable 115200 speed — make sure the board is in download mode (see Flashing help) and nothing else has the serial port open, then retry."
+    : "  Make sure the board is in download mode (see Flashing help) and nothing else has the serial port open, then retry.";
+  setFlashStatus(msg + hint);
   const actions = o.querySelector(".flash-actions");
   actions.replaceChildren(
     btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); flashProfile(t); } }),
