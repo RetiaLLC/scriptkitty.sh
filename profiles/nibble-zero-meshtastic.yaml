@@ -7,6 +7,7 @@ version: "2.7.17"
 radio: sx1262
 description: "Meshtastic 2.7.17 for the Flipper-compatible Nibble Zero (white board, SX1262)."
 program_url: https://meshtastic.org/
+recommended: true
 
 provenance:
   binary_source: static

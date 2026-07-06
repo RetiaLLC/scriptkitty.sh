@@ -5,6 +5,7 @@ model: "USB Nugget"
 mcu: esp32-s2
 description: "A versatile USB attack platform that lets you hack computers in seconds."
 program_url: https://github.com/RetiaLLC/USB-Nugget
+recommended: true
 
 provenance:
   binary_source: static

@@ -5,6 +5,7 @@ model: "WiFi Nugget"
 mcu: esp8266
 description: "The Wi-Fi Deauther modified for the Nugget to perform Wi-Fi scanning & attacking."
 program_url: https://github.com/RetiaLLC/WiFi-Nugget
+recommended: true
 
 provenance:
   binary_source: static

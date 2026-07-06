@@ -1,15 +1,20 @@
 // Searchable "all downloads" catalog. Reads manifests/index.json (generated in CI by
-// scripts/generate_manifests.py), lets you search + filter by product line, shows each
-// program's model/radio/add-ons, and flashes via the vendored ESP Web Tools button.
+// scripts/generate_manifests.py). Manual device picker + optional auto-detect (reads the
+// chip over Web Serial via vendored esptool-js), Recommended badges, add-ons, per-device
+// flashing help, and flashing via the vendored ESP Web Tools button.
 
 const targetsEl = document.getElementById("targets");
 const searchEl = document.getElementById("search");
 const filtersEl = document.getElementById("filters");
 const countEl = document.getElementById("count");
+const detectBtn = document.getElementById("detect");
+const detectedEl = document.getElementById("detected");
 const tpl = document.getElementById("tpl-card");
 
-if (!("serial" in navigator)) {
+const HAS_SERIAL = "serial" in navigator;
+if (!HAS_SERIAL) {
   document.getElementById("unsupported").hidden = false;
+  detectBtn.disabled = true;
 }
 
 const MCU_LABEL = {
@@ -27,9 +32,27 @@ const LINES = [
   ["pusheen", "Pusheen", "ESP8266 cat-lamp"],
 ];
 
+// Which product lines share each chip family (same-silicon collisions can't be
+// resolved by auto-detect — the user confirms with the manual picker).
+const LINES_BY_MCU = {
+  "esp8266": ["wifi-nugget", "pusheen"],
+  "esp32-s2": ["usb-nugget"],
+  "esp32-s3": ["bluetooth-nugget", "nibble"],
+};
+
+// Per-device flashing / recovery help, keyed by product line.
+const HELP = {
+  "usb-nugget": "Native USB (ESP32-S2). Enter flashing mode: hold BOOT (GPIO0), tap RESET, then release BOOT. After flashing, tap RESET to run.",
+  "wifi-nugget": "ESP8266 (D1 Mini). Usually flashes automatically. If it fails, hold the FLASH button while plugging in USB, then release.",
+  "pusheen": "ESP8266 (D1 Mini). Usually flashes automatically. If it fails, hold the FLASH button while plugging in USB, then release.",
+  "bluetooth-nugget": "Native USB (ESP32-S3, Wemos S3 Mini). Hold BOOT, tap RESET (or hold BOOT while plugging in USB), then release. After flashing, tap RESET or replug.",
+  "nibble": "Native USB (ESP32-S3, Waveshare S3 Zero — no RESET button). Hold BOOT while plugging in USB to enter flashing mode, then release. After flashing, unplug and replug.",
+};
+
 let ALL = [];
 let activeLine = "all";
 let query = "";
+let detectedMcu = null;
 
 init();
 
@@ -48,6 +71,7 @@ async function init() {
 
   buildFilters();
   searchEl.addEventListener("input", () => { query = searchEl.value.trim().toLowerCase(); render(); });
+  detectBtn.addEventListener("click", detectBoard);
   render();
 }
 
@@ -65,14 +89,21 @@ function buildFilters() {
     b.innerHTML = `${label} <span class="filter-n">${n}</span>`;
     b.addEventListener("click", () => {
       activeLine = key;
-      filtersEl.querySelectorAll(".filter").forEach((el) => el.classList.toggle("active", el.dataset.line === key));
+      // a manual pick overrides an earlier auto-detect
+      if (detectedMcu) clearDetection(false);
+      syncFilterButtons();
       render();
     });
     filtersEl.append(b);
   }
 }
 
+function syncFilterButtons() {
+  filtersEl.querySelectorAll(".filter").forEach((el) => el.classList.toggle("active", el.dataset.line === activeLine));
+}
+
 function matches(t) {
+  if (detectedMcu && t.mcu !== detectedMcu) return false;
   if (activeLine !== "all" && t.product_line !== activeLine) return false;
   if (!query) return true;
   const hay = [
@@ -105,6 +136,8 @@ function render() {
   for (const key of order) {
     const items = byLine.get(key);
     if (!items || !items.length) continue;
+    // recommended first, then by name
+    items.sort((a, b) => (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || ""));
     const meta = LINES.find((l) => l[0] === key);
     const section = document.createElement("section");
     section.className = "line-section";
@@ -113,6 +146,12 @@ function render() {
     head.innerHTML = `<h2>${meta ? meta[1] : key}</h2>` + (meta ? `<span>${meta[2]}</span>` : "") +
       `<span class="line-n">${items.length}</span>`;
     section.append(head);
+    if (HELP[key]) {
+      const help = document.createElement("details");
+      help.className = "line-help";
+      help.innerHTML = `<summary>Flashing help</summary><p>${HELP[key]}</p>`;
+      section.append(help);
+    }
     const grid = document.createElement("div");
     grid.className = "targets";
     for (const t of items) grid.append(renderCard(t));
@@ -125,6 +164,7 @@ function renderCard(t) {
   const node = tpl.content.cloneNode(true);
   node.querySelector(".card-name").textContent = t.name || t.id;
   node.querySelector(".mcu").textContent = MCU_LABEL[t.mcu] || t.mcu;
+  if (t.recommended) node.querySelector(".rec-badge").hidden = false;
   node.querySelector(".card-desc").textContent = stripNote(t.description);
   node.querySelector(".model").textContent = t.model || "—";
   node.querySelector(".version").textContent = t.version ? `v${t.version}` : "—";
@@ -182,7 +222,100 @@ async function renderUf2(actionEl, t) {
   actionEl.append(dl);
 }
 
-// Drop the internal "NOTE: ..." reviewer aside from the public-facing description.
+// --- auto-detect via vendored esptool-js -------------------------------------
+async function detectBoard() {
+  if (!HAS_SERIAL) return;
+  showDetected("Loading detector…", "busy");
+  let mod;
+  try {
+    mod = await import("./vendor/esptool-js/bundle.js");
+  } catch (e) {
+    showDetected("Couldn't load the detector.", "err");
+    return;
+  }
+  const { ESPLoader, Transport } = mod;
+
+  let port;
+  try {
+    port = await navigator.serial.requestPort();
+  } catch {
+    hideDetected(); // user dismissed the port picker
+    return;
+  }
+
+  const term = { clean() {}, writeLine(d) { showDetected(String(d), "busy"); }, write(d) {} };
+  const transport = new Transport(port, false);
+  const loader = new ESPLoader({ transport, baudrate: 115200, romBaudrate: 115200, terminal: term, debugLogging: false });
+  try {
+    showDetected("Connecting to board…", "busy");
+    const chipName = await loader.main();              // connects, detects chip
+    const mcu = mapChip(chipName);
+    let flash = "";
+    try { flash = flashLabel(await loader.readFlashId()); } catch {}
+    applyDetection(mcu, chipName, flash);
+  } catch (e) {
+    showDetected(`Detect failed: ${e.message}. Put the board in download mode (see Flashing help) and try again.`, "err");
+  } finally {
+    try { await transport.disconnect(); } catch {}
+  }
+}
+
+function mapChip(chipName) {
+  const s = (chipName || "").toUpperCase();
+  if (s.includes("ESP8266")) return "esp8266";
+  if (s.includes("ESP32-S2") || s.includes("ESP32S2")) return "esp32-s2";
+  if (s.includes("ESP32-S3") || s.includes("ESP32S3")) return "esp32-s3";
+  return null;
+}
+
+function flashLabel(flashId) {
+  const sizeId = (flashId >> 16) & 0xff;
+  if (sizeId < 0x12 || sizeId > 0x20) return "";
+  const mb = Math.pow(2, sizeId) / (1024 * 1024);
+  return Number.isInteger(mb) ? `${mb} MB flash` : "";
+}
+
+function applyDetection(mcu, chipName, flash) {
+  if (!mcu) {
+    showDetected(`Detected ${chipName || "an unknown chip"} — not a recognized Nugget/Nibble chip.`, "err");
+    return;
+  }
+  detectedMcu = mcu;
+  const lines = LINES_BY_MCU[mcu] || [];
+  const chipTxt = `${MCU_LABEL[mcu]}${flash ? " · " + flash : ""}`;
+  if (lines.length === 1) {
+    activeLine = lines[0];
+    const name = LINES.find((l) => l[0] === lines[0])[1];
+    showDetected(`Detected <b>${name}</b> (${chipTxt}) — showing its firmware.`, "ok");
+  } else {
+    activeLine = "all";
+    const names = lines.map((k) => LINES.find((l) => l[0] === k)[1]).join(" or a ");
+    showDetected(`Detected <b>${chipTxt}</b> — this is a ${names}. Pick your exact board below.`, "ok");
+  }
+  syncFilterButtons();
+  render();
+}
+
+function showDetected(html, kind) {
+  detectedEl.hidden = false;
+  detectedEl.className = `banner banner-detect banner-${kind}`;
+  const clear = (kind === "ok" || kind === "err") ? ` <button class="link-clear" type="button">clear</button>` : "";
+  detectedEl.innerHTML = html + clear;
+  const btn = detectedEl.querySelector(".link-clear");
+  if (btn) btn.addEventListener("click", () => clearDetection(true));
+}
+
+function hideDetected() { detectedEl.hidden = true; detectedEl.innerHTML = ""; }
+
+function clearDetection(rerender) {
+  detectedMcu = null;
+  activeLine = "all";
+  hideDetected();
+  syncFilterButtons();
+  if (rerender) render();
+}
+
+// --- helpers -----------------------------------------------------------------
 function stripNote(desc) {
   if (!desc) return "";
   return desc.split(/\s*NOTE:/i)[0].trim();

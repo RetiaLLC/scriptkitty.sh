@@ -5,6 +5,7 @@ model: "Pusheen"
 mcu: esp8266
 description: "WLED customized for the Pusheen cat lamp."
 program_url: https://wled.me
+recommended: true
 
 provenance:
   binary_source: static
