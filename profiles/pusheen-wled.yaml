@@ -12,3 +12,5 @@ provenance:
   imported_from:
     repo: RetiaLLC/esp-web-flasher-wifi-nugget
     path: js/binaries/pusheen_wled.bin
+
+# ci pipeline verification (throwaway, will be reverted)
