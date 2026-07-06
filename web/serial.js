@@ -179,28 +179,44 @@ async function sendRaw(bytes, label) {
 }
 function buildQuickSend() {
   quickSendEl.replaceChildren();
-  const lbl = document.createElement("span");
-  lbl.className = "qs-label"; lbl.textContent = "Quick send:";
-  quickSendEl.append(lbl);
+  const toggle = document.createElement("button");
+  toggle.type = "button"; toggle.className = "qs-toggle";
+  const items = document.createElement("div");
+  items.className = "qs-items";
+
   for (const m of MACROS) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "qs-btn"; b.textContent = m.label; b.disabled = true;
     b.title = m.cmd.length > 90 ? m.cmd.slice(0, 90) + "…" : m.cmd;
     b.addEventListener("click", () => sendText(m.cmd));
-    quickSendEl.append(b);
+    items.append(b);
   }
   const sep = document.createElement("span");
-  sep.className = "qs-sep"; quickSendEl.append(sep);
+  sep.className = "qs-sep"; items.append(sep);
   for (const c of CTRL_KEYS) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "qs-btn qs-ctrl"; b.textContent = c.label; b.disabled = true;
     b.title = `Send ${c.label}`;
     b.addEventListener("click", () => sendRaw([c.code], c.label));
-    quickSendEl.append(b);
+    items.append(b);
   }
+
+  const setCollapsed = (c) => {
+    quickSendEl.classList.toggle("collapsed", c);
+    toggle.textContent = (c ? "▸" : "▾") + " Quick send";
+    toggle.setAttribute("aria-expanded", String(!c));
+    try { localStorage.setItem("sk_qs_collapsed", c ? "1" : "0"); } catch {}
+    try { fitAddon.fit(); } catch {} // reclaim/return the row's space for the terminal
+  };
+  toggle.addEventListener("click", () => setCollapsed(!quickSendEl.classList.contains("collapsed")));
+  quickSendEl.append(toggle, items);
+
+  let collapsed = false;
+  try { collapsed = localStorage.getItem("sk_qs_collapsed") === "1"; } catch {}
+  setCollapsed(collapsed);
 }
 function setQuickSendEnabled(on) {
-  quickSendEl.querySelectorAll("button").forEach((b) => (b.disabled = !on));
+  quickSendEl.querySelectorAll(".qs-btn").forEach((b) => (b.disabled = !on));
 }
 
 async function disconnect() {

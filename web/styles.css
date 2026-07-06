@@ -302,7 +302,14 @@ esp-web-install-button[install-unsupported] { display: block; }
 
 /* quick-send macros + control keys */
 .quick-send { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; flex-shrink: 0; }
-.qs-label { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; margin-right: .1rem; }
+.qs-items { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.quick-send.collapsed .qs-items { display: none; }
+.qs-toggle {
+  cursor: pointer; background: transparent; border: 1px solid var(--border); border-radius: 7px;
+  color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+  font-weight: 700; padding: .3rem .55rem; white-space: nowrap;
+}
+.qs-toggle:hover { color: var(--text); border-color: #3a465b; }
 .qs-btn {
   cursor: pointer; font-family: var(--sans); font-size: .78rem; font-weight: 600;
   color: var(--accent); background: transparent; border: 1px solid var(--border);
