@@ -96,14 +96,20 @@ body {
   font: inherit; text-decoration: underline; padding: 0 0 0 .4rem;
 }
 
-.flash-options {
-  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed var(--border);
+.advanced { margin-top: 1rem; }
+.advanced > summary {
+  cursor: pointer; color: var(--muted); font-size: .82rem; font-family: var(--mono);
+  width: fit-content; list-style-position: inside;
 }
-.opt-label {
-  font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--muted); font-weight: 700;
+.advanced > summary:hover { color: var(--text); }
+.advanced-body {
+  display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap;
+  margin-top: .8rem; padding: .9rem 1rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
 }
+.help-block { flex-basis: 100%; color: var(--muted); font-size: .85rem; border-top: 1px dashed var(--border); padding-top: .7rem; }
+.help-block p { margin: .35rem 0; }
+.help-block b { color: var(--text); }
+.help-block a { color: var(--accent-2); }
 .flash-speed { font-size: .8rem; color: var(--muted); }
 .flash-speed select {
   background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);
@@ -130,6 +136,8 @@ body {
 .state-ok .flash-bar-fill { background: var(--accent); }
 .flash-pct { font-family: var(--mono); font-size: .85rem; color: var(--muted); }
 .flash-status { margin: .6rem 0 0; color: var(--muted); font-size: .88rem; min-height: 2.4em; }
+.flash-hint { margin: .5rem 0 0; color: #f0d99a; font-size: .82rem; min-height: 1em; }
+.state-ok .flash-hint { color: var(--muted); }
 .state-err .flash-title { color: #ff8080; }
 .state-ok .flash-title { color: var(--accent); }
 .flash-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1.1rem; }

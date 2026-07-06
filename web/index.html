@@ -44,20 +44,29 @@
         <button id="detect" class="btn detect" type="button" title="Connect and identify your board">🔌 Detect my board</button>
       </div>
 
-      <div class="flash-options">
-        <span class="opt-label">Flash options</span>
-        <label class="ctl flash-speed">Speed
-          <select id="baud" title="Flash speed over USB. 115200 is the reliable default; higher is faster but many USB adapters (e.g. CH340) corrupt data above it. Try faster only if your board flashes cleanly.">
-            <option value="115200" selected>Reliable (115200)</option>
-            <option value="230400">Faster (230400)</option>
-            <option value="460800">Fast (460800 — may fail over USB)</option>
-            <option value="921600">Fastest (921600 — usually fails)</option>
-          </select>
-        </label>
-        <label class="ctl ctl-check" title="Wipe the whole chip before flashing — use when switching between very different firmware (e.g. CircuitPython → deauther)">
-          <input type="checkbox" id="erase" /> Erase first
-        </label>
-      </div>
+      <details class="advanced">
+        <summary>Advanced options &amp; help</summary>
+        <div class="advanced-body">
+          <label class="ctl flash-speed">Speed
+            <select id="baud" title="Auto picks the safest fast speed for your board. 115200 is the most reliable; higher speeds only work on some USB adapters.">
+              <option value="auto" selected>Auto (recommended)</option>
+              <option value="115200">115200 — most reliable</option>
+              <option value="230400">230400</option>
+              <option value="460800">460800 — fast</option>
+              <option value="921600">921600 — native-USB boards only</option>
+            </select>
+          </label>
+          <label class="ctl ctl-check" title="Wipe the whole chip before flashing — use when switching between very different firmware (e.g. CircuitPython → deauther)">
+            <input type="checkbox" id="erase" /> Erase whole chip first
+          </label>
+          <div class="help-block">
+            <p><strong>Don't see your board in the popup?</strong> Use a USB cable that carries <em>data</em> (not charge-only). On Windows you may need a driver:
+              <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340</a> (D1 Mini / WiFi Nugget) or
+              <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener">CP2102</a>. On Mac/Linux it's usually built in. Then reload and try again.</p>
+            <p><strong>USB Nugget, Bluetooth Nugget, or Nibble won't connect?</strong> Put it in install mode: hold <b>BOOT</b>, tap <b>RESET</b> once, then release BOOT. (No reset button? Hold <b>BOOT</b> while plugging in the USB cable, then release.)</p>
+          </div>
+        </div>
+      </details>
 
       <div id="detected" class="banner banner-detect" hidden></div>
       <div id="count" class="count"></div>

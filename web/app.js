@@ -332,55 +332,77 @@ function clearDetection(rerender) {
 }
 
 // --- flashing via vendored esptool-js ----------------------------------------
+// D1 Mini (ESP8266) boards use a CH340 that is unreliable over Web Serial above
+// 115200; native-USB ESP32-S2/S3 have no such adapter and handle high baud fine.
+const NATIVE_USB = new Set(["esp32-s2", "esp32-s3"]);
+function resolveBaud(mcu) {
+  const sel = baudSel ? baudSel.value : "auto";
+  if (sel && sel !== "auto") return parseInt(sel, 10) || 115200;
+  return NATIVE_USB.has(mcu) ? 460800 : 115200;
+}
+const BOOT_HELP = "hold the BOOT button, tap RESET once, then release BOOT (no RESET button? hold BOOT while plugging in USB, then release)";
+
 async function flashProfile(t) {
   if (!HAS_SERIAL) return;
-  const baud = parseInt(baudSel.value, 10) || 115200;
+  const baud = resolveBaud(t.mcu);
   const eraseAll = !!(eraseChk && eraseChk.checked);
 
   let mod;
   try { mod = await loadEsptool(); }
-  catch { openFlash(t); showFlashError(t, "Couldn't load the flasher."); return; }
+  catch { openFlash(t); showFlashError(t, "Couldn't load the flasher.", {}); return; }
   const { ESPLoader, Transport } = mod;
+
+  openFlash(t);
+  if (NATIVE_USB.has(t.mcu)) setFlashHint(`If your board won't connect, put it in install mode: ${BOOT_HELP}.`);
 
   let port;
   try { port = await acquirePort(); }
-  catch { return; } // user dismissed the port picker
+  catch { closeFlash(); return; } // user dismissed the browser port picker
 
-  openFlash(t);
-  const term = { clean() {}, writeLine(d) { setFlashStatus(String(d)); }, write(d) {} };
+  const term = { clean() {}, writeLine() {}, write() {} };
   const transport = new Transport(port, false);
-  const loader = new ESPLoader({ transport, baudrate: baud, romBaudrate: 115200, terminal: term, debugLogging: false });
+  const loader = new ESPLoader({
+    transport, baudrate: baud, romBaudrate: 115200,
+    serialOptions: { bufferSize: 8192, flowControl: "none" },
+    terminal: term, debugLogging: false,
+  });
   try {
-    setFlashStatus("Connecting to board…");
+    setFlashStatus("Connecting to your board…");
     const chipName = await loader.main();
     const mcu = mapChip(chipName);
     if (mcu && mcu !== t.mcu) {
-      const err = new Error(`This board is ${chipName}, but "${t.name}" is built for ${MCU_LABEL[t.mcu] || t.mcu}.`);
+      const err = new Error(`This board is a ${chipName}, but “${t.name}” is built for ${MCU_LABEL[t.mcu] || t.mcu}.`);
       err.mismatch = true;
       throw err;
     }
+    setFlashHint("Keep this tab open and don't unplug the board until it says Done.");
     setFlashStatus("Downloading firmware…");
     const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
-    if (!resp.ok) throw new Error(`Couldn't fetch firmware (HTTP ${resp.status}).`);
-    const data = loader.ui8ToBstr(new Uint8Array(await resp.arrayBuffer()));
-    setFlashStatus(eraseAll ? "Erasing flash, then writing…" : `Writing at ${baud} baud…`);
+    if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
+    // esptool-js 0.6.0 requires the flash data as a Uint8Array. Passing a binary
+    // string (the old ui8ToBstr form) mis-encodes and fails deterministically
+    // mid-write with "status 201,0" on ARM64/macOS — see esptool-js issue #233.
+    const data = new Uint8Array(await resp.arrayBuffer());
+    if (eraseAll) setFlashStatus("Erasing the whole chip…");
     await loader.writeFlash({
       fileArray: [{ data, address: 0 }],
       flashSize: "keep", flashMode: "keep", flashFreq: "keep",
       eraseAll, compress: true,
-      reportProgress: (i, written, total) => setFlashProgress(written, total),
+      reportProgress: (i, written, total) => {
+        setFlashProgress(written, total);
+        setFlashStatus(`Writing… ${Math.round((written / total) * 100)}%`);
+      },
     });
-    setFlashStatus("Rebooting…");
+    setFlashStatus("Finishing up…");
     await loader.after("hard_reset");
     showFlashSuccess(t);
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     try { await transport.disconnect(); } catch {}
-    // A failed attempt can leave the granted port's streams in a bad state; drop the
-    // reference so a retry (or the classic flasher) acquires a clean port rather than
-    // reusing this one (which caused the "serial data stream stopped" failures).
+    // A failed attempt can leave the port's streams in a bad state; drop the reference
+    // so a retry (or the classic flasher) acquires a clean port instead of reusing it.
     grantedPort = null;
-    showFlashError(t, msg, { highBaud: baud > 115200, mismatch: !!e.mismatch });
+    showFlashError(t, msg, { mismatch: !!e.mismatch, mcu: t.mcu });
     return;
   }
   try { await transport.disconnect(); } catch {}
@@ -398,6 +420,7 @@ function ensureOverlay() {
        <div class="flash-bar"><div class="flash-bar-fill"></div></div>
        <div class="flash-pct"></div>
        <div class="flash-status"></div>
+       <div class="flash-hint"></div>
        <div class="flash-actions"></div>
      </div>`;
   document.body.append(overlayEl);
@@ -412,8 +435,10 @@ function openFlash(t) {
   o.querySelector(".flash-actions").replaceChildren();
   setFlashProgress(0, 1);
   setFlashStatus("");
+  setFlashHint("");
 }
 function setFlashStatus(text) { ensureOverlay().querySelector(".flash-status").textContent = text; }
+function setFlashHint(text) { ensureOverlay().querySelector(".flash-hint").textContent = text; }
 function setFlashProgress(written, total) {
   const o = ensureOverlay();
   const pct = total ? Math.round((written / total) * 100) : 0;
@@ -423,9 +448,10 @@ function setFlashProgress(written, total) {
 function showFlashSuccess(t) {
   const o = ensureOverlay();
   o.className = "flash-overlay state-ok";
-  o.querySelector(".flash-title").textContent = `✓ Flashed ${t.name}`;
+  o.querySelector(".flash-title").textContent = `✓ Flashed ${t.name}!`;
   setFlashProgress(1, 1);
-  setFlashStatus("Your board rebooted into the new firmware.");
+  setFlashStatus("Your board is restarting into the new firmware.");
+  setFlashHint("If it doesn't start up, unplug the board and plug it back in.");
   const actions = o.querySelector(".flash-actions");
   actions.replaceChildren(
     btnEl("a", "btn", "Open Serial Monitor", { href: "serial.html" }),
@@ -435,26 +461,32 @@ function showFlashSuccess(t) {
     btnEl("button", "btn secondary", "Done", { onclick: closeFlash }),
   );
 }
+// Turn a raw esptool-js error into a plain-language explanation for a beginner.
+function mapFlashError(raw, info) {
+  const m = (raw || "").toLowerCase();
+  if (info.mismatch) return { title: "Wrong firmware for this board", body: raw + " Pick the firmware that matches your board.", classic: false };
+  if (/already open|resource busy|failed to open|access denied|in use|not readable|not writable/.test(m))
+    return { title: "The board is busy", body: "Another program or browser tab is using this board. Close the Serial Monitor tab, Arduino IDE, or other flasher tabs, then try again.", classic: true };
+  if (/failed to connect|sync|no serial data|timed out|packet header|invalid head|wrong boot/.test(m))
+    return { title: "Couldn't reach the board", body: (NATIVE_USB.has(info.mcu) ? `Put the board in install mode — ${BOOT_HELP} — then Retry. ` : "") + "Also make sure you're using a USB cable that carries data (not charge-only), and that nothing else has the port open.", classic: true };
+  if (/disconnect|device.*(lost|gone)|stream stopped|noise|corruption|break/.test(m))
+    return { title: "The connection dropped", body: "The board disconnected while flashing. Check the USB cable and port, then Retry. If it keeps happening, use the classic flasher below.", classic: true };
+  return { title: "Flashing didn't finish", body: raw + " Try again, or use the classic flasher below.", classic: true };
+}
 function showFlashError(t, msg, info) {
   info = info || {};
   const o = ensureOverlay();
   o.className = "flash-overlay state-err";
-  o.querySelector(".flash-title").textContent = "Flashing failed";
+  const mapped = mapFlashError(msg, info);
+  o.querySelector(".flash-title").textContent = mapped.title;
   o.querySelector(".flash-bar").style.display = "none";
-  let hint;
-  if (info.mismatch) {
-    hint = "  Pick the firmware that matches this board, or connect the right board.";
-  } else if (info.highBaud) {
-    hint = "  Higher speeds corrupt data on many USB adapters. Set Speed to Reliable (115200), or use the classic flasher below.";
-  } else {
-    hint = "  Make sure the board is in download mode (see Flashing help) and nothing else has the serial port open. Try again, or use the classic flasher below.";
-  }
-  setFlashStatus(msg + hint);
+  setFlashStatus(mapped.body);
+  setFlashHint("");
 
   const actions = o.querySelector(".flash-actions");
   actions.replaceChildren();
   actions.append(btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); flashProfile(t); } }));
-  if (!info.mismatch) actions.append(classicFlasherButton(t));
+  if (mapped.classic) actions.append(classicFlasherButton(t));
   actions.append(btnEl("button", "btn secondary", "Close", { onclick: closeFlash }));
 }
 
