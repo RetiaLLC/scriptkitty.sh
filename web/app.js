@@ -341,7 +341,9 @@ const NATIVE_USB = new Set(["esp32-s2", "esp32-s3"]);
 function resolveBaud(mcu) {
   const sel = baudSel ? baudSel.value : "auto";
   if (sel && sel !== "auto") return parseInt(sel, 10) || 115200;
-  return NATIVE_USB.has(mcu) ? 460800 : 115200;
+  // 460800 is hardware-verified fast + reliable on both the CH340 (ESP8266) and
+  // native-USB (ESP32-S2/S3) boards; 921600 is the CH340's ceiling and fails.
+  return 460800;
 }
 const BOOT_HELP = "hold the BOOT button, tap RESET once, then release BOOT (no RESET button? hold BOOT while plugging in USB, then release)";
 
