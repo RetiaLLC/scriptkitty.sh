@@ -44,18 +44,22 @@
         <button id="detect" class="btn detect" type="button" title="Connect and identify your board">🔌 Detect my board</button>
       </div>
 
+      <div class="speed-row">
+        <label class="ctl flash-speed">Flash speed
+          <select id="baud" title="Auto picks a safe fast speed for your board. Higher is faster but some USB adapters (e.g. CH340) can't sustain the top rates — if a flash fails, drop down a step.">
+            <option value="auto" selected>Auto (recommended)</option>
+            <option value="115200">115200 — most compatible</option>
+            <option value="230400">230400 — 2× faster</option>
+            <option value="460800">460800 — fastest reliable</option>
+            <option value="921600">921600 — rarely works</option>
+          </select>
+        </label>
+        <span id="speed-hint" class="speed-hint">Auto = 460800 for USB/Bluetooth Nugget &amp; Nibble, 115200 for WiFi Nugget &amp; Pusheen.</span>
+      </div>
+
       <details class="advanced">
         <summary>Advanced options &amp; help</summary>
         <div class="advanced-body">
-          <label class="ctl flash-speed">Speed
-            <select id="baud" title="Auto picks the safest fast speed for your board. 115200 is the most reliable; higher speeds only work on some USB adapters.">
-              <option value="auto" selected>Auto (recommended)</option>
-              <option value="115200">115200 — most reliable</option>
-              <option value="230400">230400</option>
-              <option value="460800">460800 — fast</option>
-              <option value="921600">921600 — native-USB boards only</option>
-            </select>
-          </label>
           <label class="ctl ctl-check" title="Wipe the whole chip before flashing — use when switching between very different firmware (e.g. CircuitPython → deauther)">
             <input type="checkbox" id="erase" /> Erase whole chip first
           </label>

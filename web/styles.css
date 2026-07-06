@@ -110,7 +110,13 @@ body {
 .help-block p { margin: .35rem 0; }
 .help-block b { color: var(--text); }
 .help-block a { color: var(--accent-2); }
-.flash-speed { font-size: .8rem; color: var(--muted); }
+.speed-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+.speed-hint { color: var(--muted); font-size: .78rem; font-family: var(--mono); }
+.flash-speed { font-size: .85rem; color: var(--text); display: inline-flex; align-items: center; gap: .5rem; }
+.flash-speed select {
+  background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: .4rem .6rem; font-family: var(--mono); font-size: .82rem;
+}
 .flash-speed select {
   background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);
   border-radius: 8px; padding: .3rem .5rem; font-family: var(--mono); font-size: .8rem;

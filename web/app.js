@@ -89,6 +89,9 @@ async function init() {
   buildFilters();
   searchEl.addEventListener("input", () => { query = searchEl.value.trim().toLowerCase(); render(); });
   detectBtn.addEventListener("click", detectBoard);
+  // remember the user's flash-speed choice across visits
+  try { const saved = localStorage.getItem("sk_baud"); if (saved && baudSel) baudSel.value = saved; } catch {}
+  if (baudSel) baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_baud", baudSel.value); } catch {} });
   render();
 }
 
