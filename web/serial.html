@@ -51,6 +51,7 @@
       </label>
       <label class="ctl ctl-check"><input type="checkbox" id="echo" checked /> Echo</label>
       <label class="ctl ctl-check"><input type="checkbox" id="timestamps" /> Timestamps</label>
+      <label class="ctl ctl-check" title="Reconnect automatically to a board you've already used (e.g. right after flashing)"><input type="checkbox" id="autoReconnect" checked /> Auto-reconnect</label>
       <button id="reset" class="btn secondary" disabled title="Reboot the board (DTR/RTS pulse)">Reset</button>
       <button id="clear" class="btn secondary">Clear</button>
       <button id="save" class="btn secondary" title="Download the entire session (never truncated)">Save log</button>
@@ -59,6 +60,8 @@
     </div>
 
     <div id="terminal" class="xterm-host"></div>
+
+    <div class="quick-send" id="quickSend" aria-label="Quick send commands"></div>
 
     <form id="sendForm" class="term-input" autocomplete="off">
       <input id="input" type="text" placeholder="Type a command, press Enter (↑/↓ for history)…" aria-label="Send to device" disabled />

@@ -294,10 +294,25 @@ esp-web-install-button[install-unsupported] { display: block; }
 }
 .term-status.ok { color: var(--accent); border-color: var(--accent); }
 .xterm-host {
-  flex: 1 1 auto; min-height: 0;
+  flex: 1 1 auto; min-height: 0; box-sizing: border-box;
   border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
-  background: #07090d; padding: .45rem .3rem .45rem .55rem;
+  background: #07090d; padding: 8px 6px 6px 8px;
 }
+.xterm-host .xterm { height: 100%; }
+
+/* quick-send macros + control keys */
+.quick-send { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; flex-shrink: 0; }
+.qs-label { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; margin-right: .1rem; }
+.qs-btn {
+  cursor: pointer; font-family: var(--sans); font-size: .78rem; font-weight: 600;
+  color: var(--accent); background: transparent; border: 1px solid var(--border);
+  border-radius: 7px; padding: .3rem .65rem;
+}
+.qs-btn:hover:not(:disabled) { border-color: var(--accent); }
+.qs-btn:disabled { opacity: .4; cursor: not-allowed; }
+.qs-ctrl { color: var(--accent-2); font-family: var(--mono); }
+.qs-sep { width: 1px; height: 1.3em; background: var(--border); margin: 0 .35rem; }
+
 .term-input { display: flex; gap: .55rem; flex-shrink: 0; }
 .term-input input {
   flex: 1; background: var(--bg-elev); color: var(--text);

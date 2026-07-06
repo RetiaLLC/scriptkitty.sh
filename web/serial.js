@@ -12,9 +12,26 @@ const clearBtn = document.getElementById("clear");
 const saveBtn = document.getElementById("save");
 const searchInput = document.getElementById("search");
 const statusEl = document.getElementById("status");
+const autoReconnectChk = document.getElementById("autoReconnect");
+const quickSendEl = document.getElementById("quickSend");
 const form = document.getElementById("sendForm");
 const inputEl = document.getElementById("input");
 const sendBtn = document.getElementById("send");
+
+// Quick-send macros — the WiFi Nugget commands from skickar/CatGotYourPassword
+// (Missoula Wi-Fi self-defense class). Each button sends the command as-is.
+const MACROS = [
+  { label: "Scan devices", cmd: "scan -ch 1-12 -t 60 -ct 5000" },
+  { label: "Probe reveal", cmd: "scan -m st -ch 1-12 -t 60 -ct 5000" },
+  { label: "Pineapple reveal", cmd: 'probe -ssid/s "Pineapple1","Pineapple2","Pineapple3","Pineapple4","Pineapple5","Pineapple6","Pineapple7","Pineapple8","Pineapple9","Pineapple10","Pineapple11","Pineapple12","Pineapple13","Pineapple14","Pineapple15","Pineapple16","Pineapple17","Pineapple18","Pineapple19","Pineapple20","Pineapple21","Pineapple22","Pineapple23","Pineapple24","Pineapple25","Pineapple26","Pineapple27","Pineapple28","Pineapple29","Pineapple30","Pineapple31","Pineapple32","Pineapple33","Pineapple34" -ch 6' },
+  { label: "Beacon swarm", cmd: 'beacon "A_Guest","Ace Hotel","Americas Best Value Inn","Amoeba - Guest","Budget Inn","CableWiFi","Camden","CenterWiFi","CityofLosAngelesGuest","CoffeeBeanWifi","Comfort Inn","Cricket-Guest","DHS_Guest","DaysInnOnline","Dennys_Guest_WIFI","FBI-SurveillanceVan","Google Starbucks","Guest","Guest T-Mobile","Guestnet","Hazelitas-guest","Hollywood Guest Inn","Hollywood Palms Inn & Suites","JWMarriott_GUEST","JWMarriott_LOBBY","Jacks_Guest","LAFILM Guest","LATTC-Visitor","LATimes-Guest","LAUSD-Guest","LAX-C guest","McDonalds Free WiFi","Moment Hotel","Netflix","Oh Ranger! Wi-Fi","PATH Wifi","Paulist-guest","Philz Coffee","Public Health Guest","Rodeway Inn","Roosevelt","SETUP","Saharan Motor Hotel","Sandhouse Wi-Fi","Staff","Starbucks WiFi","Stella Barra Guest","Students","Sunset 8 Motel","THEMELT","TWCWiFi","TWGuest","Tender Greens","URBAN_GUEST_WIFI","USC Guest Wireless","WHOPPERWIFI","WK-Guest","WL-GUEST","WLAN-GUEST","Wendys_Guest","WhopperWifi","WlanVPN","admin-guest","att-wifi","attwifi" -mon' },
+];
+// Control keys (raw bytes). Ctrl-C stops a running scan/beacon; Ctrl-D exits a REPL.
+const CTRL_KEYS = [
+  { label: "Ctrl-C", code: 3 },
+  { label: "Ctrl-D", code: 4 },
+  { label: "Esc", code: 27 },
+];
 
 let port = null;
 let reader = null;
@@ -56,10 +73,17 @@ const searchAddon = new SearchAddon.SearchAddon();
 term.loadAddon(fitAddon);
 term.loadAddon(searchAddon);
 term.open(document.getElementById("terminal"));
-fitAddon.fit();
-new ResizeObserver(() => { try { fitAddon.fit(); } catch {} }).observe(document.getElementById("terminal"));
-window.addEventListener("resize", () => { try { fitAddon.fit(); } catch {} });
+function refit() { try { fitAddon.fit(); } catch {} }
+// Fit now, next frame, and again after the monospace web font loads — fitting before
+// the font's metrics are known miscomputes row height and clips the top line.
+refit();
+requestAnimationFrame(refit);
+setTimeout(refit, 250);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
+new ResizeObserver(refit).observe(document.getElementById("terminal"));
+window.addEventListener("resize", refit);
 
+buildQuickSend();
 intro();
 
 // --- events ------------------------------------------------------------------
@@ -85,13 +109,27 @@ function nav(dir) {
 
 // --- serial ------------------------------------------------------------------
 async function connect() {
-  try { port = await navigator.serial.requestPort(); }
+  let p;
+  try { p = await navigator.serial.requestPort(); }
   catch { return; }
+  await openPort(p);
+}
+async function openPort(p) {
+  port = p;
   try { await port.open({ baudRate: parseInt(baudSel.value, 10), bufferSize: 8192 }); }
   catch (e) { writeLine(`Could not open port: ${e.message}`, "err"); port = null; return; }
   setConnected(true);
   writeLine(`Connected at ${baudSel.value} baud.`, "sys");
   readLoop();
+}
+// Reconnect without a prompt to a board already granted this session (e.g. right
+// after flashing on the Flash page, or when the same board is re-plugged in).
+async function tryAutoReconnect() {
+  if (!supported || port || !autoReconnectChk.checked) return;
+  try {
+    const ports = await navigator.serial.getPorts();
+    if (ports.length) { writeLine("Auto-reconnecting to a known board…", "sys"); await openPort(ports[0]); }
+  } catch { /* ignore */ }
 }
 
 async function readLoop() {
@@ -119,19 +157,50 @@ function onIncoming(text) {
 
 async function sendCommand() {
   const text = inputEl.value;
+  if (text) { history.push(text); histIdx = -1; }
+  inputEl.value = "";
+  await sendText(text);
+}
+async function sendText(text) {
   if (!port || !port.writable) return;
-  const payload = text + unescapeEnding(lineEndingSel.value);
   const writer = port.writable.getWriter();
   try {
-    await writer.write(new TextEncoder().encode(payload));
-    if (text) { history.push(text); histIdx = -1; }
+    await writer.write(new TextEncoder().encode(text + unescapeEnding(lineEndingSel.value)));
     if (echo.checked) writeLine(`» ${text}`, "in");
-    inputEl.value = "";
-  } catch (e) {
-    writeLine(`Write error: ${e.message}`, "err");
-  } finally {
-    writer.releaseLock();
+  } catch (e) { writeLine(`Write error: ${e.message}`, "err"); } finally { writer.releaseLock(); }
+}
+async function sendRaw(bytes, label) {
+  if (!port || !port.writable) return;
+  const writer = port.writable.getWriter();
+  try {
+    await writer.write(new Uint8Array(bytes));
+    if (echo.checked && label) writeLine(`» ${label}`, "in");
+  } catch (e) { writeLine(`Write error: ${e.message}`, "err"); } finally { writer.releaseLock(); }
+}
+function buildQuickSend() {
+  quickSendEl.replaceChildren();
+  const lbl = document.createElement("span");
+  lbl.className = "qs-label"; lbl.textContent = "Quick send:";
+  quickSendEl.append(lbl);
+  for (const m of MACROS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "qs-btn"; b.textContent = m.label; b.disabled = true;
+    b.title = m.cmd.length > 90 ? m.cmd.slice(0, 90) + "…" : m.cmd;
+    b.addEventListener("click", () => sendText(m.cmd));
+    quickSendEl.append(b);
   }
+  const sep = document.createElement("span");
+  sep.className = "qs-sep"; quickSendEl.append(sep);
+  for (const c of CTRL_KEYS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "qs-btn qs-ctrl"; b.textContent = c.label; b.disabled = true;
+    b.title = `Send ${c.label}`;
+    b.addEventListener("click", () => sendRaw([c.code], c.label));
+    quickSendEl.append(b);
+  }
+}
+function setQuickSendEnabled(on) {
+  quickSendEl.querySelectorAll("button").forEach((b) => (b.disabled = !on));
 }
 
 async function disconnect() {
@@ -200,6 +269,7 @@ function setConnected(on) {
   resetBtn.disabled = !on;
   inputEl.disabled = !on;
   sendBtn.disabled = !on;
+  setQuickSendEnabled(on);
   if (on) inputEl.focus();
 }
 function intro() {
@@ -207,6 +277,18 @@ function intro() {
   writeLine("Click Connect, choose your board's port, and go. Output is colorized; the whole session is saved (never truncated).", "sys");
 }
 
+// remember baud + auto-reconnect preference across visits
+try {
+  const b = localStorage.getItem("sk_serial_baud"); if (b) baudSel.value = b;
+  const ar = localStorage.getItem("sk_serial_autoreconnect"); if (ar !== null) autoReconnectChk.checked = ar === "1";
+} catch {}
+baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_serial_baud", baudSel.value); } catch {} });
+autoReconnectChk.addEventListener("change", () => { try { localStorage.setItem("sk_serial_autoreconnect", autoReconnectChk.checked ? "1" : "0"); } catch {} });
+
 if (supported) {
   navigator.serial.addEventListener("disconnect", (e) => { if (port && e.target === port) disconnect(); });
+  // reconnect when a previously-granted board is (re)plugged in
+  navigator.serial.addEventListener("connect", () => { tryAutoReconnect(); });
+  // and try once on load (covers the hand-off straight from flashing)
+  tryAutoReconnect();
 }
