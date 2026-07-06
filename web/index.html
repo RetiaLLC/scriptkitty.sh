@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>scriptkitty.sh — flash your board in the browser</title>
+  <meta name="description" content="Flash firmware to your board straight from the browser. No drivers, no CLI." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+  <script type="module" src="vendor/esp-web-tools/install-button.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">🐱</span>
+        <span class="brand-name">scriptkitty<span class="tld">.sh</span></span>
+      </div>
+      <p class="tagline">Flash your board straight from the browser — no drivers, no CLI.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="unsupported" class="banner banner-warn" hidden>
+      <strong>This browser can't talk to serial devices.</strong>
+      Web Serial is needed to flash. Open this page in <b>Chrome</b>, <b>Edge</b>, or
+      another Chromium browser on desktop. (RP2040 boards still work via the UF2
+      drag-and-drop flow below.)
+    </div>
+
+    <section id="targets" class="targets" aria-live="polite">
+      <div class="loading">Loading available targets…</div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>
+        Every firmware image published here is SHA-256 hashed and carries a GitHub
+        build-provenance attestation tying it to its source commit and toolchain.
+      </p>
+      <p class="muted">
+        Flasher powered by self-hosted
+        <a href="https://esphome.github.io/esp-web-tools/" rel="noopener">ESP Web Tools</a>.
+        Nothing is uploaded anywhere — flashing happens locally between your browser
+        and the board.
+      </p>
+    </div>
+  </footer>
+
+  <!-- card template -->
+  <template id="tpl-card">
+    <article class="card">
+      <div class="card-head">
+        <h2 class="card-name"></h2>
+        <span class="chip mcu"></span>
+      </div>
+      <dl class="meta">
+        <div><dt>Version</dt><dd class="version"></dd></div>
+        <div><dt>Flash via</dt><dd class="flow"></dd></div>
+      </dl>
+      <div class="card-action"></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

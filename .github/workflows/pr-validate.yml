@@ -1,0 +1,98 @@
+name: PR Validate
+
+# Runs on pull requests. Compiles changed CI-sourced firmware and validates every
+# changed Board Profile. Deliberately has NO access to Pages deploy tokens or the
+# id-token permission used for attestations - a malicious PR cannot publish or sign.
+on:
+  pull_request:
+    paths:
+      - "profiles/**"
+      - "projects/**"
+      - ".github/workflows/pr-validate.yml"
+      - "scripts/**"
+
+permissions:
+  contents: read          # nothing else. no pages:write, no id-token:write.
+
+concurrency:
+  group: pr-validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Figure out which profiles changed, and split them by binary_source so we
+  #    only compile what we author and only "check" what we fetch.
+  # ---------------------------------------------------------------------------
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      ci_matrix: ${{ steps.plan.outputs.ci_matrix }}
+      any_ci: ${{ steps.plan.outputs.any_ci }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # need history to diff against the base branch
+
+      - name: Validate all changed profiles (schema)
+        run: |
+          python3 -m pip install --quiet --break-system-packages pyyaml jsonschema
+          python3 scripts/validate_profiles.py --changed-against "origin/${{ github.base_ref }}"
+
+      - name: Build compile plan
+        id: plan
+        run: |
+          # Emits a JSON matrix of only the profiles with binary_source: ci.
+          python3 scripts/plan_builds.py \
+            --changed-against "origin/${{ github.base_ref }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # 2. Test-compile authored firmware. PlatformIO is primary; arduino-cli is the
+  #    fallback branch for the few Arduino-CLI projects. No artifacts are published.
+  # ---------------------------------------------------------------------------
+  compile:
+    needs: discover
+    if: needs.discover.outputs.any_ci == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.discover.outputs.ci_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('projects/**/platformio.ini') }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install toolchains
+        run: |
+          python3 -m pip install --quiet --break-system-packages platformio pyyaml
+          # arduino-cli only pulled if the project needs it (checked in build script)
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Compile (test only, no publish)
+        run: |
+          scripts/build_firmware.sh \
+            --profile "${{ matrix.project.profile }}" \
+            --project-dir "${{ matrix.project.dir }}" \
+            --out-dir "/tmp/build-check" \
+            --check-only
+
+      - name: Confirm a flashable artifact was produced
+        run: |
+          # merge_bin for ESP32 happens inside build_firmware.sh; here we just assert
+          # the expected output exists so a silently-empty build fails the PR.
+          test -s "/tmp/build-check/${{ matrix.project.profile }}.bin" \
+            || test -s "/tmp/build-check/${{ matrix.project.profile }}.uf2" \
+            || { echo "::error::No flashable binary produced for ${{ matrix.project.profile }}"; exit 1; }

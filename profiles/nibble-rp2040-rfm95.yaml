@@ -1,0 +1,23 @@
+id: nibble-rp2040-rfm95
+display_name: Nibble (RP2040)
+product_line: nibble
+mcu: rp2040
+version: "2.6.2"
+
+radio: rfm95
+
+flash:
+  format: uf2        # UF2 carries its own addressing; no merge_bin
+
+recovery:
+  boot_button_label: "BOOTSEL"
+  bootloader_entry: bootsel-hold
+  serial_trigger: touch-1200    # attempt only; site falls back to bootsel-hold
+
+provenance:
+  binary_source: release
+  release:
+    repo: nsgodshall/retia-boards
+    tag: v2.6.2-nibble
+    asset_pattern: "firmware-nibble-{mcu}-*.uf2"
+    expected_sha256: ""          # pin this in production for a hard integrity check

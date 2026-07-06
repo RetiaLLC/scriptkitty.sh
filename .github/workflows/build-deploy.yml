@@ -1,0 +1,223 @@
+name: Build & Deploy
+
+# Runs on merge to main and on a weekly schedule (freshness). This is the ONLY
+# workflow that holds deploy + attestation privileges. It:
+#   ci      profiles -> compile with PlatformIO / arduino-cli, merge_bin for ESP32
+#   release profiles -> fetch the published Meshtastic artifact, do not rebuild
+#   static  profiles -> pass through the committed binary (exception-only)
+# then hashes every artifact, attests it, regenerates manifests, and publishes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "profiles/**"
+      - "projects/**"
+      - "scripts/**"
+      - "web/**"
+      - ".github/workflows/build-deploy.yml"
+  schedule:
+    - cron: "0 6 * * 1"      # Mondays 06:00 UTC - catch upstream/toolchain drift
+  workflow_dispatch:
+    inputs:
+      rebuild_all:
+        description: "Rebuild every profile, not just changed ones"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write            # publish to GitHub Pages
+  id-token: write         # required for Pages deploy AND for build attestations
+  attestations: write     # provenance attestations on each binary
+
+concurrency:
+  group: build-deploy
+  cancel-in-progress: false   # never cancel a half-finished publish
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      ci_matrix: ${{ steps.plan.outputs.ci_matrix }}
+      release_matrix: ${{ steps.plan.outputs.release_matrix }}
+      any_ci: ${{ steps.plan.outputs.any_ci }}
+      any_release: ${{ steps.plan.outputs.any_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m pip install --quiet --break-system-packages pyyaml jsonschema
+      - name: Validate profiles
+        run: python3 scripts/validate_profiles.py --all
+      - name: Plan
+        id: plan
+        run: |
+          # On schedule or manual rebuild_all, plan every profile; otherwise only changed.
+          SCOPE="--changed-against origin/main~1"
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.rebuild_all }}" = "true" ]; then
+            SCOPE="--all"
+          fi
+          python3 scripts/plan_builds.py $SCOPE --split-sources --github-output "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Compile authored firmware. Each job uploads its hashed, attested binary as a
+  # workflow artifact for the assemble job to collect.
+  # ---------------------------------------------------------------------------
+  compile-ci:
+    needs: discover
+    if: needs.discover.outputs.any_ci == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.discover.outputs.ci_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('projects/**/platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install toolchains
+        run: |
+          python3 -m pip install --quiet --break-system-packages platformio pyyaml
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$HOME/.local/bin" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build (+ esptool merge_bin for ESP32)
+        run: |
+          scripts/build_firmware.sh \
+            --profile "${{ matrix.project.profile }}" \
+            --project-dir "${{ matrix.project.dir }}" \
+            --out-dir "dist"
+
+      - name: Hash
+        run: |
+          cd dist
+          for f in *; do sha256sum "$f" > "$f.sha256"; done
+
+      - name: Attest provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "dist/${{ matrix.project.profile }}.*"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fw-${{ matrix.project.profile }}
+          path: dist/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Fetch Meshtastic release artifacts. We do NOT rebuild upstream Meshtastic;
+  # we pull the pinned release asset, verify it, hash it, and attest what we pulled.
+  # ---------------------------------------------------------------------------
+  fetch-release:
+    needs: discover
+    if: needs.discover.outputs.any_release == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.discover.outputs.release_matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m pip install --quiet --break-system-packages pyyaml requests
+
+      - name: Fetch pinned release asset
+        env:
+          GH_TOKEN: ${{ github.token }}   # read-only; used for GitHub release API rate limits
+        run: |
+          python3 scripts/fetch_release.py \
+            --profile "${{ matrix.project.profile }}" \
+            --out-dir "dist"
+
+      - name: Hash
+        run: |
+          cd dist
+          for f in *.bin *.uf2; do [ -e "$f" ] && sha256sum "$f" > "$f.sha256"; done
+
+      - name: Attest what we fetched
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "dist/${{ matrix.project.profile }}.*"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fw-${{ matrix.project.profile }}
+          path: dist/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Collect every firmware artifact, generate ESP Web Tools manifests from the
+  # profiles, assemble the static site tree, and deploy to Pages.
+  # ---------------------------------------------------------------------------
+  assemble-deploy:
+    needs: [discover, compile-ci, fetch-release]
+    # run even if one of the build jobs was skipped (e.g. only release changed)
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m pip install --quiet --break-system-packages pyyaml
+
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fw-*
+          path: _fw
+          merge-multiple: true
+
+      - name: Assemble site tree
+        run: |
+          # site/ = static app (checked in) + firmware/ + manifests/
+          mkdir -p site
+          cp -r web/* site/ 2>/dev/null || true      # your static app (flash/terminal/etc.)
+          mkdir -p site/firmware
+          # Only overwrite firmware that was rebuilt this run; leave the rest intact
+          # by first restoring the currently-published tree, then layering new builds.
+          if [ -d _fw ]; then
+            find _fw -type f \( -name '*.bin' -o -name '*.uf2' -o -name '*.sha256' \) -print0 \
+              | while IFS= read -r -d '' f; do
+                  base="$(basename "$f")"
+                  cp "$f" "site/firmware/$base"
+                done
+          fi
+
+      - name: Generate ESP Web Tools manifests from profiles
+        run: |
+          python3 scripts/generate_manifests.py \
+            --profiles-dir profiles \
+            --firmware-dir site/firmware \
+            --out-dir site/manifests
+
+      - name: Bundle self-hosted ESP Web Tools (no runtime CDN)
+        run: |
+          # esp-web-tools is vendored under web/vendor and version-pinned; this just
+          # asserts it is present so we never silently fall back to a CDN.
+          test -f site/vendor/esp-web-tools/install-button.js \
+            || { echo "::error::Vendored ESP Web Tools missing"; exit 1; }
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4

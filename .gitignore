@@ -1,0 +1,18 @@
+# build + deploy artifacts (produced by CI, never committed)
+dist/
+site/
+_fw/
+web/firmware/
+web/manifests/
+
+# PlatformIO / toolchain
+.pio/
+.platformio/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# os cruft
+.DS_Store

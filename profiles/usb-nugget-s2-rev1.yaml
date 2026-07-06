@@ -1,0 +1,32 @@
+id: usb-nugget-s2-rev1
+display_name: USB Nugget
+product_line: usb-nugget
+mcu: esp32-s2
+version: "1.0.0"
+
+usb:
+  native_cdc: true
+
+flash:
+  size: 4MB
+  mode: dio
+  frequency: 40m
+  bootloader_offset: 0x1000
+  partitions_offset: 0x8000
+  app_offset: 0x10000
+
+features:
+  oled: sh1106-128x64
+
+recovery:
+  boot_button_label: "BOOT"
+  reset_button_label: "RESET"
+  bootloader_entry: gpio0-hold
+
+build:
+  system: platformio
+  environment: usb_nugget
+  project_dir: projects/usb-nugget/badusb
+
+provenance:
+  binary_source: ci
