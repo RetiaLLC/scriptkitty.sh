@@ -332,11 +332,10 @@ function clearDetection(rerender) {
 }
 
 // --- flashing via vendored esptool-js ----------------------------------------
-async function flashProfile(t, opts) {
+async function flashProfile(t) {
   if (!HAS_SERIAL) return;
-  opts = opts || {};
-  const baud = opts.baud || parseInt(baudSel.value, 10) || 230400;
-  const eraseAll = opts.erase != null ? opts.erase : !!(eraseChk && eraseChk.checked);
+  const baud = parseInt(baudSel.value, 10) || 115200;
+  const eraseAll = !!(eraseChk && eraseChk.checked);
 
   let mod;
   try { mod = await loadEsptool(); }
@@ -377,16 +376,11 @@ async function flashProfile(t, opts) {
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     try { await transport.disconnect(); } catch {}
-    // High baud over Web Serial can corrupt data on some USB adapters and esptool-js
-    // doesn't retry a bad block. If a write (not a chip mismatch) failed above 115200,
-    // automatically retry the whole flash at the reliable 115200 rate.
-    const writeFail = !e.mismatch && /flash|status|seq|timeout|write|packet|slip/i.test(msg);
-    if (writeFail && baud > 115200 && !opts.fellBack) {
-      setFlashStatus(`Speed ${baud} failed mid-write — retrying at the reliable 115200 rate…`);
-      await new Promise((r) => setTimeout(r, 600));
-      return flashProfile(t, { baud: 115200, erase: eraseAll, fellBack: true });
-    }
-    showFlashError(t, msg, opts.fellBack);
+    // A failed attempt can leave the granted port's streams in a bad state; drop the
+    // reference so a retry (or the classic flasher) acquires a clean port rather than
+    // reusing this one (which caused the "serial data stream stopped" failures).
+    grantedPort = null;
+    showFlashError(t, msg, { highBaud: baud > 115200, mismatch: !!e.mismatch });
     return;
   }
   try { await transport.disconnect(); } catch {}
@@ -441,20 +435,47 @@ function showFlashSuccess(t) {
     btnEl("button", "btn secondary", "Done", { onclick: closeFlash }),
   );
 }
-function showFlashError(t, msg, fellBack) {
+function showFlashError(t, msg, info) {
+  info = info || {};
   const o = ensureOverlay();
   o.className = "flash-overlay state-err";
   o.querySelector(".flash-title").textContent = "Flashing failed";
   o.querySelector(".flash-bar").style.display = "none";
-  const hint = fellBack
-    ? "  This failed even at the reliable 115200 speed — make sure the board is in download mode (see Flashing help) and nothing else has the serial port open, then retry."
-    : "  Make sure the board is in download mode (see Flashing help) and nothing else has the serial port open, then retry.";
+  let hint;
+  if (info.mismatch) {
+    hint = "  Pick the firmware that matches this board, or connect the right board.";
+  } else if (info.highBaud) {
+    hint = "  Higher speeds corrupt data on many USB adapters. Set Speed to Reliable (115200), or use the classic flasher below.";
+  } else {
+    hint = "  Make sure the board is in download mode (see Flashing help) and nothing else has the serial port open. Try again, or use the classic flasher below.";
+  }
   setFlashStatus(msg + hint);
+
   const actions = o.querySelector(".flash-actions");
-  actions.replaceChildren(
-    btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); flashProfile(t); } }),
-    btnEl("button", "btn secondary", "Close", { onclick: closeFlash }),
-  );
+  actions.replaceChildren();
+  actions.append(btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); flashProfile(t); } }));
+  if (!info.mismatch) actions.append(classicFlasherButton(t));
+  actions.append(btnEl("button", "btn secondary", "Close", { onclick: closeFlash }));
+}
+
+// The ESP Web Tools "classic flasher" fallback: battle-tested at 115200 over Web
+// Serial. Rendered as a real <esp-web-install-button> so its dialog manages its own
+// fresh port; we just close our overlay when it launches.
+function classicFlasherButton(t) {
+  const ewt = document.createElement("esp-web-install-button");
+  ewt.setAttribute("manifest", `manifests/${t.manifest}`);
+  const act = document.createElement("button");
+  act.setAttribute("slot", "activate");
+  act.className = "btn secondary";
+  act.textContent = "Use classic flasher";
+  act.addEventListener("click", closeFlash);
+  ewt.append(act);
+  const unsupported = document.createElement("span");
+  unsupported.setAttribute("slot", "unsupported");
+  unsupported.className = "unsupported-note";
+  unsupported.textContent = "Chrome or Edge required";
+  ewt.append(unsupported);
+  return ewt;
 }
 function closeFlash() { if (overlayEl) overlayEl.hidden = true; }
 function btnEl(tag, cls, text, opts) {

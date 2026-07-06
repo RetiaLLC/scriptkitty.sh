@@ -7,6 +7,8 @@
   <meta name="description" content="Search and flash firmware for the Nugget & Nibble line straight from the browser. No drivers, no CLI." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- classic-flasher fallback engine (offered when the primary esptool-js flash fails) -->
+  <script type="module" src="vendor/esp-web-tools/install-button.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -45,10 +47,10 @@
       <div class="flash-options">
         <span class="opt-label">Flash options</span>
         <label class="ctl flash-speed">Speed
-          <select id="baud" title="Flash speed over USB. Higher is faster but less reliable on some adapters; if a flash fails it automatically retries at a safe speed.">
-            <option value="230400" selected>Fast (230400)</option>
-            <option value="115200">Reliable (115200)</option>
-            <option value="460800">Faster (460800 — may fail over USB)</option>
+          <select id="baud" title="Flash speed over USB. 115200 is the reliable default; higher is faster but many USB adapters (e.g. CH340) corrupt data above it. Try faster only if your board flashes cleanly.">
+            <option value="115200" selected>Reliable (115200)</option>
+            <option value="230400">Faster (230400)</option>
+            <option value="460800">Fast (460800 — may fail over USB)</option>
             <option value="921600">Fastest (921600 — usually fails)</option>
           </select>
         </label>
