@@ -1,7 +1,7 @@
 // Searchable "all downloads" catalog. Reads manifests/index.json (generated in CI by
 // scripts/generate_manifests.py). Manual device picker + optional auto-detect (reads the
 // chip over Web Serial via vendored esptool-js), Recommended badges, add-ons, per-device
-// flashing help, and flashing via the vendored ESP Web Tools button.
+// flashing help, and flashing via vendored esptool-js (fast baud, single 0x0 image).
 
 const targetsEl = document.getElementById("targets");
 const searchEl = document.getElementById("search");
@@ -9,6 +9,8 @@ const filtersEl = document.getElementById("filters");
 const countEl = document.getElementById("count");
 const detectBtn = document.getElementById("detect");
 const detectedEl = document.getElementById("detected");
+const baudSel = document.getElementById("baud");
+const eraseChk = document.getElementById("erase");
 const tpl = document.getElementById("tpl-card");
 
 const HAS_SERIAL = "serial" in navigator;
@@ -53,6 +55,21 @@ let ALL = [];
 let activeLine = "all";
 let query = "";
 let detectedMcu = null;
+
+// esptool-js is vendored and dynamic-imported once, shared by detect + flash.
+let _esptool = null;
+function loadEsptool() {
+  if (!_esptool) _esptool = import("./vendor/esptool-js/bundle.js");
+  return _esptool;
+}
+// A port the user has already granted this session — reuse it so Detect→Flash
+// (or repeat flashes) don't re-prompt the browser port picker.
+let grantedPort = null;
+async function acquirePort() {
+  if (grantedPort) return grantedPort;
+  grantedPort = await navigator.serial.requestPort();
+  return grantedPort;
+}
 
 init();
 
@@ -193,17 +210,16 @@ function renderCard(t) {
 }
 
 function renderEsp(actionEl, t) {
-  const btn = document.createElement("esp-web-install-button");
-  btn.setAttribute("manifest", `manifests/${t.manifest}`);
-  const activate = document.createElement("button");
-  activate.setAttribute("slot", "activate");
-  activate.textContent = "Flash";
-  btn.append(activate);
-  const unsupported = document.createElement("span");
-  unsupported.setAttribute("slot", "unsupported");
-  unsupported.className = "unsupported-note";
-  unsupported.textContent = "Chrome or Edge required";
-  btn.append(unsupported);
+  const btn = document.createElement("button");
+  btn.className = "btn";
+  btn.type = "button";
+  if (HAS_SERIAL) {
+    btn.textContent = "Flash";
+    btn.addEventListener("click", () => flashProfile(t));
+  } else {
+    btn.textContent = "Chrome or Edge required";
+    btn.disabled = true;
+  }
   actionEl.append(btn);
 }
 
@@ -228,7 +244,7 @@ async function detectBoard() {
   showDetected("Loading detector…", "busy");
   let mod;
   try {
-    mod = await import("./vendor/esptool-js/bundle.js");
+    mod = await loadEsptool();
   } catch (e) {
     showDetected("Couldn't load the detector.", "err");
     return;
@@ -237,7 +253,7 @@ async function detectBoard() {
 
   let port;
   try {
-    port = await navigator.serial.requestPort();
+    port = await acquirePort();
   } catch {
     hideDetected(); // user dismissed the port picker
     return;
@@ -313,6 +329,125 @@ function clearDetection(rerender) {
   hideDetected();
   syncFilterButtons();
   if (rerender) render();
+}
+
+// --- flashing via vendored esptool-js ----------------------------------------
+async function flashProfile(t) {
+  if (!HAS_SERIAL) return;
+  const baud = parseInt(baudSel.value, 10) || 460800;
+
+  let mod;
+  try { mod = await loadEsptool(); }
+  catch { openFlash(t); showFlashError(t, "Couldn't load the flasher."); return; }
+  const { ESPLoader, Transport } = mod;
+
+  let port;
+  try { port = await acquirePort(); }
+  catch { return; } // user dismissed the port picker
+
+  openFlash(t);
+  const term = { clean() {}, writeLine(d) { setFlashStatus(String(d)); }, write(d) {} };
+  const transport = new Transport(port, false);
+  const loader = new ESPLoader({ transport, baudrate: baud, romBaudrate: 115200, terminal: term, debugLogging: false });
+  try {
+    setFlashStatus("Connecting to board…");
+    const chipName = await loader.main();
+    const mcu = mapChip(chipName);
+    if (mcu && mcu !== t.mcu) {
+      throw new Error(`This board is ${chipName}, but "${t.name}" is built for ${MCU_LABEL[t.mcu] || t.mcu}.`);
+    }
+    setFlashStatus("Downloading firmware…");
+    const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
+    if (!resp.ok) throw new Error(`Couldn't fetch firmware (HTTP ${resp.status}).`);
+    const data = loader.ui8ToBstr(new Uint8Array(await resp.arrayBuffer()));
+    const eraseAll = !!(eraseChk && eraseChk.checked);
+    if (eraseAll) setFlashStatus("Erasing flash…");
+    setFlashStatus(`Writing at ${baud} baud…`);
+    await loader.writeFlash({
+      fileArray: [{ data, address: 0 }],
+      flashSize: "keep", flashMode: "keep", flashFreq: "keep",
+      eraseAll, compress: true,
+      reportProgress: (i, written, total) => setFlashProgress(written, total),
+    });
+    setFlashStatus("Rebooting…");
+    await loader.after("hard_reset");
+    showFlashSuccess(t);
+  } catch (e) {
+    showFlashError(t, e && e.message ? e.message : String(e));
+  } finally {
+    try { await transport.disconnect(); } catch {}
+  }
+}
+
+let overlayEl = null;
+function ensureOverlay() {
+  if (overlayEl) return overlayEl;
+  overlayEl = document.createElement("div");
+  overlayEl.className = "flash-overlay";
+  overlayEl.hidden = true;
+  overlayEl.innerHTML =
+    `<div class="flash-modal" role="dialog" aria-modal="true">
+       <h3 class="flash-title"></h3>
+       <div class="flash-bar"><div class="flash-bar-fill"></div></div>
+       <div class="flash-pct"></div>
+       <div class="flash-status"></div>
+       <div class="flash-actions"></div>
+     </div>`;
+  document.body.append(overlayEl);
+  return overlayEl;
+}
+function openFlash(t) {
+  const o = ensureOverlay();
+  o.hidden = false;
+  o.className = "flash-overlay state-flashing";
+  o.querySelector(".flash-title").textContent = `Flashing ${t.name}`;
+  o.querySelector(".flash-bar").style.display = "";
+  o.querySelector(".flash-actions").replaceChildren();
+  setFlashProgress(0, 1);
+  setFlashStatus("");
+}
+function setFlashStatus(text) { ensureOverlay().querySelector(".flash-status").textContent = text; }
+function setFlashProgress(written, total) {
+  const o = ensureOverlay();
+  const pct = total ? Math.round((written / total) * 100) : 0;
+  o.querySelector(".flash-bar-fill").style.width = pct + "%";
+  o.querySelector(".flash-pct").textContent = pct + "%";
+}
+function showFlashSuccess(t) {
+  const o = ensureOverlay();
+  o.className = "flash-overlay state-ok";
+  o.querySelector(".flash-title").textContent = `✓ Flashed ${t.name}`;
+  setFlashProgress(1, 1);
+  setFlashStatus("Your board rebooted into the new firmware.");
+  const actions = o.querySelector(".flash-actions");
+  actions.replaceChildren(
+    btnEl("a", "btn", "Open Serial Monitor", { href: "serial.html" }),
+    btnEl("button", "btn secondary", "Flash another board", { onclick: () => {
+      grantedPort = null; closeFlash(); clearDetection(true); window.scrollTo({ top: 0, behavior: "smooth" });
+    } }),
+    btnEl("button", "btn secondary", "Done", { onclick: closeFlash }),
+  );
+}
+function showFlashError(t, msg) {
+  const o = ensureOverlay();
+  o.className = "flash-overlay state-err";
+  o.querySelector(".flash-title").textContent = "Flashing failed";
+  o.querySelector(".flash-bar").style.display = "none";
+  setFlashStatus(`${msg}  If this keeps happening, lower the Speed setting and make sure the board is in download mode (see Flashing help), then retry.`);
+  const actions = o.querySelector(".flash-actions");
+  actions.replaceChildren(
+    btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); flashProfile(t); } }),
+    btnEl("button", "btn secondary", "Close", { onclick: closeFlash }),
+  );
+}
+function closeFlash() { if (overlayEl) overlayEl.hidden = true; }
+function btnEl(tag, cls, text, opts) {
+  const n = document.createElement(tag);
+  n.className = cls; n.textContent = text;
+  if (tag === "button") n.type = "button";
+  if (opts && opts.href) n.href = opts.href;
+  if (opts && opts.onclick) n.addEventListener("click", opts.onclick);
+  return n;
 }
 
 // --- helpers -----------------------------------------------------------------

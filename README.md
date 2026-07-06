@@ -11,7 +11,7 @@ served at the default `https://<owner>.github.io/<repo>/` Pages URL.
 
 ```
 web/                     static app served at the site root (index.html + assets)
-  vendor/esp-web-tools/  vendored ESP Web Tools 10.2.1 (no runtime CDN)
+  vendor/esptool-js/     vendored esptool-js 0.6.0 (detect + flash, no runtime CDN)
 profiles/                one Board Profile per flashable target (23 at launch)
 firmware/                prebuilt 0x0 images for static profiles (imported from nugget.dev)
 scripts/                 build/validate/plan/fetch/manifest helpers
@@ -101,8 +101,9 @@ python3 -m http.server -d web 8000   # then open http://localhost:8000/
 3. **Custom domain:** once live, set Settings -> Pages -> Custom domain to
    `scriptkitty.sh`, add the DNS records GitHub shows (apex `A`/`AAAA` or a `CNAME`
    for a subdomain), and commit the generated `web/CNAME` so redeploys keep it.
-4. **Vendor ESP Web Tools** is already done (`web/vendor/esp-web-tools/`, pinned
-   10.2.1). The deploy job hard-fails if it goes missing, by design.
+4. **Vendor esptool-js** is already done (`web/vendor/esptool-js/`, pinned 0.6.0) — it
+   powers both "Detect my board" and flashing (single 0x0 image, fast baud by default
+   with a speed selector + optional erase). The deploy job hard-fails if it goes missing.
 5. **Pin `expected_sha256`** in each `release` profile once you know the asset hash,
    turning a moved/retagged upstream asset into a hard failure instead of a silent
    swap.

@@ -213,12 +213,13 @@ jobs:
             --firmware-dir site/firmware \
             --out-dir site/manifests
 
-      - name: Bundle self-hosted ESP Web Tools (no runtime CDN)
+      - name: Assert self-hosted flasher present (no runtime CDN)
         run: |
-          # esp-web-tools is vendored under web/vendor and version-pinned; this just
-          # asserts it is present so we never silently fall back to a CDN.
-          test -f site/vendor/esp-web-tools/install-button.js \
-            || { echo "::error::Vendored ESP Web Tools missing"; exit 1; }
+          # esptool-js is vendored under web/vendor and version-pinned; it powers both
+          # "Detect my board" and flashing. Assert it is present so we never silently
+          # fall back to a CDN.
+          test -f site/vendor/esptool-js/bundle.js \
+            || { echo "::error::Vendored esptool-js missing"; exit 1; }
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

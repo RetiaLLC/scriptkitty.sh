@@ -82,7 +82,7 @@ def main() -> int:
                 print(f"::warning::{pid}: no {b} present, skipping manifest")
                 continue
             doc = esp_manifest(profile, f"../firmware/{b}")
-            flow = "esp-web-tools"
+            flow = "esp-serial"
         else:
             print(f"::error::{pid}: unknown mcu '{mcu}'")
             return 1

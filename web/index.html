@@ -7,7 +7,6 @@
   <meta name="description" content="Search and flash firmware for the Nugget & Nibble line straight from the browser. No drivers, no CLI." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
-  <script type="module" src="vendor/esp-web-tools/install-button.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +39,17 @@
       <div class="picker">
         <div class="picker-label">Choose your device</div>
         <div id="filters" class="filters" role="tablist" aria-label="Filter by product"></div>
+        <label class="ctl flash-speed">Speed
+          <select id="baud" title="Flashing speed — drop to a slower rate if a flash fails">
+            <option value="460800" selected>Fast (460800)</option>
+            <option value="230400">Medium (230400)</option>
+            <option value="115200">Safe (115200)</option>
+            <option value="921600">Fastest (921600 — may fail)</option>
+          </select>
+        </label>
+        <label class="ctl ctl-check" title="Wipe the whole chip before flashing — use when switching between very different firmware (e.g. CircuitPython → deauther)">
+          <input type="checkbox" id="erase" /> Erase first
+        </label>
         <button id="detect" class="btn detect" type="button" title="Connect and identify your board">🔌 Detect my board</button>
       </div>
 
@@ -61,7 +71,7 @@
       </p>
       <p class="muted">
         Flasher powered by self-hosted
-        <a href="https://esphome.github.io/esp-web-tools/" rel="noopener">ESP Web Tools</a>.
+        <a href="https://github.com/espressif/esptool-js" rel="noopener">esptool-js</a>.
         Nothing is uploaded — flashing happens locally between your browser and the board.
         Need the console? Open the <a href="serial.html">Serial Monitor</a>.
         Made by <a href="https://retia.io" target="_blank" rel="noopener">Retia LLC</a>.
