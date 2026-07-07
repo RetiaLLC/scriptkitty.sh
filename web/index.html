@@ -79,6 +79,25 @@
     <div id="targets" aria-live="polite">
       <div class="loading">Loading firmware library…</div>
     </div>
+
+    <section class="custom-flash" aria-label="Flash your own firmware">
+      <div class="cf-head"><h2>Flash your own firmware</h2><span class="chip">.bin</span></div>
+      <p class="cf-desc">Have a compiled <code>.bin</code>? Drop it here to flash it to any connected ESP board. Uses the speed setting above.</p>
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="customFile" accept=".bin,application/octet-stream" hidden />
+        <span id="dropText">Drop a <b>.bin</b> here, or click to choose a file</span>
+      </label>
+      <div class="cf-foot">
+        <details class="cf-adv">
+          <summary>Advanced</summary>
+          <label class="ctl">Flash offset
+            <input id="customOffset" class="cf-offset" value="0x0" spellcheck="false" inputmode="text" />
+          </label>
+          <span class="cf-hint">Leave at <code>0x0</code> for a full/merged image; use a specific offset only for a partial image (e.g. an app-only build).</span>
+        </details>
+        <button id="customFlash" class="btn" type="button" disabled>Flash .bin</button>
+      </div>
+    </section>
   </main>
 
   <footer class="site-footer">

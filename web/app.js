@@ -92,6 +92,7 @@ async function init() {
   // remember the user's flash-speed choice across visits
   try { const saved = localStorage.getItem("sk_baud"); if (saved && baudSel) baudSel.value = saved; } catch {}
   if (baudSel) baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_baud", baudSel.value); } catch {} });
+  setupCustomFlash();
   render();
 }
 
@@ -347,18 +348,41 @@ function resolveBaud(mcu) {
 }
 const BOOT_HELP = "hold the BOOT button, tap RESET once, then release BOOT (no RESET button? hold BOOT while plugging in USB, then release)";
 
-async function flashProfile(t) {
+// Flash a catalog profile: fetch its bin and run the shared flasher.
+function flashProfile(t) {
+  return flashImage({
+    name: t.name, manifest: t.manifest, expectMcu: t.mcu, offset: 0,
+    loadData: async () => {
+      const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
+      if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
+      return new Uint8Array(await resp.arrayBuffer());
+    },
+    retry: () => flashProfile(t),
+  });
+}
+// Flash a user-supplied .bin at a chosen offset (no chip lock-in — it's their file).
+function flashCustom(file, offset) {
+  return flashImage({
+    name: file.name, manifest: null, expectMcu: null, offset: offset || 0,
+    loadData: async () => new Uint8Array(await file.arrayBuffer()),
+    retry: () => flashCustom(file, offset),
+  });
+}
+
+// Shared esptool-js flash flow used by both the catalog and the custom-.bin path.
+// ctx: { name, manifest, expectMcu, offset, loadData(): Promise<Uint8Array>, retry() }
+async function flashImage(ctx) {
   if (!HAS_SERIAL) return;
-  const baud = resolveBaud(t.mcu);
+  const baud = resolveBaud(ctx.expectMcu);
   const eraseAll = !!(eraseChk && eraseChk.checked);
 
   let mod;
   try { mod = await loadEsptool(); }
-  catch { openFlash(t); showFlashError(t, "Couldn't load the flasher.", {}); return; }
+  catch { openFlash(ctx); showFlashError(ctx, "Couldn't load the flasher.", {}); return; }
   const { ESPLoader, Transport } = mod;
 
-  openFlash(t);
-  if (NATIVE_USB.has(t.mcu)) setFlashHint(`If your board won't connect, put it in install mode: ${BOOT_HELP}.`);
+  openFlash(ctx);
+  if (NATIVE_USB.has(ctx.expectMcu)) setFlashHint(`If your board won't connect, put it in install mode: ${BOOT_HELP}.`);
 
   let port;
   try { port = await acquirePort(); }
@@ -375,22 +399,19 @@ async function flashProfile(t) {
     setFlashStatus("Connecting to your board…");
     const chipName = await loader.main();
     const mcu = mapChip(chipName);
-    if (mcu && mcu !== t.mcu) {
-      const err = new Error(`This board is a ${chipName}, but “${t.name}” is built for ${MCU_LABEL[t.mcu] || t.mcu}.`);
+    if (ctx.expectMcu && mcu && mcu !== ctx.expectMcu) {
+      const err = new Error(`This board is a ${chipName}, but “${ctx.name}” is built for ${MCU_LABEL[ctx.expectMcu] || ctx.expectMcu}.`);
       err.mismatch = true;
       throw err;
     }
     setFlashHint("Keep this tab open and don't unplug the board until it says Done.");
-    setFlashStatus("Downloading firmware…");
-    const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
-    if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
-    // esptool-js 0.6.0 requires the flash data as a Uint8Array. Passing a binary
-    // string (the old ui8ToBstr form) mis-encodes and fails deterministically
-    // mid-write with "status 201,0" on ARM64/macOS — see esptool-js issue #233.
-    const data = new Uint8Array(await resp.arrayBuffer());
+    setFlashStatus(ctx.expectMcu ? "Downloading firmware…" : `Detected ${chipName || "chip"}. Loading your file…`);
+    // esptool-js 0.6.0 requires the flash data as a Uint8Array (issue #233).
+    const data = await ctx.loadData();
+    if (!data || !data.length) throw new Error("The firmware file is empty.");
     if (eraseAll) setFlashStatus("Erasing the whole chip…");
     await loader.writeFlash({
-      fileArray: [{ data, address: 0 }],
+      fileArray: [{ data, address: ctx.offset || 0 }],
       flashSize: "keep", flashMode: "keep", flashFreq: "keep",
       eraseAll, compress: true,
       reportProgress: (i, written, total) => {
@@ -400,14 +421,14 @@ async function flashProfile(t) {
     });
     setFlashStatus("Finishing up…");
     await loader.after("hard_reset");
-    showFlashSuccess(t);
+    showFlashSuccess(ctx);
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     try { await transport.disconnect(); } catch {}
     // A failed attempt can leave the port's streams in a bad state; drop the reference
     // so a retry (or the classic flasher) acquires a clean port instead of reusing it.
     grantedPort = null;
-    showFlashError(t, msg, { mismatch: !!e.mismatch, mcu: t.mcu });
+    showFlashError(ctx, msg, { mismatch: !!e.mismatch, mcu: ctx.expectMcu });
     return;
   }
   try { await transport.disconnect(); } catch {}
@@ -431,11 +452,11 @@ function ensureOverlay() {
   document.body.append(overlayEl);
   return overlayEl;
 }
-function openFlash(t) {
+function openFlash(ctx) {
   const o = ensureOverlay();
   o.hidden = false;
   o.className = "flash-overlay state-flashing";
-  o.querySelector(".flash-title").textContent = `Flashing ${t.name}`;
+  o.querySelector(".flash-title").textContent = `Flashing ${ctx.name}`;
   o.querySelector(".flash-bar").style.display = "";
   o.querySelector(".flash-actions").replaceChildren();
   setFlashProgress(0, 1);
@@ -450,10 +471,10 @@ function setFlashProgress(written, total) {
   o.querySelector(".flash-bar-fill").style.width = pct + "%";
   o.querySelector(".flash-pct").textContent = pct + "%";
 }
-function showFlashSuccess(t) {
+function showFlashSuccess(ctx) {
   const o = ensureOverlay();
   o.className = "flash-overlay state-ok";
-  o.querySelector(".flash-title").textContent = `✓ Flashed ${t.name}!`;
+  o.querySelector(".flash-title").textContent = `✓ Flashed ${ctx.name}!`;
   setFlashProgress(1, 1);
   setFlashStatus("Your board is restarting into the new firmware.");
   setFlashHint("If it doesn't start up, unplug the board and plug it back in.");
@@ -478,7 +499,7 @@ function mapFlashError(raw, info) {
     return { title: "The connection dropped", body: "The board disconnected while flashing. Check the USB cable and port, then Retry. If it keeps happening, use the classic flasher below.", classic: true };
   return { title: "Flashing didn't finish", body: raw + " Try again, or use the classic flasher below.", classic: true };
 }
-function showFlashError(t, msg, info) {
+function showFlashError(ctx, msg, info) {
   info = info || {};
   const o = ensureOverlay();
   o.className = "flash-overlay state-err";
@@ -490,17 +511,17 @@ function showFlashError(t, msg, info) {
 
   const actions = o.querySelector(".flash-actions");
   actions.replaceChildren();
-  actions.append(btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); flashProfile(t); } }));
-  if (mapped.classic) actions.append(classicFlasherButton(t));
+  if (ctx.retry) actions.append(btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); ctx.retry(); } }));
+  if (mapped.classic && ctx.manifest) actions.append(classicFlasherButton(ctx));
   actions.append(btnEl("button", "btn secondary", "Close", { onclick: closeFlash }));
 }
 
 // The ESP Web Tools "classic flasher" fallback: battle-tested at 115200 over Web
 // Serial. Rendered as a real <esp-web-install-button> so its dialog manages its own
 // fresh port; we just close our overlay when it launches.
-function classicFlasherButton(t) {
+function classicFlasherButton(ctx) {
   const ewt = document.createElement("esp-web-install-button");
-  ewt.setAttribute("manifest", `manifests/${t.manifest}`);
+  ewt.setAttribute("manifest", `manifests/${ctx.manifest}`);
   const act = document.createElement("button");
   act.setAttribute("slot", "activate");
   act.className = "btn secondary";
@@ -522,6 +543,46 @@ function btnEl(tag, cls, text, opts) {
   if (opts && opts.href) n.href = opts.href;
   if (opts && opts.onclick) n.addEventListener("click", opts.onclick);
   return n;
+}
+
+// --- custom .bin flashing ----------------------------------------------------
+function setupCustomFlash() {
+  const fileInput = document.getElementById("customFile");
+  const dropzone = document.getElementById("dropzone");
+  const dropText = document.getElementById("dropText");
+  const flashBtn = document.getElementById("customFlash");
+  const offsetInput = document.getElementById("customOffset");
+  if (!fileInput || !dropzone || !flashBtn) return;
+
+  let file = null;
+  const setFile = (f) => {
+    file = f || null;
+    if (file) {
+      dropText.innerHTML = `<b>${escapeHtml(file.name)}</b> · ${(file.size / 1024).toFixed(1)} KB`;
+      flashBtn.disabled = !HAS_SERIAL;
+    } else {
+      dropText.innerHTML = "Drop a <b>.bin</b> here, or click to choose a file";
+      flashBtn.disabled = true;
+    }
+  };
+  fileInput.addEventListener("change", () => setFile(fileInput.files[0]));
+  dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault(); dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+  flashBtn.addEventListener("click", () => {
+    if (!file) return;
+    const raw = ((offsetInput && offsetInput.value) || "0").trim();
+    let offset = /^0x/i.test(raw) ? parseInt(raw, 16) : parseInt(raw, 10);
+    if (!Number.isFinite(offset) || offset < 0) offset = 0;
+    flashCustom(file, offset);
+  });
+  if (!HAS_SERIAL) flashBtn.disabled = true;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // --- helpers -----------------------------------------------------------------
