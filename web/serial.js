@@ -199,18 +199,18 @@ function buildQuickSend() {
     quickSendEl.append(b);
   }
 
-  // Floating arrow overlaid on the terminal toggles the whole bar. When collapsed the
-  // bar is fully removed from layout so the terminal grows into the space.
-  const float = document.getElementById("qsFloat");
+  // A tiny toggle lives in the input row (which is always present), so hiding the
+  // macros costs zero extra height — the bar is fully removed and the terminal grows.
+  const toggle = document.getElementById("qsToggle");
   const setCollapsed = (c) => {
     quickSendEl.classList.toggle("collapsed", c);
-    float.textContent = c ? "⌨ Macros" : "▾ Hide";
-    float.setAttribute("aria-expanded", String(!c));
+    toggle.classList.toggle("active", !c);
+    toggle.setAttribute("aria-expanded", String(!c));
     try { localStorage.setItem("sk_qs_collapsed", c ? "1" : "0"); } catch {}
     // fit AFTER the layout reflows, so xterm actually fills the reclaimed space
     requestAnimationFrame(() => { try { fitAddon.fit(); } catch {} });
   };
-  float.addEventListener("click", () => setCollapsed(!quickSendEl.classList.contains("collapsed")));
+  toggle.addEventListener("click", () => setCollapsed(!quickSendEl.classList.contains("collapsed")));
   let collapsed = false;
   try { collapsed = localStorage.getItem("sk_qs_collapsed") === "1"; } catch {}
   setCollapsed(collapsed);

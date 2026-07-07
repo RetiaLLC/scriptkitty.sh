@@ -59,14 +59,12 @@
       <span id="status" class="term-status">Disconnected</span>
     </div>
 
-    <div class="term-wrap">
-      <div id="terminal" class="xterm-host"></div>
-      <button id="qsFloat" class="qs-float" type="button" title="Show/hide quick-send macros">⌨ Macros</button>
-    </div>
+    <div id="terminal" class="xterm-host"></div>
 
     <div class="quick-send" id="quickSend" aria-label="Quick send commands"></div>
 
     <form id="sendForm" class="term-input" autocomplete="off">
+      <button id="qsToggle" class="btn secondary qs-toggle-btn" type="button" title="Show/hide quick-send macros" aria-label="Show or hide quick-send macros">⌨</button>
       <input id="input" type="text" placeholder="Type a command, press Enter (↑/↓ for history)…" aria-label="Send to device" disabled />
       <button id="send" class="btn" type="submit" disabled>Send</button>
     </form>
