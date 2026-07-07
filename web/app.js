@@ -348,24 +348,28 @@ function resolveBaud(mcu) {
 }
 const BOOT_HELP = "hold the BOOT button, tap RESET once, then release BOOT (no RESET button? hold BOOT while plugging in USB, then release)";
 
-// Flash a catalog profile: fetch its bin and run the shared flasher.
+// Flash a catalog profile: fetch its (single, merged) bin and run the shared flasher.
 function flashProfile(t) {
   return flashImage({
-    name: t.name, manifest: t.manifest, expectMcu: t.mcu, offset: 0,
-    loadData: async () => {
+    name: t.name, manifest: t.manifest, expectMcu: t.mcu,
+    loadParts: async () => {
       const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
       if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
-      return new Uint8Array(await resp.arrayBuffer());
+      return [{ data: new Uint8Array(await resp.arrayBuffer()), address: 0 }];
     },
     retry: () => flashProfile(t),
   });
 }
-// Flash a user-supplied .bin at a chosen offset (no chip lock-in — it's their file).
-function flashCustom(file, offset) {
+// Flash one or more user-supplied .bin parts, each at its own offset (Adafruit-style
+// multi-part). No chip lock-in — it's the user's file(s).
+function flashCustomParts(parts) {
+  const name = parts.length === 1 ? parts[0].file.name : `${parts.length} parts`;
   return flashImage({
-    name: file.name, manifest: null, expectMcu: null, offset: offset || 0,
-    loadData: async () => new Uint8Array(await file.arrayBuffer()),
-    retry: () => flashCustom(file, offset),
+    name, manifest: null, expectMcu: null,
+    loadParts: async () => Promise.all(parts.map(async (p) => ({
+      data: new Uint8Array(await p.file.arrayBuffer()), address: p.offset || 0,
+    }))),
+    retry: () => flashCustomParts(parts),
   });
 }
 
@@ -406,17 +410,18 @@ async function flashImage(ctx) {
     }
     setFlashHint("Keep this tab open and don't unplug the board until it says Done.");
     setFlashStatus(ctx.expectMcu ? "Downloading firmware…" : `Detected ${chipName || "chip"}. Loading your file…`);
-    // esptool-js 0.6.0 requires the flash data as a Uint8Array (issue #233).
-    const data = await ctx.loadData();
-    if (!data || !data.length) throw new Error("The firmware file is empty.");
+    // esptool-js 0.6.0 requires each part's data as a Uint8Array (issue #233).
+    const parts = await ctx.loadParts();
+    if (!parts.length || parts.some((p) => !p.data || !p.data.length)) throw new Error("A firmware part is empty or unreadable.");
     if (eraseAll) setFlashStatus("Erasing the whole chip…");
     await loader.writeFlash({
-      fileArray: [{ data, address: ctx.offset || 0 }],
+      fileArray: parts,
       flashSize: "keep", flashMode: "keep", flashFreq: "keep",
       eraseAll, compress: true,
       reportProgress: (i, written, total) => {
         setFlashProgress(written, total);
-        setFlashStatus(`Writing… ${Math.round((written / total) * 100)}%`);
+        const lbl = parts.length > 1 ? `part ${i + 1}/${parts.length} ` : "";
+        setFlashStatus(`Writing ${lbl}… ${Math.round((written / total) * 100)}%`);
       },
     });
     setFlashStatus("Finishing up…");
@@ -545,41 +550,74 @@ function btnEl(tag, cls, text, opts) {
   return n;
 }
 
-// --- custom .bin flashing ----------------------------------------------------
+// --- custom .bin flashing (single merged image, or multi-part like Adafruit) --
+function parseOffset(v) {
+  const raw = (v || "0").trim();
+  const o = /^0x/i.test(raw) ? parseInt(raw, 16) : parseInt(raw, 10);
+  return Number.isFinite(o) && o >= 0 ? o : 0;
+}
 function setupCustomFlash() {
   const fileInput = document.getElementById("customFile");
   const dropzone = document.getElementById("dropzone");
   const dropText = document.getElementById("dropText");
   const flashBtn = document.getElementById("customFlash");
   const offsetInput = document.getElementById("customOffset");
+  const partsEl = document.getElementById("cfParts");
+  const addBtn = document.getElementById("cfAddPart");
   if (!fileInput || !dropzone || !flashBtn) return;
 
-  let file = null;
-  const setFile = (f) => {
-    file = f || null;
-    if (file) {
-      dropText.innerHTML = `<b>${escapeHtml(file.name)}</b> · ${(file.size / 1024).toFixed(1)} KB`;
-      flashBtn.disabled = !HAS_SERIAL;
-    } else {
-      dropText.innerHTML = "Drop a <b>.bin</b> here, or click to choose a file";
-      flashBtn.disabled = true;
-    }
+  let file0 = null;
+  const extra = []; // additional parts: [{ file, offsetInput }]
+  const anyFile = () => !!file0 || extra.some((e) => e.file);
+  const refreshBtn = () => { flashBtn.disabled = !HAS_SERIAL || !anyFile(); };
+
+  const setFile0 = (f) => {
+    file0 = f || null;
+    dropText.innerHTML = file0
+      ? `<b>${escapeHtml(file0.name)}</b> · ${(file0.size / 1024).toFixed(1)} KB`
+      : "Drop a <b>.bin</b> here, or click to choose a file";
+    refreshBtn();
   };
-  fileInput.addEventListener("change", () => setFile(fileInput.files[0]));
+  fileInput.addEventListener("change", () => setFile0(fileInput.files[0]));
   dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
   dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault(); dropzone.classList.remove("dragover");
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile0(e.dataTransfer.files[0]);
   });
+
+  function addPartRow(defaultOffset) {
+    const row = document.createElement("div");
+    row.className = "cf-part";
+    const fileBtn = document.createElement("label");
+    fileBtn.className = "cf-file";
+    const fi = document.createElement("input");
+    fi.type = "file"; fi.accept = ".bin,application/octet-stream"; fi.hidden = true;
+    const fname = document.createElement("span");
+    fname.className = "cf-fname"; fname.textContent = "Choose .bin…";
+    fileBtn.append(fi, fname);
+    const off = document.createElement("input");
+    off.className = "cf-offset"; off.value = defaultOffset || "0x10000"; off.spellcheck = false; off.placeholder = "0x…";
+    off.setAttribute("aria-label", "part offset");
+    const rm = document.createElement("button");
+    rm.type = "button"; rm.className = "cf-remove"; rm.textContent = "✕"; rm.title = "Remove this part";
+    row.append(fileBtn, off, rm);
+    const entry = { file: null, offsetInput: off };
+    fi.addEventListener("change", () => { entry.file = fi.files[0] || null; fname.textContent = entry.file ? entry.file.name : "Choose .bin…"; refreshBtn(); });
+    rm.addEventListener("click", () => { row.remove(); const i = extra.indexOf(entry); if (i >= 0) extra.splice(i, 1); refreshBtn(); });
+    extra.push(entry);
+    partsEl.append(row);
+  }
+  if (addBtn && partsEl) addBtn.addEventListener("click", () => addPartRow());
+
   flashBtn.addEventListener("click", () => {
-    if (!file) return;
-    const raw = ((offsetInput && offsetInput.value) || "0").trim();
-    let offset = /^0x/i.test(raw) ? parseInt(raw, 16) : parseInt(raw, 10);
-    if (!Number.isFinite(offset) || offset < 0) offset = 0;
-    flashCustom(file, offset);
+    const parts = [];
+    if (file0) parts.push({ file: file0, offset: parseOffset(offsetInput && offsetInput.value) });
+    for (const e of extra) if (e.file) parts.push({ file: e.file, offset: parseOffset(e.offsetInput.value) });
+    if (!parts.length) return;
+    flashCustomParts(parts);
   });
-  if (!HAS_SERIAL) flashBtn.disabled = true;
+  refreshBtn();
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

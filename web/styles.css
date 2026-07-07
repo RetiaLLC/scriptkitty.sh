@@ -276,8 +276,24 @@ esp-web-install-button[install-unsupported] { display: block; }
   width: 8rem; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);
   border-radius: 7px; padding: .35rem .55rem; font-family: var(--mono); font-size: .85rem;
 }
-.cf-hint { display: block; margin-top: .4rem; color: var(--muted); font-size: .8rem; max-width: 60ch; }
+.cf-hint { display: block; margin-top: .4rem; color: var(--muted); font-size: .8rem; max-width: 62ch; }
 .custom-flash .btn { width: auto; padding-inline: 1.4rem; }
+.cf-adv-body { margin-top: .6rem; }
+.cf-parts { display: flex; flex-direction: column; gap: .5rem; margin: .6rem 0; }
+.cf-part { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.cf-file {
+  cursor: pointer; display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 7px;
+  padding: .35rem .6rem; font-size: .82rem; color: var(--accent-2); min-width: 12rem;
+}
+.cf-file:hover { border-color: #3a465b; }
+.cf-fname { color: var(--text); font-family: var(--mono); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16rem; }
+.cf-remove {
+  cursor: pointer; background: transparent; border: 1px solid var(--border); border-radius: 7px;
+  color: var(--muted); font-size: .8rem; padding: .3rem .5rem; line-height: 1;
+}
+.cf-remove:hover { color: #ff8080; border-color: #6b2b2b; }
+.custom-flash .cf-adv .btn.secondary { width: auto; padding: .35rem .7rem; font-size: .8rem; }
 
 /* footer */
 .site-footer {

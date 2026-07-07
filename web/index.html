@@ -89,11 +89,15 @@
       </label>
       <div class="cf-foot">
         <details class="cf-adv">
-          <summary>Advanced</summary>
-          <label class="ctl">Flash offset
-            <input id="customOffset" class="cf-offset" value="0x0" spellcheck="false" inputmode="text" />
-          </label>
-          <span class="cf-hint">Leave at <code>0x0</code> for a full/merged image; use a specific offset only for a partial image (e.g. an app-only build).</span>
+          <summary>Advanced — offset &amp; multiple parts</summary>
+          <div class="cf-adv-body">
+            <label class="ctl">First part offset
+              <input id="customOffset" class="cf-offset" value="0x0" spellcheck="false" inputmode="text" />
+            </label>
+            <div id="cfParts" class="cf-parts"></div>
+            <button id="cfAddPart" class="btn secondary" type="button">+ Add part</button>
+            <span class="cf-hint">A full/merged image is one part at <code>0x0</code>. For a multi-part ESP32 flash (like Adafruit's ESPTool): bootloader <code>0x1000</code>, partitions <code>0x8000</code>, app <code>0x10000</code>. Each part flashes at its own offset in one pass.</span>
+          </div>
         </details>
         <button id="customFlash" class="btn" type="button" disabled>Flash .bin</button>
       </div>
