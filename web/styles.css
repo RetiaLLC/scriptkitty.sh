@@ -182,6 +182,14 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
   gap: 1.15rem;
 }
 .loading, .empty { color: var(--muted); font-family: var(--mono); padding: 2rem 0; }
+.empty { text-align: center; }
+.empty-text { color: var(--muted); }
+
+/* ascii cats */
+.cat-art { font-family: var(--mono); white-space: pre; line-height: 1.12; margin: 0 auto .9rem; display: inline-block; color: var(--accent); font-size: .82rem; }
+.footer-cat { font-family: var(--mono); white-space: pre; line-height: 1.12; margin: 1.3rem 0 0; color: #3a465b; font-size: .78rem; }
+.flash-cat { font-family: var(--mono); white-space: pre; line-height: 1.12; margin: .1rem auto .8rem; color: var(--accent); font-size: .8rem; display: inline-block; text-align: left; }
+.flash-cat:empty { display: none; margin: 0; }
 
 .card {
   background: linear-gradient(180deg, var(--bg-elev), var(--bg-elev-2));

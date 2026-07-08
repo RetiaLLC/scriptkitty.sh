@@ -289,8 +289,10 @@ function setConnected(on) {
   if (on) inputEl.focus();
 }
 function intro() {
-  writeLine("scriptkitty Serial Monitor  =^._.^=", "sys");
-  writeLine("Click Connect, choose your board's port, and go. Output is colorized; the whole session is saved (never truncated).", "sys");
+  const el = document.getElementById("introCat");
+  const art = el ? el.textContent : "";
+  if (art) { term.write(art.replace(/\n/g, "\r\n") + "\r\n"); fullLog += art + "\n"; }
+  writeLine("scriptkitty Serial Monitor — connect a board and go. Output is colorized; the whole session is saved (never truncated).", "sys");
 }
 
 // remember baud + auto-reconnect preference across visits

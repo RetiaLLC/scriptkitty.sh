@@ -141,7 +141,7 @@ function render() {
     : `${shown.length} of ${ALL.length} programs`;
 
   if (!shown.length) {
-    targetsEl.replaceChildren(el("div", "empty", "No firmware matches your search."));
+    targetsEl.replaceChildren(emptyBox("No firmware matches your search."));
     return;
   }
 
@@ -448,6 +448,7 @@ function ensureOverlay() {
   overlayEl.innerHTML =
     `<div class="flash-modal" role="dialog" aria-modal="true">
        <h3 class="flash-title"></h3>
+       <pre class="flash-cat" aria-hidden="true"></pre>
        <div class="flash-bar"><div class="flash-bar-fill"></div></div>
        <div class="flash-pct"></div>
        <div class="flash-status"></div>
@@ -462,6 +463,7 @@ function openFlash(ctx) {
   o.hidden = false;
   o.className = "flash-overlay state-flashing";
   o.querySelector(".flash-title").textContent = `Flashing ${ctx.name}`;
+  o.querySelector(".flash-cat").textContent = "";
   o.querySelector(".flash-bar").style.display = "";
   o.querySelector(".flash-actions").replaceChildren();
   setFlashProgress(0, 1);
@@ -480,6 +482,7 @@ function showFlashSuccess(ctx) {
   const o = ensureOverlay();
   o.className = "flash-overlay state-ok";
   o.querySelector(".flash-title").textContent = `✓ Flashed ${ctx.name}!`;
+  o.querySelector(".flash-cat").textContent = catArt("hacker");
   setFlashProgress(1, 1);
   setFlashStatus("Your board is restarting into the new firmware.");
   setFlashHint("If it doesn't start up, unplug the board and plug it back in.");
@@ -636,8 +639,20 @@ function el(tag, cls, text) {
   return n;
 }
 
+function catArt(name) {
+  const e = document.querySelector(`#cats [data-cat="${name}"]`);
+  return e ? e.textContent : "";
+}
+function emptyBox(text) {
+  const box = el("div", "empty");
+  const cat = document.createElement("pre");
+  cat.className = "cat-art";
+  cat.textContent = catArt("terminal");
+  box.append(cat, el("div", "empty-text", text));
+  return box;
+}
 function renderEmpty(err) {
-  targetsEl.replaceChildren(el("div", "empty", err
+  targetsEl.replaceChildren(emptyBox(err
     ? "No firmware published yet — run the Build & Deploy workflow to populate the library."
     : "No firmware is configured yet."));
 }

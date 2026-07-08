@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>scriptkitty.sh — flash your board in the browser</title>
   <meta name="description" content="Search and flash firmware for the Nugget & Nibble line straight from the browser. No drivers, no CLI." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='6,4 13,13 4,12' fill='%237cf5c4'/%3E%3Cpolygon points='26,4 19,13 28,12' fill='%237cf5c4'/%3E%3Ccircle cx='16' cy='19' r='9' fill='%237cf5c4'/%3E%3Ccircle cx='12.5' cy='18' r='1.4' fill='%230d0f14'/%3E%3Ccircle cx='19.5' cy='18' r='1.4' fill='%230d0f14'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
   <!-- classic-flasher fallback engine (offered when the primary esptool-js flash fails) -->
   <script type="module" src="vendor/esp-web-tools/install-button.js"></script>
@@ -15,7 +15,7 @@
     <div class="wrap">
       <div class="topbar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">🐱</span>
+          <span class="brand-mark" aria-hidden="true">ᓚᘏᗢ</span>
           <span class="brand-name">scriptkitty<span class="tld">.sh</span></span>
         </div>
         <nav class="nav">
@@ -118,8 +118,20 @@
         Need the console? Open the <a href="serial.html">Serial Monitor</a>.
         Made by <a href="https://retia.io" target="_blank" rel="noopener">Retia LLC</a>.
       </p>
+<pre class="footer-cat" aria-hidden="true"> |\---/|
+ | o_o |
+  \_^_/</pre>
     </div>
   </footer>
+
+  <!-- cat library (read by app.js for the empty state + flash success) -->
+  <div id="cats" hidden aria-hidden="true"><pre data-cat="terminal"> _._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , o o)
+          `-    \`_`"'-</pre><pre data-cat="hacker">        |\__/,|   (`\
+      _.|o o  |_   ) )
+    -(((---(((--------
+      access granted</pre></div>
 
   <!-- card template -->
   <template id="tpl-card">
