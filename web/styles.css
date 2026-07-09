@@ -230,6 +230,12 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 }
 .addon-ok { color: var(--muted); background: transparent; border-color: var(--border); }
 
+.card-quickstart { margin: 0; }
+.card-quickstart > summary { cursor: pointer; color: var(--accent-2); font-family: var(--mono); font-size: .76rem; width: fit-content; }
+.card-quickstart > summary:hover { color: var(--text); }
+.card-quickstart ol { margin: .5rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: .85rem; }
+.card-quickstart li { margin: .25rem 0; }
+
 .card-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .src-link { color: var(--accent-2); text-decoration: none; font-size: .85rem; font-family: var(--mono); white-space: nowrap; }
 .src-link:hover { text-decoration: underline; }

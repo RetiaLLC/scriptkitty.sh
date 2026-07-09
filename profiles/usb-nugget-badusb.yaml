@@ -6,6 +6,11 @@ mcu: esp32-s2
 description: "A versatile USB attack platform that lets you hack computers in seconds."
 program_url: https://github.com/RetiaLLC/USB-Nugget
 recommended: true
+quickstart:
+  - "Flash this firmware, then unplug and replug the USB Nugget."
+  - "It shows up as a USB drive — open it and edit payload.dd with your DuckyScript."
+  - "Plug it into a target computer; the payload runs automatically."
+  - "Press the BOOT button to re-run the payload, or drop in a new one anytime."
 
 provenance:
   binary_source: static

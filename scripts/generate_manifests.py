@@ -105,6 +105,7 @@ def main() -> int:
             "description": profile.get("description", ""),
             "program_url": profile.get("program_url", ""),
             "addons": profile.get("addons", []) or [],
+            "quickstart": profile.get("quickstart", []) or [],
             "recommended": bool(profile.get("recommended", False)),
             "flow": flow,
             "manifest": f"{pid}.json",

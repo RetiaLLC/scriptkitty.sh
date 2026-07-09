@@ -1,0 +1,53 @@
+# Copy to profiles/<id>.yaml and fill in. `id` MUST match the filename.
+# For a `static` firmware, also drop the merged 0x0 image at firmware/<id>.bin
+# (or firmware/<id>.uf2 for rp2040). Then: python3 scripts/validate_profiles.py --all
+
+id: my-board-program           # kebab-case, == filename (without .yaml)
+display_name: "My Program"     # card title
+product_line: usb-nugget       # usb-nugget | wifi-nugget | bluetooth-nugget | nibble | pusheen
+model: "My Board"              # exact hardware model
+mcu: esp32-s2                  # esp8266 | esp32 | esp32-s2 | esp32-s3 | rp2040
+version: "1.0.0"               # optional
+# radio: rfm95                 # optional: rfm95 | sx1262
+description: "One sentence on what this firmware does."
+program_url: https://github.com/owner/repo    # "Source ↗" link
+# addons:                      # optional hardware needed beyond the base board
+#   - "RFM95 LoRa backpack"
+# recommended: true            # optional: badge + sorts first (one per model)
+quickstart:                    # optional but encouraged (beginner-facing, 3–6 steps)
+  - "Flash this firmware, then unplug and replug the board."
+  - "Open the Serial Monitor at 115200 to see it running."
+  - "Only test devices/networks you own or have permission to test."
+
+provenance:
+  binary_source: static        # static | release | ci
+  exception: "Why this is a committed binary (required for static)."
+  imported_from:               # optional breadcrumb for where the bin came from
+    repo: owner/repo
+    path: path/to/original.bin
+
+# --- Alternatives ---
+# release (CI fetches a pinned release asset; do NOT commit a bin):
+# provenance:
+#   binary_source: release
+#   release:
+#     repo: owner/repo
+#     tag: v1.2.3               # exact tag, never "latest"
+#     asset_pattern: "firmware-*-{mcu}.bin"   # {mcu} -> mcu with dashes removed
+#     expected_sha256: ""      # pin for a hard integrity check
+#
+# ci (CI compiles from projects/<dir>; do NOT commit a bin):
+# build:
+#   system: platformio         # or arduino-cli
+#   environment: my_env        # platformio env  (or: fqbn: <fqbn> for arduino-cli)
+#   project_dir: projects/my-board/app
+# flash:                       # REQUIRED for esp32* ci builds (esptool merge_bin)
+#   mode: dio
+#   frequency: 40m
+#   size: 4MB
+# provenance:
+#   binary_source: ci
+#
+# rp2040 anything: add
+# flash:
+#   format: uf2                # REQUIRED, and ship firmware/<id>.uf2

@@ -203,6 +203,18 @@ function renderCard(t) {
     addonsEl.innerHTML = `<span class="addon addon-ok">No add-ons needed</span>`;
   }
 
+  const steps = t.quickstart || [];
+  if (steps.length) {
+    const d = document.createElement("details");
+    d.className = "card-quickstart";
+    const sum = document.createElement("summary");
+    sum.textContent = "Quickstart";
+    const ol = document.createElement("ol");
+    for (const s of steps) { const li = document.createElement("li"); li.textContent = s; ol.append(li); }
+    d.append(sum, ol);
+    addonsEl.after(d);
+  }
+
   const src = node.querySelector(".src-link");
   if (t.program_url) src.href = t.program_url;
   else src.remove();

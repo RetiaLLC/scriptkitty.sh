@@ -6,6 +6,11 @@ mcu: esp8266
 description: "The Wi-Fi Deauther modified for the Nugget to perform Wi-Fi scanning & attacking."
 program_url: https://github.com/RetiaLLC/WiFi-Nugget
 recommended: true
+quickstart:
+  - "Flash this firmware, then open the Serial Monitor and connect at 115200."
+  - "Type `scan` to list nearby Wi-Fi networks and devices."
+  - "Use the on-screen menu (or serial commands) to select a target and start/stop attacks."
+  - "Only test networks you own or have permission to test."
 
 provenance:
   binary_source: static
