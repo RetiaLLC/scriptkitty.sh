@@ -31,6 +31,7 @@ const LINES = [
   ["wifi-nugget", "WiFi Nugget", "ESP8266 Wi-Fi hacking tool"],
   ["bluetooth-nugget", "Bluetooth Nugget", "ESP32-S3 Bluetooth / LoRa platform"],
   ["nibble", "Nibble", "ESP32-S3 Meshtastic / Meshcore boards"],
+  ["defcon-badge", "DEF CON Badge (2026)", "ESP32-S3 conference badge — mesh, games & more"],
   ["pusheen", "Pusheen", "ESP8266 cat-lamp"],
 ];
 
@@ -39,7 +40,13 @@ const LINES = [
 const LINES_BY_MCU = {
   "esp8266": ["wifi-nugget", "pusheen"],
   "esp32-s2": ["usb-nugget"],
-  "esp32-s3": ["bluetooth-nugget", "nibble"],
+  "esp32-s3": ["bluetooth-nugget", "nibble", "defcon-badge"],
+};
+
+// Flash size resolves same-silicon collisions where it can: every S3 Nugget/
+// Nibble is 4 MB, the DEF CON badge is the only 8 MB ESP32-S3 in the catalog.
+const LINES_BY_MCU_FLASH = {
+  "esp32-s3": { 8: ["defcon-badge"], 4: ["bluetooth-nugget", "nibble"] },
 };
 
 // Per-device flashing / recovery help, keyed by product line.
@@ -49,6 +56,7 @@ const HELP = {
   "pusheen": "ESP8266 (D1 Mini). Usually flashes automatically. If it fails, hold the FLASH button while plugging in USB, then release.",
   "bluetooth-nugget": "Native USB (ESP32-S3, Wemos S3 Mini). Hold BOOT, tap RESET (or hold BOOT while plugging in USB), then release. After flashing, tap RESET or replug.",
   "nibble": "Native USB (ESP32-S3, Waveshare S3 Zero — no RESET button). Hold BOOT while plugging in USB to enter flashing mode, then release. After flashing, unplug and replug.",
+  "defcon-badge": "Native USB (ESP32-S3). Enter flashing mode: hold SW2 (BOOT), tap SW1 (RESET), release SW2. After flashing, tap RESET. The Badge Launcher firmwares REQUIRE a FAT-formatted micro-SD card — grab the SD zip(s) from the release linked on the card.",
 };
 
 let ALL = [];
@@ -313,7 +321,10 @@ function applyDetection(mcu, chipName, flash) {
     return;
   }
   detectedMcu = mcu;
-  const lines = LINES_BY_MCU[mcu] || [];
+  let lines = LINES_BY_MCU[mcu] || [];
+  const flashMb = parseInt(flash, 10); // "8 MB flash" -> 8, "" -> NaN
+  const byFlash = (LINES_BY_MCU_FLASH[mcu] || {})[flashMb];
+  if (byFlash) lines = byFlash;
   const chipTxt = `${MCU_LABEL[mcu]}${flash ? " · " + flash : ""}`;
   if (lines.length === 1) {
     activeLine = lines[0];

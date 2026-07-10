@@ -1,0 +1,21 @@
+id: defcon-badge-reticulum-rnode
+display_name: "Reticulum RNode (standalone)"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "1.85"
+radio: rfm95
+description: "Turns the badge into an RNode: a host-controlled 915 MHz LoRa transceiver for the Reticulum network stack (MeshChat, Sideband, NomadNet), with a live status display on the TFT. (Also included in Badge Launcher v2.)"
+program_url: https://github.com/RetiaLLC/RNode_Firmware
+quickstart:
+  - "Flash, then provision once: pip install rns, then rnodeconf <PORT> -r --platform 80 --product f0 --model fe --hwrev 1"
+  - "The screen stays dark until provisioning completes — that's expected."
+  - "Point MeshChat/Sideband/NomadNet at the serial port and you're on the Reticulum network."
+  - "Attach the antenna before transmitting."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/DefconBadge2026
+    tag: reticulum-v1.85
+    asset_pattern: "rnode-1.85-tft.factory.bin"
+    expected_sha256: "f726b9590a62e0c3f8efd572c7a5592f1cbde96e7c1d7d9396595e3760333e87"

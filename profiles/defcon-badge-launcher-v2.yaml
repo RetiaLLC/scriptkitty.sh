@@ -1,0 +1,26 @@
+id: defcon-badge-launcher-v2
+display_name: "Badge Launcher v2 \"Touch\""
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "2.0.0"
+radio: rfm95
+description: "The flagship badge experience: an on-badge menu that installs firmware from the micro-SD card — two full-color touch mesh messengers (MeshCore + Meshtastic MUI), classic Meshtastic, a Reticulum RNode, an NES emulator with a 37-game homebrew library, and WLED. Switch in ~10 seconds, no computer needed."
+program_url: https://github.com/RetiaLLC/badge-launcher
+addons:
+  - "micro-SD card (FAT) — REQUIRED, holds the firmware library"
+  - "915 MHz antenna (attach before any LoRa TX)"
+recommended: true
+quickstart:
+  - "Flash this image, then unzip sd-card-apps-v2.zip (required) and sd-card-games-v2.zip (optional NES library) from the v2.0.0 release onto a FAT micro-SD card."
+  - "Insert the card and tap RESET — the badge boots the MeshCore touch messenger."
+  - "To switch firmware: hold UP, tap RESET, keep holding UP ~1 second → menu. Pick with the d-pad, A to install & boot."
+  - "Read START-HERE.txt on the card, then MESH-101.md to get two badges messaging over LoRa."
+  - "Never transmit without the antenna attached; set your region before meshing."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/badge-launcher
+    tag: v2.0.0
+    asset_pattern: "launcher-v2.factory.bin"
+    expected_sha256: "1636737737c3fefed8c8d1affcf87409a24f62c846de5d3c7df7756b4fc5522e"

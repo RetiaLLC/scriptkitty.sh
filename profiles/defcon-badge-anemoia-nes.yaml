@@ -1,0 +1,21 @@
+id: defcon-badge-anemoia-nes
+display_name: "Anemoia NES Emulator (standalone)"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "1.0.0"
+description: "A full NES emulator on the badge: browse .nes ROMs from the micro-SD card, play with the d-pad + A/B, save states, chiptune audio through the piezo. (Also included in Badge Launcher v2, with a 37-game homebrew library.)"
+program_url: https://github.com/RetiaLLC/Anemoia-DefconBadge
+addons:
+  - "micro-SD card (FAT) with .nes ROMs — REQUIRED"
+quickstart:
+  - "Put homebrew .nes files on a FAT micro-SD card (mappers 0-4 and 69 supported — see the GAMES.md list in the repo)."
+  - "Flash, insert the card, tap RESET, and pick a game."
+  - "Tap BOOT = START, hold BOOT = pause menu, BOOT+B = SELECT. First launch of each game takes a few seconds."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/DefconBadge2026
+    tag: anemoia-v1.0.0
+    asset_pattern: "anemoia-badge-factory.bin"
+    expected_sha256: "47f09ac38a2437d5a2d0c109ce6a4bc680592decd52fccad706a9977ce985122"

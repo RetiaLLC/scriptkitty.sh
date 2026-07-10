@@ -1,0 +1,20 @@
+id: defcon-badge-meshcore-touch
+display_name: "MeshCore Touch Messenger (standalone)"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "1.0.0"
+radio: rfm95
+description: "Standalone full-screen MeshCore mesh communicator: chats, contacts, channels, on-screen keyboard, RF monitor + spectrum analyzer — and a BLE companion for the MeshCore phone app at the same time. (Also included in Badge Launcher v2.)"
+program_url: https://github.com/RetiaLLC/wadamesh
+quickstart:
+  - "Flash, tap RESET, and walk through the touch setup wizard."
+  - "Tap Advert to announce yourself; nearby badges appear in Contacts."
+  - "Attach the antenna before transmitting; badge ships tuned for US 902-928 MHz."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/DefconBadge2026
+    tag: meshcore-v1.0.0
+    asset_pattern: "meshcore-touch-messenger.factory.bin"
+    expected_sha256: "00982545e5dda4db198dfe4d7f21af2eca1dadb487278dcf407c415af373e83c"
