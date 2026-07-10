@@ -44,19 +44,29 @@ def main() -> int:
     ap.add_argument("--github-output", required=True)
     args = ap.parse_args()
 
-    files = sorted(glob.glob("profiles/*.yaml")) if args.all else changed_profiles(args.changed_against)
+    all_files = sorted(glob.glob("profiles/*.yaml"))
+    changed = all_files if args.all else changed_profiles(args.changed_against)
 
-    ci, release = [], []
-    for path in files:
+    def source_of(path):
         with open(path) as f:
             p = yaml.safe_load(f)
-        pid = p["id"]
-        src = (p.get("provenance") or {}).get("binary_source", "ci")
-        entry = {"profile": pid, "dir": (p.get("build") or {}).get("project_dir", "")}
+        return p, (p.get("provenance") or {}).get("binary_source", "ci")
+
+    ci, release = [], []
+    # ci: only what changed — compiling is expensive.
+    for path in changed:
+        p, src = source_of(path)
         if src == "ci":
-            ci.append(entry)
-        elif src == "release":
-            release.append({"profile": pid})
+            ci.append({"profile": p["id"], "dir": (p.get("build") or {}).get("project_dir", "")})
+    # release: ALWAYS fetch every release profile, not just changed ones. Release bins
+    # are not committed and the site's firmware/ + manifests/ are regenerated from
+    # scratch on every deploy, so fetching only *changed* releases makes every
+    # release-based card disappear on any unrelated deploy (e.g. a web/ change). That
+    # is exactly what dropped the DEF CON badge line. Fetching is cheap (downloads).
+    for path in all_files:
+        p, src = source_of(path)
+        if src == "release":
+            release.append({"profile": p["id"]})
 
     with open(args.github_output, "a") as out:
         out.write(f"ci_matrix={json.dumps(ci)}\n")
@@ -64,8 +74,7 @@ def main() -> int:
         out.write(f"any_ci={'true' if ci else 'false'}\n")
         out.write(f"any_release={'true' if release else 'false'}\n")
 
-    print(f"planned: {len(ci)} ci, {len(release)} release, "
-          f"{len(files) - len(ci) - len(release)} static/other")
+    print(f"planned: {len(ci)} ci (changed), {len(release)} release (all)")
     return 0
 
 
