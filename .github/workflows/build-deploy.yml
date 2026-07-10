@@ -168,8 +168,14 @@ jobs:
   # ---------------------------------------------------------------------------
   assemble-deploy:
     needs: [discover, compile-ci, fetch-release]
-    # run even if one of the build jobs was skipped (e.g. only release changed)
-    if: always() && !failure() && !cancelled()
+    # Deploy as long as validation passed and no ci build failed. A failed release
+    # fetch (e.g. a retagged/deleted pinned asset) does NOT block: the backfill step
+    # below restores that card's last-known-good binary, so we publish a full catalog
+    # instead of holding the whole deploy. The failed fetch job still shows red to flag it.
+    if: >-
+      always() && !cancelled()
+      && needs.discover.result == 'success'
+      && needs.compile-ci.result != 'failure'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -209,6 +215,48 @@ jobs:
                   cp "$f" "site/firmware/$base"
                 done
           fi
+
+      - name: Backfill missing firmware from the live site (last-known-good)
+        # If a release/ci binary wasn't produced this run (e.g. a pinned asset was
+        # retagged or deleted and fetch-release failed), fall back to the currently-
+        # published copy so the card keeps serving its last-good firmware instead of
+        # vanishing. Only fills gaps — freshly built/fetched bins already win. Best-effort.
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          BASE = "https://scriptkitty.sh"
+          os.makedirs("site/firmware", exist_ok=True)
+          try:
+              with urllib.request.urlopen(BASE + "/manifests/index.json", timeout=20) as r:
+                  idx = json.load(r)
+          except Exception as e:
+              print(f"::warning::backfill: could not read published index ({e}); skipping")
+              idx = {"targets": []}
+          restored = []
+          for t in idx.get("targets", []):
+              for ext in (".bin", ".uf2"):
+                  dst = f"site/firmware/{t['id']}{ext}"
+                  if os.path.exists(dst):
+                      continue
+                  try:
+                      with urllib.request.urlopen(f"{BASE}/firmware/{t['id']}{ext}", timeout=60) as resp:
+                          data = resp.read()
+                      with open(dst, "wb") as f:
+                          f.write(data)
+                      # bring the sha256 sidecar along if one is published
+                      try:
+                          with urllib.request.urlopen(f"{BASE}/firmware/{t['id']}{ext}.sha256", timeout=20) as sr:
+                              open(dst + ".sha256", "wb").write(sr.read())
+                      except Exception:
+                          pass
+                      restored.append(f"{t['id']}{ext}")
+                  except Exception:
+                      pass  # not published under this extension — fine
+          if restored:
+              print("::warning::backfilled last-known-good firmware (a fresh build/fetch was missing) for: " + ", ".join(restored))
+          else:
+              print("backfill: nothing missing")
+          PY
 
       - name: Generate ESP Web Tools manifests from profiles
         run: |
