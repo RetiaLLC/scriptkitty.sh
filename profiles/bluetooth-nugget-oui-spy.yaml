@@ -1,0 +1,20 @@
+id: bluetooth-nugget-oui-spy
+display_name: "OUI-SPY (Blue)"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "2.0.0"
+description: "Four-in-one passive surveillance detector: Flock/Raven cameras, drone Remote-ID, a BLE device watchlist, and an RSSI foxhunt — pick a mode from a WiFi menu. No LoRa backpack needed."
+program_url: https://github.com/colonelpanichacks/oui-spy-unified-blue
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "Join its WiFi network 'oui-spy' (password 'ouispy123') and open http://192.168.4.1."
+  - "Pick a mode: Detector, Flock-You, Sky-Spy (drone Remote-ID), or Foxhunter."
+  - "The onboard RGB LED flashes on a detection. Hold BOOT ~2s to return to the menu."
+  - "Everything is passive — it only listens; nothing is transmitted."
+provenance:
+  binary_source: static
+  exception: "Built from source (colonelpanichacks/oui-spy-unified-blue, the defensive 'blue' modes only) with an added lolin_s3_mini env for the Nugget's 4MB / QSPI PSRAM and the NeoPixel re-pinned to the onboard WS2812 (GPIO10). Merged 0x0 image, hardware-validated. Migrate to ci later."
+  imported_from:
+    repo: colonelpanichacks/oui-spy-unified-blue
+    path: "built-from-source (env:nugget, board=lolin_s3_mini, NeoPixel GPIO10)"

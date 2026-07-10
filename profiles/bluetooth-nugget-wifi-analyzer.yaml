@@ -1,0 +1,19 @@
+id: bluetooth-nugget-wifi-analyzer
+display_name: "WiFi Analyzer"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "1.0.0"
+description: "A passive WiFi site-survey and device-hunter: browse nearby networks on the OLED, then pick one for a live signal-strength meter to physically track it down. No LoRa backpack needed."
+program_url: https://github.com/hackffm/ESP32_OLED_WifiScanner
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "LIST view: UP/DOWN move the highlight through nearby networks (SSID / channel / RSSI / security); press B to rescan."
+  - "Press A to SELECT a network and enter HUNT view — a big live RSSI meter with a warmer/colder trend and peak-hold to walk the signal down."
+  - "Long-press B returns to the list. Fully passive — it only listens for beacons and never transmits."
+provenance:
+  binary_source: static
+  exception: "Passive OLED WiFi scanner adapted from hackffm/ESP32_OLED_WifiScanner for the Nugget: I2C re-pinned to SDA=35/SCL=36 on an SH1106 driver, uses passive WiFi.scanNetworks. Merged 0x0 image, hardware-validated. Migrate to ci later."
+  imported_from:
+    repo: hackffm/ESP32_OLED_WifiScanner
+    path: "built-from-source (arduino-cli, board=lolin_s3_mini, SH1106 on 35/36, passive scan)"

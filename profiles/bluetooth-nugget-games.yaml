@@ -1,0 +1,18 @@
+id: bluetooth-nugget-games
+display_name: "Retro Arcade"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "1.0.0"
+description: "An eight-game retro arcade — Snake, Tetris, Breakout, Pac-Man, Flappy, 2048, Frogger, Helicopter — played on the Nugget's OLED with its buttons. No LoRa backpack needed."
+program_url: https://github.com/nturmose21/MiniGames
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "Use UP/DOWN to scroll the menu and A (or RIGHT) to pick a game."
+  - "Play with the direction buttons; high scores are saved between reboots."
+provenance:
+  binary_source: static
+  exception: "Built from source (nturmose21/MiniGames) retargeted to the Nugget: display re-pinned to I2C SDA=35/SCL=36 on an SH1106 driver, buttons mapped to the Nugget (UP=13/DOWN=18/LEFT=11/RIGHT=12/A=44/B=43). Merged 0x0 image, hardware-validated. Migrate to ci later."
+  imported_from:
+    repo: nturmose21/MiniGames
+    path: "built-from-source (arduino-cli, board=lolin_s3_mini, re-pinned display+buttons)"

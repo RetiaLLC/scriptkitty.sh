@@ -1,0 +1,19 @@
+id: bluetooth-nugget-marauder
+display_name: "ESP32 Marauder"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "1.0.0"
+description: "The ESP32 Marauder suite of WiFi and Bluetooth analysis and testing tools, driven over USB serial. No LoRa backpack needed."
+program_url: https://github.com/justcallmekoko/ESP32Marauder
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "Open the Serial Monitor at 115200 baud; type 'help' to list commands."
+  - "Passive tools include WiFi/Bluetooth sniffing, wardriving, and AirTag/Flock detection."
+  - "Only test networks and devices you own or have explicit written permission to test. Many active features (deauthentication, beacon spam, evil portal) are illegal to use against others and may be illegal to operate on some radio bands in your region — know your local laws."
+provenance:
+  binary_source: static
+  exception: "Built from source (justcallmekoko/ESP32Marauder, XIAO_ESP32_S3 headless profile) for the Nugget's lolin_s3_mini / 4MB / QSPI PSRAM with -Wl,-zmuldefs. Ships a pre-formatted SPIFFS and a boot-stability patch (yields + a BT->WiFi init split to avoid an intermittent interrupt-watchdog reset during radio bring-up; verified 29/29 clean boots on hardware). Full 4MB merged image. Migrate to ci later (re-apply the yields patch)."
+  imported_from:
+    repo: justcallmekoko/ESP32Marauder
+    path: "built-from-source (arduino-cli, board=lolin_s3_mini, huge_app, preformatted SPIFFS)"

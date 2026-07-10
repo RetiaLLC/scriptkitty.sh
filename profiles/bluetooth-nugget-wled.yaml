@@ -1,0 +1,19 @@
+id: bluetooth-nugget-wled
+display_name: "WLED"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "0.15.0"
+description: "The popular WLED addressable-LED art controller, with the onboard RGB driven out of the box and live status shown on the Nugget's OLED. No LoRa backpack needed."
+program_url: https://github.com/wled/WLED
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 to set up WiFi."
+  - "The onboard 2x WS2812 RGB (GPIO10) lights up immediately; add an external strip on GPIO10 for more."
+  - "The OLED shows brightness, effect, and network status."
+provenance:
+  binary_source: static
+  exception: "Built from source (wled/WLED, env esp32s3_4M_qspi) with the Four-Line-Display OLED usermod enabled on the Nugget's I2C (SDA=35, SCL=36, 180-degree flip), default LEDs on GPIO10. Merged 0x0 image, hardware-validated. Migrate to a pinned release/ci later."
+  imported_from:
+    repo: wled/WLED
+    path: "built-from-source (env:nugget from esp32s3_4M_qspi + four_line_display_ALT usermod)"

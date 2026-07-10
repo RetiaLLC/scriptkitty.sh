@@ -1,0 +1,19 @@
+id: bluetooth-nugget-airtag-scanner
+display_name: "AirTag Scanner"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "1.0.0"
+description: "Passive detector for Apple AirTags and Find-My BLE trackers nearby — useful for spotting an unwanted tracker. Shows a live count and the last tag's MAC/RSSI on the OLED. No LoRa backpack needed."
+program_url: https://github.com/MatthewKuKanich/ESP32-AirTag-Scanner
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "The OLED shows how many Find-My trackers are seen, plus the last tag's MAC, signal, and age."
+  - "Open the Serial Monitor at 115200 for the full log; type 'rescan' to clear and rescan."
+  - "Detection is passive BLE listening — nothing is transmitted."
+provenance:
+  binary_source: static
+  exception: "Built from source (MatthewKuKanich/ESP32-AirTag-Scanner) for the Nugget with an SH1106 OLED readout on I2C 35/36 and a fixed unsigned-underflow OOB read on short BLE payloads. Merged 0x0 image, hardware-validated. Migrate to ci later."
+  imported_from:
+    repo: MatthewKuKanich/ESP32-AirTag-Scanner
+    path: "built-from-source (arduino-cli, board=lolin_s3_mini, SH1106 on 35/36, OOB fix)"
