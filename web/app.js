@@ -342,10 +342,15 @@ function applyDetection(mcu, chipName, flash) {
 function showDetected(html, kind) {
   detectedEl.hidden = false;
   detectedEl.className = `banner banner-detect banner-${kind}`;
-  const clear = (kind === "ok" || kind === "err") ? ` <button class="link-clear" type="button">clear</button>` : "";
-  detectedEl.innerHTML = html + clear;
-  const btn = detectedEl.querySelector(".link-clear");
-  if (btn) btn.addEventListener("click", () => clearDetection(true));
+  const actions = (kind === "ok" || kind === "err")
+    ? ` <button class="link-repick" type="button">use a different port</button> <button class="link-clear" type="button">clear</button>`
+    : "";
+  detectedEl.innerHTML = html + actions;
+  const clearBtn = detectedEl.querySelector(".link-clear");
+  if (clearBtn) clearBtn.addEventListener("click", () => clearDetection(true));
+  // Picked the wrong serial port? Drop it and re-prompt the browser port picker.
+  const repick = detectedEl.querySelector(".link-repick");
+  if (repick) repick.addEventListener("click", () => { grantedPort = null; detectBoard(); });
 }
 
 function hideDetected() { detectedEl.hidden = true; detectedEl.innerHTML = ""; }
