@@ -1,0 +1,24 @@
+id: defcon-badge-launcher-v1-classic
+display_name: "Badge Launcher v1 \"Classic\" (DOOM)"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "1.0.0"
+radio: rfm95
+description: "The DOOM-first launcher personality: DOOM's game data stays resident in flash for instant switching, alongside Meshtastic (standard + low-power) and WLED, all installable from the micro-SD menu."
+program_url: https://github.com/RetiaLLC/badge-launcher
+addons:
+  - "micro-SD card (FAT) — REQUIRED, holds the firmware library"
+  - "915 MHz antenna (attach before any LoRa TX)"
+quickstart:
+  - "Flash this image, then unzip sd-card.zip from the v1.0.0 release onto a FAT micro-SD card (includes the DOOM WADs)."
+  - "Insert the card; hold UP, tap RESET, keep holding UP ~1 second → menu."
+  - "Pick doom-audio.bin — first install copies the WADs into flash (one time), then DOOM switches in ~10 seconds forever after."
+  - "Want the touch messengers + NES instead? That's Badge Launcher v2 \"Touch\" — the flagship."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/badge-launcher
+    tag: v1.0.0
+    asset_pattern: "launcher.factory.bin"
+    expected_sha256: "c666c6db5e6681743d0b9a34ea4d1843e002e2b7847c877749474e69bc5cbb4c"
