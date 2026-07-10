@@ -1,0 +1,21 @@
+id: defcon-badge-meshtastic-mui
+display_name: "Meshtastic MUI Touch UI (standalone)"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "2.7.23"
+radio: rfm95
+description: "Full-color touch Meshtastic: the LVGL device-UI with on-screen keyboard, node map, message bubbles, and touch region picker — plus the phone TCP API alongside the home screen. (Also included in Badge Launcher v2.)"
+program_url: https://github.com/RetiaLLC/DefconBadge2026
+quickstart:
+  - "Flash, tap RESET, and pick your region (US) on the touch picker at first boot."
+  - "You land on LongFast — Meshtastic's default public channel. Name yourself in settings and say hi."
+  - "BLE ships off; enable it in settings to pair the Meshtastic phone app (or use WiFi + the TCP API)."
+  - "Attach the antenna before transmitting."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/DefconBadge2026
+    tag: meshtastic-mui-v2.7.23
+    asset_pattern: "meshtastic-mui-touch.factory.bin"
+    expected_sha256: "0190872f45fd1a8ad4b93a1f50e64cadc4b7ca532d998e41df6f3ba8ba853b38"
