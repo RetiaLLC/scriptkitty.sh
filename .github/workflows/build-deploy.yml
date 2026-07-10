@@ -145,7 +145,11 @@ jobs:
       - name: Hash
         run: |
           cd dist
-          for f in *.bin *.uf2; do [ -e "$f" ] && sha256sum "$f" > "$f.sha256"; done
+          # nullglob: with only .bin (or only .uf2) present, the unmatched glob
+          # must vanish — a literal "*.uf2" fails the [ -e ] test, and under
+          # bash -e a false && as the loop's last command kills the job.
+          shopt -s nullglob
+          for f in *.bin *.uf2; do sha256sum "$f" > "$f.sha256"; done
 
       - name: Attest what we fetched
         uses: actions/attest-build-provenance@v1
