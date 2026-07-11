@@ -1,16 +1,20 @@
 id: usb-nugget-wled
-display_name: "WLED"
+display_name: "WLEDkitty"
 product_line: usb-nugget
 model: "USB Nugget"
 mcu: esp32-s2
-description: "WLED webserver to control NeoPixel LEDs on the USB Nugget."
-program_url: https://github.com/Aircoookie/WLED
-addons:
-  - "Addressable LEDs (WS2812B / NeoPixel)"
-
+version: "0.15.0"
+description: "WLEDkitty — WLED tuned for Retia hardware, on the USB Nugget. Boots straight into a Pride rainbow on the onboard NeoPixel, shows live status on the OLED, and maps the d-pad to brightness, color, on/off, and effects."
+program_url: https://github.com/wled/WLED
+quickstart:
+  - "Flash this firmware, then tap the RST button (or unplug and replug) to boot."
+  - "The onboard NeoPixel (GPIO12) lights up in a Pride rainbow immediately."
+  - "D-pad: UP/DOWN = brightness, LEFT/RIGHT = color; hold UP = on/off, hold DOWN = next effect."
+  - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 to set up WiFi and add an external strip on GPIO12."
+  - "The OLED shows brightness, effect, and network status."
 provenance:
   binary_source: static
-  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  exception: "Built from source (wled/WLED, env usb-nugget extending lolin_s2_mini) with the Four-Line-Display OLED usermod (SH1106 128x64 on SDA33/SCL35), the onboard NeoPixel on GPIO12, and a 4-button d-pad (UP=9 DOWN=18 LEFT=11 RIGHT=7) driving WLEDkitty's custom handlers (tap = brightness/hue, hold UP = on/off, hold DOWN = next effect). Pride-2015 boot default. Merged 0x0 factory image, hardware-validated. Migrate to a pinned release/ci later."
   imported_from:
-    repo: RetiaLLC/esp-web-flasher-wifi-nugget
-    path: js/binaries-usb/wled_flash_dump.bin
+    repo: wled/WLED
+    path: "built-from-source (env:usb-nugget from lolin_s2_mini + four_line_display_ALT usermod)"
