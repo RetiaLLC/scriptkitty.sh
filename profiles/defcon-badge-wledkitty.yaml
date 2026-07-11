@@ -1,0 +1,23 @@
+id: defcon-badge-wledkitty
+display_name: "WLEDkitty"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "0.15.0"
+radio: rfm95
+description: "WLEDkitty — WLED for Retia devices, tuned for the DEF CON badge. Drives the ear NeoPixels plus a 300-LED strip on the J8 connector, shows live status + a color-preview bar on the TFT, and adds on-badge control (A on/off, B effects, d-pad brightness/color). Boots into a Pride rainbow. Standalone flash — replaces the SD launcher."
+program_url: https://github.com/wled/WLED
+addons:
+  - "optional: external WS2812 strip on the J8 connector (data + GND; strip on its own 5V)"
+quickstart:
+  - "Flash this image (standalone; replaces the SD launcher), then unplug and replug the badge."
+  - "The ear NeoPixels boot into a Pride rainbow; the TFT shows status and a live strip preview."
+  - "Buttons: A on/off, B next effect, UP/DOWN brightness, LEFT/RIGHT color."
+  - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 for the full web UI."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/badge-launcher
+    tag: v2.0.0
+    asset_pattern: "wledkitty-badge.factory.bin"
+    expected_sha256: "03899f9eb9587d3ba312a0682d82b9afc20042bd37e45da81e06eaa090b09797"

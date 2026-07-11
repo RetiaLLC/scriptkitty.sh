@@ -1,19 +1,20 @@
 id: bluetooth-nugget-wled
-display_name: "WLED"
+display_name: "WLEDkitty"
 product_line: bluetooth-nugget
 model: "Bluetooth Nugget"
 mcu: esp32-s3
 version: "0.15.0"
-description: "The popular WLED addressable-LED art controller, with the onboard RGB driven out of the box and live status shown on the Nugget's OLED. No LoRa backpack needed."
+description: "WLEDkitty — WLED for Retia devices, tuned for the Bluetooth Nugget. Drives the onboard RGB ears (GPIO10, chainable to an external strip) and shows live status on the 128x64 OLED, with on-device control (A on/off, B effects, d-pad brightness/color). Boots into a Pride rainbow. No LoRa backpack needed."
 program_url: https://github.com/wled/WLED
 quickstart:
   - "Flash this firmware, then unplug and replug the Nugget."
-  - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 to set up WiFi."
-  - "The onboard 2x WS2812 RGB (GPIO10) lights up immediately; add an external strip on GPIO10 for more."
-  - "The OLED shows brightness, effect, and network status."
+  - "The onboard RGB ears (GPIO10) boot into a Pride rainbow; chain an external WS2812 strip out J4 and set the count in the web UI for more."
+  - "The OLED shows brightness, effect, and network status. Buttons: A on/off, B next effect, UP/DOWN brightness, LEFT/RIGHT color."
+  - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 for the full web UI."
 provenance:
-  binary_source: static
-  exception: "Built from source (wled/WLED, env esp32s3_4M_qspi) with the Four-Line-Display OLED usermod enabled on the Nugget's I2C (SDA=35, SCL=36, 180-degree flip), default LEDs on GPIO10. Merged 0x0 image, hardware-validated. Migrate to a pinned release/ci later."
-  imported_from:
-    repo: wled/WLED
-    path: "built-from-source (env:nugget from esp32s3_4M_qspi + four_line_display_ALT usermod)"
+  binary_source: release
+  release:
+    repo: RetiaLLC/BluetoothNugget
+    tag: wledkitty-v0.15.0
+    asset_pattern: "wledkitty-nugget.factory.bin"
+    expected_sha256: "a40a2567b6c32e448d254dd3bfee0be942094fc8f28e961d1adc2c7dd8a7f555"
