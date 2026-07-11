@@ -1,15 +1,19 @@
 id: pusheen-wled
-display_name: "Pusheen WLED"
+display_name: "WLEDkitty"
 product_line: pusheen
 model: "Pusheen"
 mcu: esp8266
-description: "WLED customized for the Pusheen cat lamp."
-program_url: https://wled.me
+version: "0.15.0"
 recommended: true
-
+description: "WLEDkitty — WLED tuned for Retia hardware, on the ESP8266 Pusheen cat lamp. Boots straight into a Pride rainbow across the 4 onboard LEDs, with the front button for on/off, brightness, and palettes."
+program_url: https://github.com/wled/WLED
+quickstart:
+  - "Flash this firmware; the Pusheen reboots into a Pride rainbow on its 4 LEDs (D1 / GPIO5)."
+  - "Button (D3 / GPIO0): tap = on/off, hold = brightness, double-tap = next palette."
+  - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 to set up WiFi and pick effects."
 provenance:
   binary_source: static
-  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  exception: "Built from source (wled/WLED, env pusheen extending nodemcuv2) with LEDs on D1/GPIO5 (4 px) and the stock WLED button on D3/GPIO0 (tap = on/off, hold = brightness, double = palette). Pride-2015 boot default, no display. 0x0 image, hardware-validated. Migrate to a pinned release/ci later."
   imported_from:
-    repo: RetiaLLC/esp-web-flasher-wifi-nugget
-    path: js/binaries/pusheen_wled.bin
+    repo: wled/WLED
+    path: "built-from-source (env:pusheen from nodemcuv2)"
