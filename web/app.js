@@ -546,7 +546,10 @@ async function detectBoard() {
     try { flash = flashLabel(await loader.readFlashId()); } catch {}
     applyDetection(mcu, chipName, flash);
   } catch (e) {
-    showDetected(`Detect failed: ${e.message}. Put the board in download mode (see Flashing help) and try again.`, "err");
+    // Drop the port so the next "Detect my board" click re-opens the browser picker —
+    // lets the user choose a different port (or the same one, in download mode) on retry.
+    grantedPort = null;
+    showDetected(`Detect failed: ${e.message}. Put the board in download mode (see Flashing help), then click Detect to try again — you can pick a different port.`, "err");
     setMascot("error");
   } finally {
     try { await transport.disconnect(); } catch {}
