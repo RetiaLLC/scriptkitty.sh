@@ -211,8 +211,8 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 .tile.active .tile-caret { color: var(--accent); transform: rotate(90deg); }
 
 .pick-prompt {
-  color: var(--muted); font-size: .92rem; line-height: 1.6;
-  padding: 1.5rem 0 .5rem; max-width: 46ch;
+  color: var(--dim); font-size: .85rem; line-height: 1.5;
+  padding: .1rem 0 0; margin: 0;
 }
 .tile-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .tile-name { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -355,7 +355,7 @@ esp-web-install-button[install-unsupported] { display: block; }
 
 /* flash your own .bin */
 .custom-flash {
-  margin: 2.5rem 0 0; padding: 1.4rem 1.5rem 1.5rem;
+  margin: 1.75rem 0 0; padding: 1.4rem 1.5rem 1.5rem;
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--bg-elev);
 }

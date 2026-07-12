@@ -295,7 +295,7 @@ function renderOpenLines() {
   const keys = orderedLines([...openLines]).filter(linePresent);
   if (!keys.length) {
     const prompt = el("div", "pick-prompt");
-    prompt.textContent = "Pick a device above to see its firmware — or Detect your board to auto-select it.";
+    prompt.textContent = "Pick a device above to see its firmware — or hit Detect to auto-select.";
     buildsEl.replaceChildren(prompt);
     return;
   }
