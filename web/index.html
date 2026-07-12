@@ -4,13 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>scriptkitty.sh — flash your board in the browser</title>
-  <meta name="description" content="Search and flash firmware for the Nugget & Nibble line straight from the browser. No drivers, no CLI." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='6,4 13,13 4,12' fill='%237cf5c4'/%3E%3Cpolygon points='26,4 19,13 28,12' fill='%237cf5c4'/%3E%3Ccircle cx='16' cy='19' r='9' fill='%237cf5c4'/%3E%3Ccircle cx='12.5' cy='18' r='1.4' fill='%230d0f14'/%3E%3Ccircle cx='19.5' cy='18' r='1.4' fill='%230d0f14'/%3E%3C/svg%3E" />
+  <meta name="description" content="Plug in your Nugget or Nibble and flash it straight from the browser — no drivers, no CLI. Detect your board or pick it from the list." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='6,4 13,13 4,12' fill='%237bf1ad'/%3E%3Cpolygon points='26,4 19,13 28,12' fill='%237bf1ad'/%3E%3Ccircle cx='16' cy='19' r='9' fill='%237bf1ad'/%3E%3Ccircle cx='12.5' cy='18' r='1.4' fill='%23070a0f'/%3E%3Ccircle cx='19.5' cy='18' r='1.4' fill='%23070a0f'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
   <!-- classic-flasher fallback engine (offered when the primary esptool-js flash fails) -->
   <script type="module" src="vendor/esp-web-tools/install-button.js"></script>
 </head>
-<body>
+<body class="flash-page">
   <header class="site-header">
     <div class="wrap">
       <div class="topbar">
@@ -20,11 +20,10 @@
         </div>
         <nav class="nav">
           <a href="index.html" class="active">Flash</a>
-          <a href="serial.html">Serial Monitor</a>
+          <a href="serial.html">Serial</a>
           <a href="https://retia.io" target="_blank" rel="noopener">Shop ↗</a>
         </nav>
       </div>
-      <p class="tagline">Search the whole Nugget &amp; Nibble firmware library and flash it straight from the browser — no drivers, no CLI.</p>
     </div>
   </header>
 
@@ -35,48 +34,66 @@
       another Chromium browser on desktop.
     </div>
 
-    <div class="controls">
-      <input id="search" type="search" class="search" placeholder="Search firmware — e.g. meshtastic, deauth, nibble zero, LoRa…" autocomplete="off" aria-label="Search firmware" />
-
-      <div class="picker">
-        <div class="picker-label">Choose your device</div>
-        <div id="filters" class="filters" role="tablist" aria-label="Filter by product"></div>
-        <button id="detect" class="btn detect" type="button" title="Connect and identify your board">🔌 Detect my board</button>
+    <!-- detect hero with reactive mascot -->
+    <section class="detect-hero" id="detectHero" aria-label="Detect your board">
+      <pre class="hero-cat" id="heroCat" aria-hidden="true"></pre>
+      <div class="hero-body">
+        <div class="hero-title" id="heroTitle">Plug in your board</div>
+        <p class="hero-sub" id="heroSub">I'll sniff out which Nugget or Nibble you've plugged in and show only the firmware that fits.</p>
+        <button class="btn hero-detect" id="detect" type="button" title="Connect and identify your board">◎ Detect my board</button>
+        <div class="hero-bar" id="heroBar" hidden><div class="hero-bar-fill" id="heroBarFill"></div></div>
       </div>
+    </section>
 
-      <div class="speed-row">
-        <label class="ctl flash-speed">Flash speed
-          <select id="baud" title="Auto picks a safe fast speed for your board. Higher is faster but some USB adapters (e.g. CH340) can't sustain the top rates — if a flash fails, drop down a step.">
-            <option value="auto" selected>Auto (recommended)</option>
-            <option value="115200">115200 — most compatible</option>
-            <option value="230400">230400 — 2× faster</option>
-            <option value="460800">460800 — fastest reliable</option>
-            <option value="921600">921600 — rarely works</option>
-          </select>
+    <div id="detected" class="banner banner-detect" hidden></div>
+
+    <!-- advanced options & help -->
+    <details class="advanced" id="advanced">
+      <summary><span class="adv-caret" aria-hidden="true">▸</span> Advanced options &amp; help</summary>
+      <div class="adv-panel">
+        <div class="adv-label">Flash speed (baud)</div>
+        <select id="baud" class="adv-select" title="Auto picks a safe fast speed for your board. Higher is faster but some USB adapters (e.g. CH340) can't sustain the top rates — if a flash fails, drop down a step.">
+          <option value="auto" selected>Auto (recommended)</option>
+          <option value="921600">921600 — rarely works</option>
+          <option value="460800">460800 — fastest reliable</option>
+          <option value="230400">230400 — 2× faster</option>
+          <option value="115200">115200 — most compatible</option>
+        </select>
+        <p class="adv-hint">Auto picks the fastest speed verified for your board (460800). Drop to 115200 only if a flash ever fails.</p>
+
+        <label class="switch-row" title="Wipe the whole chip before flashing — use when switching between very different firmware (e.g. CircuitPython → deauther)">
+          <input type="checkbox" id="erase" class="switch-input" />
+          <span class="switch" aria-hidden="true"></span>
+          <span class="switch-text">
+            <span class="switch-title">Full chip erase</span>
+            <span class="switch-sub">Wipes all data &amp; settings before flashing. Use for a clean slate or a stuck board.</span>
+          </span>
         </label>
-        <span id="speed-hint" class="speed-hint">Auto = 460800 (fast, verified on all boards). Drop to 115200 only if a flash ever fails.</span>
-      </div>
 
-      <details class="advanced">
-        <summary>Advanced options &amp; help</summary>
-        <div class="advanced-body">
-          <label class="ctl ctl-check" title="Wipe the whole chip before flashing — use when switching between very different firmware (e.g. CircuitPython → deauther)">
-            <input type="checkbox" id="erase" /> Erase whole chip first
-          </label>
-          <div class="help-block">
-            <p><strong>Don't see your board in the popup?</strong> Use a USB cable that carries <em>data</em> (not charge-only). On Windows you may need a driver:
-              <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340</a> (D1 Mini / WiFi Nugget) or
-              <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener">CP2102</a>. On Mac/Linux it's usually built in. Then reload and try again.</p>
-            <p><strong>USB Nugget, Bluetooth Nugget, or Nibble won't connect?</strong> Put it in install mode: hold <b>BOOT</b>, tap <b>RESET</b> once, then release BOOT. (No reset button? Hold <b>BOOT</b> while plugging in the USB cable, then release.)</p>
-          </div>
+        <div class="adv-help">
+          <details class="help-disc">
+            <summary><span class="adv-caret" aria-hidden="true">▸</span> Flashing help</summary>
+            <p id="famHelp" class="help-text">Pick a device above to see how to put it in flashing mode.</p>
+          </details>
+          <details class="help-disc">
+            <summary><span class="adv-caret" aria-hidden="true">▸</span> Troubleshooting</summary>
+            <div class="help-text">
+              <p><strong>Don't see your board in the popup?</strong> Use a USB cable that carries <em>data</em> (not charge-only). On Windows you may need a driver:
+                <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340</a> (D1 Mini / WiFi Nugget) or
+                <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener">CP2102</a>. On Mac/Linux it's usually built in. Then reload and try again.</p>
+              <p><strong>USB Nugget, Bluetooth Nugget, or Nibble won't connect?</strong> Put it in install mode: hold <b>BOOT</b>, tap <b>RESET</b> once, then release BOOT. (No reset button? Hold <b>BOOT</b> while plugging in the USB cable, then release.)</p>
+            </div>
+          </details>
         </div>
-      </details>
+      </div>
+    </details>
 
-      <div id="detected" class="banner banner-detect" hidden></div>
-      <div id="count" class="count"></div>
-    </div>
+    <!-- choose your device -->
+    <div class="picker-label">Choose your device</div>
+    <div id="tiles" class="tiles" role="tablist" aria-label="Choose your device"></div>
 
-    <div id="targets" aria-live="polite">
+    <!-- selected-family firmware -->
+    <div id="builds" aria-live="polite">
       <div class="loading">Loading firmware library…</div>
     </div>
 
@@ -124,7 +141,7 @@
     </div>
   </footer>
 
-  <!-- cat library (read by app.js for the empty state + flash success) -->
+  <!-- cat library (read by app.js for the flash overlay art) -->
   <div id="cats" hidden aria-hidden="true"><pre data-cat="terminal"> _._     _,-'""`-._
 (,-.`._,'(       |\`-/|
     `-.-' \ )-`( , o o)
@@ -132,28 +149,6 @@
       _.|o o  |_   ) )
     -(((---(((--------
       access granted</pre></div>
-
-  <!-- card template -->
-  <template id="tpl-card">
-    <article class="card">
-      <div class="card-head">
-        <h3 class="card-name"></h3>
-        <span class="rec-badge" hidden>★ Recommended</span>
-        <span class="chip mcu"></span>
-      </div>
-      <p class="card-desc"></p>
-      <dl class="meta">
-        <div><dt>Model</dt><dd class="model"></dd></div>
-        <div><dt>Version</dt><dd class="version"></dd></div>
-        <div class="radio-wrap"><dt>Radio</dt><dd class="radio"></dd></div>
-      </dl>
-      <div class="addons"></div>
-      <div class="card-foot">
-        <a class="src-link" target="_blank" rel="noopener">Source ↗</a>
-        <div class="card-action"></div>
-      </div>
-    </article>
-  </template>
 
   <script src="app.js"></script>
 </body>

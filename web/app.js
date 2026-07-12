@@ -1,17 +1,16 @@
-// Searchable "all downloads" catalog. Reads manifests/index.json (generated in CI by
-// scripts/generate_manifests.py). Manual device picker + optional auto-detect (reads the
-// chip over Web Serial via vendored esptool-js), Recommended badges, add-ons, per-device
-// flashing help, and flashing via vendored esptool-js (fast baud, single 0x0 image).
+// scriptkitty.sh — detect-first home. Reads manifests/index.json (generated in CI by
+// scripts/generate_manifests.py). Pick a device tile (or auto-detect the chip over Web
+// Serial via vendored esptool-js) to reveal its firmware as expanding cards; the
+// recommended build opens first. Flashing runs on the vendored esptool-js (fast baud,
+// single 0x0 image) with a reactive ASCII-cat mascot mirroring each flash.
 
-const targetsEl = document.getElementById("targets");
-const searchEl = document.getElementById("search");
-const filtersEl = document.getElementById("filters");
-const countEl = document.getElementById("count");
+const buildsEl = document.getElementById("builds");
+const tilesEl = document.getElementById("tiles");
 const detectBtn = document.getElementById("detect");
 const detectedEl = document.getElementById("detected");
 const baudSel = document.getElementById("baud");
 const eraseChk = document.getElementById("erase");
-const tpl = document.getElementById("tpl-card");
+const famHelpEl = document.getElementById("famHelp");
 
 const HAS_SERIAL = "serial" in navigator;
 if (!HAS_SERIAL) {
@@ -25,15 +24,28 @@ const MCU_LABEL = {
 };
 const RADIO_LABEL = { rfm95: "RFM95 (LoRa)", sx1262: "SX1262 (LoRa)" };
 
-// Product lines in display order: [key, heading, subtitle]
+// Product lines in display order: [key, heading, short family descriptor].
 const LINES = [
-  ["usb-nugget", "USB Nugget", "ESP32-S2 USB attack platform"],
-  ["wifi-nugget", "WiFi Nugget", "ESP8266 Wi-Fi hacking tool"],
-  ["bluetooth-nugget", "Bluetooth Nugget", "ESP32-S3 Bluetooth / LoRa platform"],
-  ["nibble", "Nibble", "ESP32-S3 Meshtastic / Meshcore boards"],
-  ["defcon-badge", "DEF CON Badge (2026)", "ESP32-S3 conference badge — mesh, games & more"],
-  ["pusheen", "Pusheen", "ESP8266 cat-lamp"],
+  ["usb-nugget", "USB Nugget", "USB attack platform"],
+  ["wifi-nugget", "WiFi Nugget", "Wi-Fi hacking tool"],
+  ["bluetooth-nugget", "Bluetooth Nugget", "Bluetooth / LoRa platform"],
+  ["nibble", "Nibble", "Meshtastic / Meshcore"],
+  ["defcon-badge", "DEF CON Badge (2026)", "conference badge — mesh, games & more"],
+  ["pusheen", "Pusheen", "just for fun"],
 ];
+function famName(key) { const l = LINES.find((x) => x[0] === key); return l ? l[1] : key; }
+function famTag(key) { const l = LINES.find((x) => x[0] === key); return l ? l[2] : ""; }
+
+// Board line-art (black-on-white; displayed inverted + screen so it reads as white line
+// art on the dark UI). Keyed by product line.
+const BOARD_IMG = {
+  "usb-nugget": "assets/boards/usb-nugget.png",
+  "wifi-nugget": "assets/boards/wifi-nugget.png",
+  "bluetooth-nugget": "assets/boards/bluetooth-nugget.png",
+  "nibble": "assets/boards/nibble.png",
+  "pusheen": "assets/boards/pusheen.png",
+  "defcon-badge": "assets/boards/defcon-badge.png",
+};
 
 // Which product lines share each chip family (same-silicon collisions can't be
 // resolved by auto-detect — the user confirms with the manual picker).
@@ -42,9 +54,8 @@ const LINES_BY_MCU = {
   "esp32-s2": ["usb-nugget"],
   "esp32-s3": ["bluetooth-nugget", "nibble", "defcon-badge"],
 };
-
-// Flash size resolves same-silicon collisions where it can: every S3 Nugget/
-// Nibble is 4 MB, the DEF CON badge is the only 8 MB ESP32-S3 in the catalog.
+// Flash size resolves same-silicon collisions where it can: every S3 Nugget/Nibble is
+// 4 MB, the DEF CON badge is the only 8 MB ESP32-S3 in the catalog.
 const LINES_BY_MCU_FLASH = {
   "esp32-s3": { 8: ["defcon-badge"], 4: ["bluetooth-nugget", "nibble"] },
 };
@@ -59,10 +70,26 @@ const HELP = {
   "defcon-badge": "Native USB (ESP32-S3). Enter flashing mode: hold SW2 (BOOT), tap SW1 (RESET), release SW2. After flashing, tap RESET. The Badge Launcher firmwares REQUIRE a FAT-formatted micro-SD card — grab the SD zip(s) from the release linked on the card.",
 };
 
+// reactive-mascot ASCII art
+const CAT = {
+  idle: ` /\\_/\\
+( o.o )
+ (")_(")`,
+  working: ` /\\_/\\
+( o.o )7
+ (")_(")`,
+  success: ` /\\_/\\
+( ^.^ )♥
+ (")_(")`,
+  error: ` /\\_/\\
+( x.x )
+ (")_(")`,
+};
+
 let ALL = [];
-let activeLine = "all";
-let query = "";
-let detectedMcu = null;
+let activeLine = null;          // the currently selected device family
+let openCards = new Set();      // ids of expanded firmware cards
+let candidateLines = new Set(); // families a detected chip could be (ambiguous detect)
 
 // esptool-js is vendored and dynamic-imported once, shared by detect + flash.
 let _esptool = null;
@@ -94,172 +121,313 @@ async function init() {
   ALL = (data && data.targets) || [];
   if (!ALL.length) { renderEmpty(); return; }
 
-  buildFilters();
-  searchEl.addEventListener("input", () => { query = searchEl.value.trim().toLowerCase(); render(); });
+  buildTiles();
   detectBtn.addEventListener("click", detectBoard);
   // remember the user's flash-speed choice across visits
   try { const saved = localStorage.getItem("sk_baud"); if (saved && baudSel) baudSel.value = saved; } catch {}
   if (baudSel) baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_baud", baudSel.value); } catch {} });
   setupCustomFlash();
+  setMascot("idle");
+
+  // open the family named in the URL hash (shareable device links), else the first
+  // product line that actually has firmware
+  const present = (k) => ALL.some((t) => t.product_line === k);
+  const fromHash = (location.hash || "").replace(/^#/, "");
+  const first = (fromHash && present(fromHash) && fromHash)
+    || LINES.map((l) => l[0]).find(present)
+    || (ALL[0] && ALL[0].product_line);
+  if (first) selectFamily(first); else render();
+  window.addEventListener("hashchange", () => {
+    const k = (location.hash || "").replace(/^#/, "");
+    if (k && present(k) && k !== activeLine) selectFamily(k);
+  });
+}
+
+// --- device tiles ------------------------------------------------------------
+function familiesPresent() {
+  const present = LINES.filter(([key]) => ALL.some((t) => t.product_line === key));
+  const extras = [...new Set(ALL.map((t) => t.product_line))]
+    .filter((k) => !LINES.some((l) => l[0] === k))
+    .map((k) => [k, k, ""]);
+  return [...present, ...extras];
+}
+
+function buildTiles() {
+  tilesEl.replaceChildren();
+  for (const [key, name] of familiesPresent()) {
+    const items = ALL.filter((t) => t.product_line === key);
+    const mcu = items[0] && items[0].mcu;
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "tile";
+    tile.dataset.key = key;
+    tile.setAttribute("role", "tab");
+    tile.innerHTML =
+      `<span class="tile-caret" aria-hidden="true">›</span>` +
+      `<span class="tile-text">` +
+        `<span class="tile-name">${escapeHtml(name)}</span>` +
+        `<span class="tile-chip">${MCU_LABEL[mcu] || mcu || ""}</span>` +
+      `</span>` +
+      `<span class="tile-count">${items.length}</span>`;
+    tile.addEventListener("click", () => selectFamily(key));
+    tilesEl.append(tile);
+  }
+  syncTiles();
+}
+
+function syncTiles() {
+  tilesEl.querySelectorAll(".tile").forEach((el) => {
+    const on = el.dataset.key === activeLine;
+    el.classList.toggle("active", on);
+    el.classList.toggle("candidate", !on && candidateLines.has(el.dataset.key));
+    el.setAttribute("aria-selected", String(on));
+  });
+}
+
+function selectFamily(key) {
+  activeLine = key;
+  candidateLines.clear();
+  try { history.replaceState(null, "", "#" + key); } catch {}
+  // open the build that renders first (recommended-first, then by name — matching render())
+  const items = ALL.filter((t) => t.product_line === key)
+    .sort((a, b) => (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || ""));
+  const rec = items.find((t) => t.recommended) || items[0];
+  openCards = new Set(rec ? [rec.id] : []);
   render();
 }
 
-function buildFilters() {
-  const present = new Set(ALL.map((t) => t.product_line));
-  const chips = [["all", "All", ALL.length]];
-  for (const [key, label] of LINES) {
-    if (present.has(key)) chips.push([key, label, ALL.filter((t) => t.product_line === key).length]);
-  }
-  filtersEl.replaceChildren();
-  for (const [key, label, n] of chips) {
-    const b = document.createElement("button");
-    b.className = "filter" + (key === activeLine ? " active" : "");
-    b.dataset.line = key;
-    b.innerHTML = `${label} <span class="filter-n">${n}</span>`;
-    b.addEventListener("click", () => {
-      activeLine = key;
-      // a manual pick overrides an earlier auto-detect
-      if (detectedMcu) clearDetection(false);
-      syncFilterButtons();
-      render();
-    });
-    filtersEl.append(b);
-  }
+// --- selected-family builds --------------------------------------------------
+function updateFamilyHelp(key) {
+  if (!famHelpEl) return;
+  famHelpEl.textContent = HELP[key] || "Plug the board in, pick a build, and hit Flash.";
 }
 
-function syncFilterButtons() {
-  filtersEl.querySelectorAll(".filter").forEach((el) => el.classList.toggle("active", el.dataset.line === activeLine));
-}
-
-function matches(t) {
-  if (detectedMcu && t.mcu !== detectedMcu) return false;
-  if (activeLine !== "all" && t.product_line !== activeLine) return false;
-  if (!query) return true;
-  const hay = [
-    t.name, t.model, t.product_line, t.description, t.mcu, t.radio,
-    MCU_LABEL[t.mcu], (t.addons || []).join(" "),
-  ].join(" ").toLowerCase();
-  return query.split(/\s+/).every((term) => hay.includes(term));
+// Group a family's builds by model (variant) when it meaningfully clusters — e.g. the
+// Nibble line splits into Nibble Zero / Connect / Screen Connect. Flat otherwise.
+function groupsFor(items) {
+  const models = [...new Set(items.map((t) => t.model || ""))].filter(Boolean);
+  // Only sub-group when a family has ≥3 genuine board variants (e.g. the Nibble line:
+  // Zero / Connect / OG / Screen Connect). A base model + one add-on variant stays flat.
+  if (models.length < 3) return [{ tag: "", show: false, items }];
+  const order = [];
+  const by = new Map();
+  for (const t of items) {
+    const m = t.model || "Other";
+    if (!by.has(m)) { by.set(m, []); order.push(m); }
+    by.get(m).push(t);
+  }
+  return order.map((m) => ({ tag: m, show: true, items: by.get(m) }));
 }
 
 function render() {
-  const shown = ALL.filter(matches);
-  countEl.textContent = shown.length === ALL.length
-    ? `${ALL.length} programs`
-    : `${shown.length} of ${ALL.length} programs`;
-
-  if (!shown.length) {
-    targetsEl.replaceChildren(emptyBox("No firmware matches your search."));
+  syncTiles();
+  const key = activeLine;
+  updateFamilyHelp(key);
+  const items = ALL.filter((t) => t.product_line === key);
+  if (!items.length) {
+    buildsEl.replaceChildren(emptyBox("No firmware for this device yet — run the Build & Deploy workflow to populate it."));
     return;
   }
+  // recommended first, then by name
+  items.sort((a, b) => (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || ""));
+  const mcu = items[0].mcu;
 
-  // group shown items by line, in LINES order then any extras
-  const byLine = new Map();
-  for (const t of shown) {
-    if (!byLine.has(t.product_line)) byLine.set(t.product_line, []);
-    byLine.get(t.product_line).push(t);
-  }
-  const order = [...LINES.map((l) => l[0]), ...[...byLine.keys()].filter((k) => !LINES.some((l) => l[0] === k))];
+  buildsEl.replaceChildren();
+  const section = document.createElement("section");
+  section.className = "fam-section";
 
-  targetsEl.replaceChildren();
-  for (const key of order) {
-    const items = byLine.get(key);
-    if (!items || !items.length) continue;
-    // recommended first, then by name
-    items.sort((a, b) => (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || ""));
-    const meta = LINES.find((l) => l[0] === key);
-    const section = document.createElement("section");
-    section.className = "line-section";
-    const head = document.createElement("div");
-    head.className = "line-head";
-    head.innerHTML = `<h2>${meta ? meta[1] : key}</h2>` + (meta ? `<span>${meta[2]}</span>` : "") +
-      `<span class="line-n">${items.length}</span>`;
-    section.append(head);
-    if (HELP[key]) {
-      const help = document.createElement("details");
-      help.className = "line-help";
-      help.innerHTML = `<summary>Flashing help</summary><p>${HELP[key]}</p>`;
-      section.append(help);
+  const head = document.createElement("div");
+  head.className = "fam-head";
+  head.innerHTML =
+    `<span class="fam-name">${escapeHtml(famName(key))}</span>` +
+    `<span class="fam-meta">${MCU_LABEL[mcu] || mcu || ""}${famTag(key) ? " · " + escapeHtml(famTag(key)) : ""}</span>` +
+    `<span class="fam-count">${items.length} build${items.length === 1 ? "" : "s"}</span>`;
+  section.append(head);
+
+  const groups = groupsFor(items);
+  for (const g of groups) {
+    if (g.show) {
+      const gh = document.createElement("div");
+      gh.className = "tag-head";
+      gh.innerHTML =
+        `<span class="tag-name">${escapeHtml(g.tag)}</span>` +
+        `<span class="tag-count">${g.items.length} build${g.items.length === 1 ? "" : "s"}</span>` +
+        `<span class="tag-rule" aria-hidden="true"></span>`;
+      section.append(gh);
     }
-    const grid = document.createElement("div");
-    grid.className = "targets";
-    for (const t of items) grid.append(renderCard(t));
-    section.append(grid);
-    targetsEl.append(section);
+    const list = document.createElement("div");
+    list.className = "fw-list";
+    for (const t of g.items) list.append(renderCard(t));
+    section.append(list);
   }
+  buildsEl.append(section);
 }
 
 function renderCard(t) {
-  const node = tpl.content.cloneNode(true);
-  node.querySelector(".card-name").textContent = t.name || t.id;
-  node.querySelector(".mcu").textContent = MCU_LABEL[t.mcu] || t.mcu;
-  if (t.recommended) node.querySelector(".rec-badge").hidden = false;
-  node.querySelector(".card-desc").textContent = stripNote(t.description);
-  node.querySelector(".model").textContent = t.model || "—";
-  node.querySelector(".version").textContent = t.version ? `v${t.version}` : "—";
+  const open = openCards.has(t.id);
+  const img = BOARD_IMG[t.product_line];
+  const desc = stripNote(t.description);
+  const chip = MCU_LABEL[t.mcu] || t.mcu || "";
+  const ver = t.version ? `v${t.version}` : "";
 
-  const radioWrap = node.querySelector(".radio-wrap");
-  if (t.radio) node.querySelector(".radio").textContent = RADIO_LABEL[t.radio] || t.radio;
-  else radioWrap.remove();
+  const card = el("article", "fw-card" + (open ? " open" : ""));
+  card.dataset.id = t.id;
 
-  const addonsEl = node.querySelector(".addons");
-  const addons = t.addons || [];
-  if (addons.length) {
-    addonsEl.innerHTML = `<span class="addons-label">Add-ons needed</span>` +
-      addons.map((a) => `<span class="addon">${a}</span>`).join("");
+  // ---- header (click to expand) ----
+  const headBtn = document.createElement("button");
+  headBtn.type = "button";
+  headBtn.className = "fw-head";
+  headBtn.setAttribute("aria-expanded", String(open));
+
+  const thumb = el("span", "fw-thumb");
+  if (img) {
+    const im = document.createElement("img");
+    im.src = img; im.alt = ""; im.loading = "lazy";
+    thumb.append(im);
   } else {
-    addonsEl.innerHTML = `<span class="addon addon-ok">No add-ons needed</span>`;
+    thumb.append(el("span", "fw-thumb-ph", "▢"));
   }
 
+  const main = el("span", "fw-main");
+  const titleRow = el("span", "fw-titlerow");
+  titleRow.append(el("span", "fw-name", t.name || t.id));
+  if (t.recommended) titleRow.append(el("span", "fw-default", "★ DEFAULT"));
+  const chipRow = el("span", "fw-chiprow");
+  chipRow.append(el("span", "fw-chip", chip));
+  if (ver) chipRow.append(el("span", "fw-ver", ver));
+  main.append(titleRow, chipRow);
+  if (desc) main.append(el("span", "fw-short", desc));
+
+  headBtn.append(thumb, main, el("span", "fw-chevron", "▸"));
+  card.append(headBtn);
+
+  // ---- expanded detail ----
+  const detail = el("div", "fw-detail");
+  if (img) {
+    const wrap = el("div", "fw-img");
+    const im = document.createElement("img");
+    im.src = img; im.alt = `${famName(t.product_line)} board`; im.loading = "lazy";
+    wrap.append(im);
+    detail.append(wrap);
+  }
+  if (desc) detail.append(el("p", "fw-long", desc));
+
+  const meta = el("div", "fw-meta");
+  meta.append(metaItem("Model", t.model || "—"), metaItem("Version", ver || "—"));
+  if (t.radio) meta.append(metaItem("Radio", RADIO_LABEL[t.radio] || t.radio));
+  detail.append(meta);
+
+  const addons = t.addons || [];
+  if (addons.length) detail.append(el("div", "fw-addon", `⚠ needs ${addons.join(", ")}`));
+
+  const links = el("div", "fw-links");
   const steps = t.quickstart || [];
   if (steps.length) {
     const d = document.createElement("details");
-    d.className = "card-quickstart";
+    d.className = "fw-quickstart";
     const sum = document.createElement("summary");
-    sum.textContent = "Quickstart";
+    sum.innerHTML = `<span class="adv-caret" aria-hidden="true">▸</span> Quickstart`;
     const ol = document.createElement("ol");
     for (const s of steps) { const li = document.createElement("li"); li.textContent = s; ol.append(li); }
     d.append(sum, ol);
-    addonsEl.after(d);
+    links.append(d);
   }
+  if (t.program_url) {
+    const a = document.createElement("a");
+    a.className = "fw-src"; a.href = t.program_url; a.target = "_blank"; a.rel = "noopener";
+    a.textContent = "Source ↗";
+    links.append(a);
+  }
+  if (links.childElementCount) detail.append(links);
+  card.append(detail);
 
-  const src = node.querySelector(".src-link");
-  if (t.program_url) src.href = t.program_url;
-  else src.remove();
+  // ---- flash row ----
+  const flashRow = el("div", "fw-flashrow");
+  flashRow.append(makeFlashAction(t, open));
+  card.append(flashRow);
 
-  const actionEl = node.querySelector(".card-action");
-  if (t.flow === "uf2") renderUf2(actionEl, t);
-  else renderEsp(actionEl, t);
-  return node;
+  headBtn.addEventListener("click", () => toggleCard(card, t));
+  return card;
 }
 
-function renderEsp(actionEl, t) {
+function metaItem(label, value) {
+  const d = el("div", "fw-meta-item");
+  d.append(el("dt", null, label), el("dd", null, value));
+  return d;
+}
+
+function toggleCard(card, t) {
+  const nowOpen = !card.classList.contains("open");
+  card.classList.toggle("open", nowOpen);
+  const head = card.querySelector(".fw-head");
+  if (head) head.setAttribute("aria-expanded", String(nowOpen));
+  if (nowOpen) openCards.add(t.id); else openCards.delete(t.id);
+  const btn = card.querySelector(".fw-flash[data-flash='esp']");
+  if (btn && !btn.disabled) btn.textContent = nowOpen ? "⚡ Flash this build" : "⚡ Flash";
+}
+
+function makeFlashAction(t, open) {
+  if (t.flow === "uf2") return makeUf2Action(t);
   const btn = document.createElement("button");
-  btn.className = "btn";
+  btn.className = "btn fw-flash";
   btn.type = "button";
   if (HAS_SERIAL) {
-    btn.textContent = "Flash";
+    btn.dataset.flash = "esp";
+    btn.textContent = open ? "⚡ Flash this build" : "⚡ Flash";
     btn.addEventListener("click", () => flashProfile(t));
   } else {
     btn.textContent = "Chrome or Edge required";
     btn.disabled = true;
   }
-  actionEl.append(btn);
+  return btn;
 }
 
-async function renderUf2(actionEl, t) {
-  let side = {};
-  try {
-    const res = await fetch(`manifests/${t.manifest}`, { cache: "no-cache" });
-    if (res.ok) side = await res.json();
-  } catch { /* defaults below */ }
-  const uf2Path = side.uf2_path ? side.uf2_path.replace(/^\.\.\//, "") : `firmware/${t.id}.uf2`;
+function makeUf2Action(t) {
   const dl = document.createElement("a");
-  dl.className = "btn";
-  dl.href = uf2Path;
-  dl.setAttribute("download", "");
+  dl.className = "btn fw-flash";
   dl.textContent = "Download .uf2";
-  actionEl.append(dl);
+  dl.setAttribute("download", "");
+  dl.href = `firmware/${t.id}.uf2`;
+  // refine the path from the side manifest when available
+  fetch(`manifests/${t.manifest}`, { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((side) => { if (side && side.uf2_path) dl.href = side.uf2_path.replace(/^\.\.\//, ""); })
+    .catch(() => {});
+  return dl;
+}
+
+// --- reactive mascot ---------------------------------------------------------
+let mascotTimer = null;
+function setMascot(phase, name) {
+  const cat = document.getElementById("heroCat");
+  const title = document.getElementById("heroTitle");
+  const sub = document.getElementById("heroSub");
+  const bar = document.getElementById("heroBar");
+  const hero = document.getElementById("detectHero");
+  if (!cat) return;
+  clearTimeout(mascotTimer); mascotTimer = null;
+
+  const artKey = phase === "found" ? "success" : phase;
+  cat.textContent = CAT[artKey] || CAT.idle;
+  if (hero) hero.className = "detect-hero mascot-" + artKey;
+
+  const idle = phase === "idle";
+  if (sub) sub.hidden = !idle;
+  if (bar) bar.hidden = phase !== "working";
+  if (detectBtn) detectBtn.hidden = phase === "working";
+
+  if (phase === "working") title.textContent = `Flashing ${name || "your board"}…`;
+  else if (phase === "success") title.textContent = `${name || "Your board"} flashed! Unplug & enjoy ♥`;
+  else if (phase === "error") title.textContent = "Hiccup — check the popup for the fix";
+  else if (phase === "found") title.textContent = name && name !== "board"
+    ? `Found your ${name} — here it is`
+    : "Found your board — pick which one below";
+  else title.textContent = "Plug in your board";
+
+  // reactive states settle back to idle so the hero stays inviting
+  if (phase === "success") mascotTimer = setTimeout(() => setMascot("idle"), 5000);
+  else if (phase === "error") mascotTimer = setTimeout(() => setMascot("idle"), 6000);
+  else if (phase === "found") mascotTimer = setTimeout(() => setMascot("idle"), 4500);
 }
 
 // --- auto-detect via vendored esptool-js -------------------------------------
@@ -295,6 +463,7 @@ async function detectBoard() {
     applyDetection(mcu, chipName, flash);
   } catch (e) {
     showDetected(`Detect failed: ${e.message}. Put the board in download mode (see Flashing help) and try again.`, "err");
+    setMascot("error");
   } finally {
     try { await transport.disconnect(); } catch {}
   }
@@ -318,25 +487,31 @@ function flashLabel(flashId) {
 function applyDetection(mcu, chipName, flash) {
   if (!mcu) {
     showDetected(`Detected ${chipName || "an unknown chip"} — not a recognized Nugget/Nibble chip.`, "err");
+    setMascot("error");
     return;
   }
-  detectedMcu = mcu;
   let lines = LINES_BY_MCU[mcu] || [];
   const flashMb = parseInt(flash, 10); // "8 MB flash" -> 8, "" -> NaN
   const byFlash = (LINES_BY_MCU_FLASH[mcu] || {})[flashMb];
   if (byFlash) lines = byFlash;
+  // only offer families that actually have firmware in the catalog
+  lines = lines.filter((k) => ALL.some((t) => t.product_line === k));
   const chipTxt = `${MCU_LABEL[mcu]}${flash ? " · " + flash : ""}`;
+
   if (lines.length === 1) {
-    activeLine = lines[0];
-    const name = LINES.find((l) => l[0] === lines[0])[1];
-    showDetected(`Detected <b>${name}</b> (${chipTxt}) — showing its firmware.`, "ok");
+    selectFamily(lines[0]);
+    setMascot("found", famName(lines[0]));
+    showDetected(`Detected <b>${famName(lines[0])}</b> (${chipTxt}) — showing its firmware.`, "ok");
+  } else if (lines.length > 1) {
+    candidateLines = new Set(lines);
+    syncTiles();
+    const names = lines.map(famName).join(", ");
+    setMascot("found", "board");
+    showDetected(`Detected <b>${chipTxt}</b> — this could be ${names}. Pick your exact board below.`, "ok");
   } else {
-    activeLine = "all";
-    const names = lines.map((k) => LINES.find((l) => l[0] === k)[1]).join(" or a ");
-    showDetected(`Detected <b>${chipTxt}</b> — this is a ${names}. Pick your exact board below.`, "ok");
+    showDetected(`Detected ${chipTxt} — no matching firmware in the catalog yet.`, "err");
+    setMascot("error");
   }
-  syncFilterButtons();
-  render();
 }
 
 function showDetected(html, kind) {
@@ -347,7 +522,7 @@ function showDetected(html, kind) {
     : "";
   detectedEl.innerHTML = html + actions;
   const clearBtn = detectedEl.querySelector(".link-clear");
-  if (clearBtn) clearBtn.addEventListener("click", () => clearDetection(true));
+  if (clearBtn) clearBtn.addEventListener("click", () => clearDetection());
   // Picked the wrong serial port? Drop it and re-prompt the browser port picker.
   const repick = detectedEl.querySelector(".link-repick");
   if (repick) repick.addEventListener("click", () => { grantedPort = null; detectBoard(); });
@@ -355,12 +530,11 @@ function showDetected(html, kind) {
 
 function hideDetected() { detectedEl.hidden = true; detectedEl.innerHTML = ""; }
 
-function clearDetection(rerender) {
-  detectedMcu = null;
-  activeLine = "all";
+function clearDetection() {
   hideDetected();
-  syncFilterButtons();
-  if (rerender) render();
+  candidateLines.clear();
+  syncTiles();
+  setMascot("idle");
 }
 
 // --- flashing via vendored esptool-js ----------------------------------------
@@ -402,7 +576,6 @@ function flashCustomParts(parts) {
 }
 
 // Shared esptool-js flash flow used by both the catalog and the custom-.bin path.
-// ctx: { name, manifest, expectMcu, offset, loadData(): Promise<Uint8Array>, retry() }
 async function flashImage(ctx) {
   if (!HAS_SERIAL) return;
   const baud = resolveBaud(ctx.expectMcu);
@@ -418,7 +591,7 @@ async function flashImage(ctx) {
 
   let port;
   try { port = await acquirePort(); }
-  catch { closeFlash(); return; } // user dismissed the browser port picker
+  catch { closeFlash(); setMascot("idle"); return; } // user dismissed the browser port picker
 
   const term = { clean() {}, writeLine() {}, write() {} };
   const transport = new Transport(port, false);
@@ -497,6 +670,7 @@ function openFlash(ctx) {
   setFlashProgress(0, 1);
   setFlashStatus("");
   setFlashHint("");
+  setMascot("working", ctx.name);
 }
 function setFlashStatus(text) { ensureOverlay().querySelector(".flash-status").textContent = text; }
 function setFlashHint(text) { ensureOverlay().querySelector(".flash-hint").textContent = text; }
@@ -505,6 +679,8 @@ function setFlashProgress(written, total) {
   const pct = total ? Math.round((written / total) * 100) : 0;
   o.querySelector(".flash-bar-fill").style.width = pct + "%";
   o.querySelector(".flash-pct").textContent = pct + "%";
+  const hb = document.getElementById("heroBarFill");
+  if (hb) hb.style.width = pct + "%";
 }
 function showFlashSuccess(ctx) {
   const o = ensureOverlay();
@@ -518,10 +694,11 @@ function showFlashSuccess(ctx) {
   actions.replaceChildren(
     btnEl("a", "btn", "Open Serial Monitor", { href: "serial.html" }),
     btnEl("button", "btn secondary", "Flash another board", { onclick: () => {
-      grantedPort = null; closeFlash(); clearDetection(true); window.scrollTo({ top: 0, behavior: "smooth" });
+      grantedPort = null; closeFlash(); clearDetection(); window.scrollTo({ top: 0, behavior: "smooth" });
     } }),
     btnEl("button", "btn secondary", "Done", { onclick: closeFlash }),
   );
+  setMascot("success", ctx.name);
 }
 // Turn a raw esptool-js error into a plain-language explanation for a beginner.
 function mapFlashError(raw, info) {
@@ -550,6 +727,7 @@ function showFlashError(ctx, msg, info) {
   if (ctx.retry) actions.append(btnEl("button", "btn", "Retry", { onclick: () => { closeFlash(); ctx.retry(); } }));
   if (mapped.classic && ctx.manifest) actions.append(classicFlasherButton(ctx));
   actions.append(btnEl("button", "btn secondary", "Close", { onclick: closeFlash }));
+  setMascot("error", ctx.name);
 }
 
 // The ESP Web Tools "classic flasher" fallback: battle-tested at 115200 over Web
@@ -663,7 +841,7 @@ function stripNote(desc) {
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
-  if (text) n.textContent = text;
+  if (text != null) n.textContent = text;
   return n;
 }
 
@@ -680,7 +858,7 @@ function emptyBox(text) {
   return box;
 }
 function renderEmpty(err) {
-  targetsEl.replaceChildren(emptyBox(err
+  buildsEl.replaceChildren(emptyBox(err
     ? "No firmware published yet — run the Build & Deploy workflow to populate the library."
     : "No firmware is configured yet."));
 }
