@@ -12,8 +12,9 @@ quickstart:
   - "Button (D3 / GPIO0): tap = on/off, hold = brightness, double-tap = next palette."
   - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 to set up WiFi and pick effects."
 provenance:
-  binary_source: static
-  exception: "Built from source (wled/WLED, env pusheen extending nodemcuv2) with LEDs on D1/GPIO5 (4 px) and the stock WLED button on D3/GPIO0 (tap = on/off, hold = brightness, double = palette). Pride-2015 boot default, no display. 0x0 image, hardware-validated. Migrate to a pinned release/ci later."
-  imported_from:
-    repo: wled/WLED
-    path: "built-from-source (env:pusheen from nodemcuv2)"
+  binary_source: release
+  release:
+    repo: RetiaLLC/WLEDkitty
+    tag: wledkitty-v0.15.0
+    asset_pattern: "wledkitty-pusheen.bin"
+    expected_sha256: "e42dfddffeced1988fd1af0671e8879e4ecad10cdc42911d8cda9689e382350f"

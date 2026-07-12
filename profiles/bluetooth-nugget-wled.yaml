@@ -14,7 +14,7 @@ quickstart:
 provenance:
   binary_source: release
   release:
-    repo: RetiaLLC/BluetoothNugget
+    repo: RetiaLLC/WLEDkitty
     tag: wledkitty-v0.15.0
     asset_pattern: "wledkitty-nugget.factory.bin"
     expected_sha256: "a40a2567b6c32e448d254dd3bfee0be942094fc8f28e961d1adc2c7dd8a7f555"

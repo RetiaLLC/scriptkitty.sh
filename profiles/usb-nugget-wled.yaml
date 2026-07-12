@@ -13,8 +13,9 @@ quickstart:
   - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 to set up WiFi and add an external strip on GPIO12."
   - "The OLED shows brightness, effect, and network status."
 provenance:
-  binary_source: static
-  exception: "Built from source (wled/WLED, env usb-nugget extending lolin_s2_mini) with the Four-Line-Display OLED usermod (SH1106 128x64 on SDA33/SCL35), the onboard NeoPixel on GPIO12, and a 4-button d-pad (UP=9 DOWN=18 LEFT=11 RIGHT=7) driving WLEDkitty's custom handlers (tap = brightness/hue, hold UP = on/off, hold DOWN = next effect). Pride-2015 boot default. Merged 0x0 factory image, hardware-validated. Migrate to a pinned release/ci later."
-  imported_from:
-    repo: wled/WLED
-    path: "built-from-source (env:usb-nugget from lolin_s2_mini + four_line_display_ALT usermod)"
+  binary_source: release
+  release:
+    repo: RetiaLLC/WLEDkitty
+    tag: wledkitty-v0.15.0
+    asset_pattern: "wledkitty-usb-nugget.factory.bin"
+    expected_sha256: "ede3b4b1f4c0071773a96d531cc89a81f48f5b621876a0a74f2ea22859185aff"

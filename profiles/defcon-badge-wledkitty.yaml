@@ -17,7 +17,7 @@ quickstart:
 provenance:
   binary_source: release
   release:
-    repo: RetiaLLC/badge-launcher
-    tag: v2.0.0
+    repo: RetiaLLC/WLEDkitty
+    tag: wledkitty-v0.15.0
     asset_pattern: "wledkitty-badge.factory.bin"
     expected_sha256: "03899f9eb9587d3ba312a0682d82b9afc20042bd37e45da81e06eaa090b09797"
