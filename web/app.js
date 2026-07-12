@@ -460,7 +460,7 @@ function makeFlashAction(t, open) {
     btn.textContent = open ? "⚡ Flash this build" : "⚡ Flash";
     btn.addEventListener("click", () => flashProfile(t));
   } else {
-    btn.textContent = "Chrome or Edge required";
+    btn.textContent = "Needs Web Serial";
     btn.disabled = true;
   }
   return btn;
@@ -839,7 +839,7 @@ function classicFlasherButton(ctx) {
   const unsupported = document.createElement("span");
   unsupported.setAttribute("slot", "unsupported");
   unsupported.className = "unsupported-note";
-  unsupported.textContent = "Chrome or Edge required";
+  unsupported.textContent = "Needs a Web Serial browser";
   ewt.append(unsupported);
   return ewt;
 }
