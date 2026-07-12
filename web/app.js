@@ -193,11 +193,7 @@ function selectFamily(key) {
   query = "";
   if (searchEl) searchEl.value = "";
   try { history.replaceState(null, "", "#" + key); } catch {}
-  // open the build that renders first (recommended-first, then by name — matching render())
-  const items = ALL.filter((t) => t.product_line === key)
-    .sort((a, b) => (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || ""));
-  const rec = items.find((t) => t.recommended) || items[0];
-  openCards = new Set(rec ? [rec.id] : []);
+  openCards = new Set();   // start fully collapsed — the user expands what they want
   render();
 }
 
@@ -555,11 +551,13 @@ function applyDetection(mcu, chipName, flash) {
     setMascot("found", famName(lines[0]));
     showDetected(`Detected <b>${famName(lines[0])}</b> (${chipTxt}) — showing its firmware.`, "ok");
   } else if (lines.length > 1) {
+    // ambiguous chip: open the primary candidate, flag the alternative(s) to switch to
+    selectFamily(lines[0]);
     candidateLines = new Set(lines);
     syncTiles();
-    const names = lines.map(famName).join(", ");
-    setMascot("found", "board");
-    showDetected(`Detected <b>${chipTxt}</b> — this could be ${names}. Pick your exact board below.`, "ok");
+    const others = lines.slice(1).map(famName).join(" or a ");
+    setMascot("found", famName(lines[0]));
+    showDetected(`Detected <b>${chipTxt}</b> — showing <b>${famName(lines[0])}</b>. If it's actually a ${others}, tap it below.`, "ok");
   } else {
     showDetected(`Detected ${chipTxt} — no matching firmware in the catalog yet.`, "err");
     setMascot("error");
