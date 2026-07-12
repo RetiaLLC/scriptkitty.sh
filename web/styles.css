@@ -207,9 +207,13 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 }
 .tile:hover { border-color: rgba(110, 168, 255, .4); background: var(--bg-elev-2); }
 .tile.active { border-color: rgba(123, 241, 173, .45); background: linear-gradient(160deg, #12201a, #0e1620); }
-.tile.candidate { border-color: rgba(110, 168, 255, .5); animation: pulse 2s infinite; }
-.tile-caret { font-family: var(--mono); font-weight: 700; font-size: 15px; color: var(--accent-2); flex: none; }
-.tile.active .tile-caret { color: var(--accent); }
+.tile-caret { font-family: var(--mono); font-weight: 700; font-size: 15px; color: var(--accent-2); flex: none; transition: transform .15s ease; }
+.tile.active .tile-caret { color: var(--accent); transform: rotate(90deg); }
+
+.pick-prompt {
+  color: var(--muted); font-size: .92rem; line-height: 1.6;
+  padding: 1.5rem 0 .5rem; max-width: 46ch;
+}
 .tile-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .tile-name { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile-chip { font-family: var(--mono); font-size: 10px; color: var(--dim); }

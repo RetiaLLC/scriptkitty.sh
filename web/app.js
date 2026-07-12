@@ -88,10 +88,11 @@ const CAT = {
 };
 
 let ALL = [];
-let activeLine = null;          // the currently selected device family
-let query = "";                 // free-text search (spans every family when set)
-let openCards = new Set();      // ids of expanded firmware cards
-let candidateLines = new Set(); // families a detected chip could be (ambiguous detect)
+let openLines = new Set();       // device families whose firmware section is expanded (multi-open)
+let query = "";                  // free-text search (spans every family when set)
+let openCards = new Set();       // ids of expanded firmware cards
+
+const linePresent = (k) => ALL.some((t) => t.product_line === k);
 
 // esptool-js is vendored and dynamic-imported once, shared by detect + flash.
 let _esptool = null;
@@ -132,18 +133,22 @@ async function init() {
   setupCustomFlash();
   setMascot("idle");
 
-  // open the family named in the URL hash (shareable device links), else the first
-  // product line that actually has firmware
-  const present = (k) => ALL.some((t) => t.product_line === k);
-  const fromHash = (location.hash || "").replace(/^#/, "");
-  const first = (fromHash && present(fromHash) && fromHash)
-    || LINES.map((l) => l[0]).find(present)
-    || (ALL[0] && ALL[0].product_line);
-  if (first) selectFamily(first); else render();
-  window.addEventListener("hashchange", () => {
-    const k = (location.hash || "").replace(/^#/, "");
-    if (k && present(k) && k !== activeLine) selectFamily(k);
-  });
+  // Expand the family/families named in the URL hash (comma-separated, shareable).
+  // A fresh visit with no hash starts with nothing expanded — you click a device to
+  // reveal its projects.
+  openLinesFromHash();
+  render();
+  window.addEventListener("hashchange", () => { openLinesFromHash(); render(); });
+}
+
+function openLinesFromHash() {
+  const keys = (location.hash || "").replace(/^#/, "").split(",")
+    .map((s) => s.trim()).filter((k) => k && linePresent(k));
+  openLines = new Set(keys);
+}
+function syncHash() {
+  const h = [...openLines].join(",");
+  try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch {}
 }
 
 // --- device tiles ------------------------------------------------------------
@@ -164,7 +169,6 @@ function buildTiles() {
     tile.type = "button";
     tile.className = "tile";
     tile.dataset.key = key;
-    tile.setAttribute("role", "tab");
     tile.innerHTML =
       `<span class="tile-caret" aria-hidden="true">›</span>` +
       `<span class="tile-text">` +
@@ -172,7 +176,7 @@ function buildTiles() {
         `<span class="tile-chip">${MCU_LABEL[mcu] || mcu || ""}</span>` +
       `</span>` +
       `<span class="tile-count">${items.length}</span>`;
-    tile.addEventListener("click", () => selectFamily(key));
+    tile.addEventListener("click", () => toggleLine(key));
     tilesEl.append(tile);
   }
   syncTiles();
@@ -180,27 +184,45 @@ function buildTiles() {
 
 function syncTiles() {
   tilesEl.querySelectorAll(".tile").forEach((el) => {
-    const on = el.dataset.key === activeLine;
+    const on = openLines.has(el.dataset.key);
     el.classList.toggle("active", on);
-    el.classList.toggle("candidate", !on && candidateLines.has(el.dataset.key));
-    el.setAttribute("aria-selected", String(on));
+    el.setAttribute("aria-expanded", String(on));
   });
 }
 
-function selectFamily(key) {
-  activeLine = key;
-  candidateLines.clear();
+// Tiles are independent toggles: click to reveal a device's firmware, click again
+// (or click an already-expanded device) to collapse it. Several can be open at once.
+function toggleLine(key) {
+  if (openLines.has(key)) openLines.delete(key); else openLines.add(key);
   query = "";
   if (searchEl) searchEl.value = "";
-  try { history.replaceState(null, "", "#" + key); } catch {}
-  openCards = new Set();   // start fully collapsed — the user expands what they want
+  hideDetected();
+  syncHash();
+  render();
+}
+// Detection sets exactly which families are shown (single or all applicable).
+function setOpenLines(keys) {
+  openLines = new Set(keys);
+  openCards = new Set();   // fresh context → every card collapsed
+  query = "";
+  if (searchEl) searchEl.value = "";
+  syncHash();
   render();
 }
 
-// --- selected-family builds --------------------------------------------------
-function updateFamilyHelp(key) {
+// --- device firmware sections ------------------------------------------------
+function updateFamilyHelp() {
   if (!famHelpEl) return;
-  famHelpEl.textContent = HELP[key] || "Plug the board in, pick a build, and hit Flash.";
+  const open = orderedLines([...openLines]).filter(linePresent);
+  if (!open.length) {
+    famHelpEl.textContent = "Pick a device above, then plug it in and hit Flash.";
+  } else if (open.length === 1) {
+    famHelpEl.textContent = HELP[open[0]] || "Plug the board in, pick a build, and hit Flash.";
+  } else {
+    famHelpEl.innerHTML = open
+      .map((k) => `<b>${escapeHtml(famName(k))}:</b> ${escapeHtml(HELP[k] || "Plug in, pick a build, and hit Flash.")}`)
+      .join("<br><br>");
+  }
 }
 
 // Group a family's builds by model (variant) when it meaningfully clusters — e.g. the
@@ -264,25 +286,39 @@ function orderedLines(keys) {
 
 function render() {
   syncTiles();
-  updateFamilyHelp(activeLine);
-  if (query) renderSearch(); else renderFamily(activeLine);
+  updateFamilyHelp();
+  if (query) { renderSearch(); return; }
+  renderOpenLines();
 }
 
-function renderFamily(key) {
-  const items = ALL.filter((t) => t.product_line === key).sort(recThenName);
-  if (!items.length) {
-    buildsEl.replaceChildren(emptyBox("No firmware for this device yet — run the Build & Deploy workflow to populate it."));
+function renderOpenLines() {
+  const keys = orderedLines([...openLines]).filter(linePresent);
+  if (!keys.length) {
+    const prompt = el("div", "pick-prompt");
+    prompt.textContent = "Pick a device above to see its firmware — or Detect your board to auto-select it.";
+    buildsEl.replaceChildren(prompt);
     return;
   }
+  const frag = document.createDocumentFragment();
+  for (const key of keys) frag.append(familySection(key));
+  buildsEl.replaceChildren(frag);
+}
+
+function familySection(key) {
+  const items = ALL.filter((t) => t.product_line === key).sort(recThenName);
   const section = el("section", "fam-section");
   section.append(familyHeader(key, items.length));
+  if (!items.length) {
+    section.append(emptyBox("No firmware for this device yet — run the Build & Deploy workflow to populate it."));
+    return section;
+  }
   for (const g of groupsFor(items)) {
     if (g.show) section.append(tagHeader(g));
     const list = el("div", "fw-list");
     for (const t of g.items) list.append(renderCard(t));
     section.append(list);
   }
-  buildsEl.replaceChildren(section);
+  return section;
 }
 
 // search spans every family — results grouped by family (flat list per family)
@@ -547,17 +583,16 @@ function applyDetection(mcu, chipName, flash) {
   const chipTxt = `${MCU_LABEL[mcu]}${flash ? " · " + flash : ""}`;
 
   if (lines.length === 1) {
-    selectFamily(lines[0]);
+    setOpenLines(lines);
     setMascot("found", famName(lines[0]));
     showDetected(`Detected <b>${famName(lines[0])}</b> (${chipTxt}) — showing its firmware.`, "ok");
   } else if (lines.length > 1) {
-    // ambiguous chip: open the primary candidate, flag the alternative(s) to switch to
-    selectFamily(lines[0]);
-    candidateLines = new Set(lines);
-    syncTiles();
-    const others = lines.slice(1).map(famName).join(" or a ");
-    setMascot("found", famName(lines[0]));
-    showDetected(`Detected <b>${chipTxt}</b> — showing <b>${famName(lines[0])}</b>. If it's actually a ${others}, tap it below.`, "ok");
+    // ambiguous chip: open every applicable board (all highlighted green) so the user
+    // collapses whichever isn't theirs
+    setOpenLines(lines);
+    setMascot("found", "board");
+    const allOpen = lines.length === 2 ? "Both are" : "They're all";
+    showDetected(`Detected <b>${chipTxt}</b> — this could be ${joinBoards(lines)}. ${allOpen} open below; collapse the one that isn't yours.`, "ok");
   } else {
     showDetected(`Detected ${chipTxt} — no matching firmware in the catalog yet.`, "err");
     setMascot("error");
@@ -580,10 +615,16 @@ function showDetected(html, kind) {
 
 function hideDetected() { detectedEl.hidden = true; detectedEl.innerHTML = ""; }
 
+// "a WiFi Nugget or a Pusheen" / "a Bluetooth Nugget, a Nibble, or a DEF CON Badge"
+function joinBoards(keys) {
+  const names = keys.map(famName);
+  if (names.length === 1) return "a " + names[0];
+  if (names.length === 2) return "a " + names[0] + " or a " + names[1];
+  return "a " + names.slice(0, -1).join(", a ") + ", or a " + names[names.length - 1];
+}
+
 function clearDetection() {
   hideDetected();
-  candidateLines.clear();
-  syncTiles();
   setMascot("idle");
 }
 
