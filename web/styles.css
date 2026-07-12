@@ -182,6 +182,17 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 .help-text b, .help-text strong { color: var(--text); }
 .help-text a { color: var(--accent-2); }
 
+/* search across every family */
+.search-row { position: relative; display: flex; align-items: center; margin: 0 0 20px; }
+.search-ic { position: absolute; left: 14px; font-family: var(--mono); font-size: 14px; color: var(--dim); pointer-events: none; }
+.search {
+  width: 100%; background: var(--inset); color: var(--text);
+  border: 1px solid rgba(255, 255, 255, .1); border-radius: 11px;
+  padding: 13px 14px 13px 36px; font-family: var(--sans); font-size: 14px;
+}
+.search:focus { outline: none; border-color: var(--accent-2); }
+.search::placeholder { color: var(--dim); }
+
 /* choose your device — tiles */
 .picker-label {
   font-family: var(--mono); font-size: 12px; letter-spacing: .3px; text-transform: uppercase;

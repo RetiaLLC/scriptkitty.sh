@@ -6,6 +6,7 @@
 
 const buildsEl = document.getElementById("builds");
 const tilesEl = document.getElementById("tiles");
+const searchEl = document.getElementById("search");
 const detectBtn = document.getElementById("detect");
 const detectedEl = document.getElementById("detected");
 const baudSel = document.getElementById("baud");
@@ -88,6 +89,7 @@ const CAT = {
 
 let ALL = [];
 let activeLine = null;          // the currently selected device family
+let query = "";                 // free-text search (spans every family when set)
 let openCards = new Set();      // ids of expanded firmware cards
 let candidateLines = new Set(); // families a detected chip could be (ambiguous detect)
 
@@ -122,6 +124,7 @@ async function init() {
   if (!ALL.length) { renderEmpty(); return; }
 
   buildTiles();
+  if (searchEl) searchEl.addEventListener("input", () => { query = searchEl.value.trim().toLowerCase(); render(); });
   detectBtn.addEventListener("click", detectBoard);
   // remember the user's flash-speed choice across visits
   try { const saved = localStorage.getItem("sk_baud"); if (saved && baudSel) baudSel.value = saved; } catch {}
@@ -187,6 +190,8 @@ function syncTiles() {
 function selectFamily(key) {
   activeLine = key;
   candidateLines.clear();
+  query = "";
+  if (searchEl) searchEl.value = "";
   try { history.replaceState(null, "", "#" + key); } catch {}
   // open the build that renders first (recommended-first, then by name — matching render())
   const items = ALL.filter((t) => t.product_line === key)
@@ -219,48 +224,95 @@ function groupsFor(items) {
   return order.map((m) => ({ tag: m, show: true, items: by.get(m) }));
 }
 
+const recThenName = (a, b) =>
+  (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || "");
+
+// A build matches when every search term appears in its name/model/line/desc/chip/radio.
+function matchesQuery(t) {
+  const hay = [
+    t.name, t.model, t.product_line, t.description, t.mcu, t.radio,
+    MCU_LABEL[t.mcu], (t.addons || []).join(" "),
+  ].join(" ").toLowerCase();
+  return query.split(/\s+/).every((term) => hay.includes(term));
+}
+
+function familyHeader(key, count, total) {
+  const mcu = (ALL.find((t) => t.product_line === key) || {}).mcu;
+  const countTxt = (total != null && count !== total)
+    ? `${count} of ${total} builds`
+    : `${count} build${count === 1 ? "" : "s"}`;
+  const head = el("div", "fam-head");
+  head.innerHTML =
+    `<span class="fam-name">${escapeHtml(famName(key))}</span>` +
+    `<span class="fam-meta">${MCU_LABEL[mcu] || mcu || ""}${famTag(key) ? " · " + escapeHtml(famTag(key)) : ""}</span>` +
+    `<span class="fam-count">${countTxt}</span>`;
+  return head;
+}
+
+function tagHeader(g) {
+  const gh = el("div", "tag-head");
+  gh.innerHTML =
+    `<span class="tag-name">${escapeHtml(g.tag)}</span>` +
+    `<span class="tag-count">${g.items.length} build${g.items.length === 1 ? "" : "s"}</span>` +
+    `<span class="tag-rule" aria-hidden="true"></span>`;
+  return gh;
+}
+
+// group product lines in LINES order, then any extras not in LINES
+function orderedLines(keys) {
+  return [
+    ...LINES.map((l) => l[0]).filter((k) => keys.includes(k)),
+    ...keys.filter((k) => !LINES.some((l) => l[0] === k)),
+  ];
+}
+
 function render() {
   syncTiles();
-  const key = activeLine;
-  updateFamilyHelp(key);
-  const items = ALL.filter((t) => t.product_line === key);
+  updateFamilyHelp(activeLine);
+  if (query) renderSearch(); else renderFamily(activeLine);
+}
+
+function renderFamily(key) {
+  const items = ALL.filter((t) => t.product_line === key).sort(recThenName);
   if (!items.length) {
     buildsEl.replaceChildren(emptyBox("No firmware for this device yet — run the Build & Deploy workflow to populate it."));
     return;
   }
-  // recommended first, then by name
-  items.sort((a, b) => (b.recommended === true) - (a.recommended === true) || (a.name || "").localeCompare(b.name || ""));
-  const mcu = items[0].mcu;
-
-  buildsEl.replaceChildren();
-  const section = document.createElement("section");
-  section.className = "fam-section";
-
-  const head = document.createElement("div");
-  head.className = "fam-head";
-  head.innerHTML =
-    `<span class="fam-name">${escapeHtml(famName(key))}</span>` +
-    `<span class="fam-meta">${MCU_LABEL[mcu] || mcu || ""}${famTag(key) ? " · " + escapeHtml(famTag(key)) : ""}</span>` +
-    `<span class="fam-count">${items.length} build${items.length === 1 ? "" : "s"}</span>`;
-  section.append(head);
-
-  const groups = groupsFor(items);
-  for (const g of groups) {
-    if (g.show) {
-      const gh = document.createElement("div");
-      gh.className = "tag-head";
-      gh.innerHTML =
-        `<span class="tag-name">${escapeHtml(g.tag)}</span>` +
-        `<span class="tag-count">${g.items.length} build${g.items.length === 1 ? "" : "s"}</span>` +
-        `<span class="tag-rule" aria-hidden="true"></span>`;
-      section.append(gh);
-    }
-    const list = document.createElement("div");
-    list.className = "fw-list";
+  const section = el("section", "fam-section");
+  section.append(familyHeader(key, items.length));
+  for (const g of groupsFor(items)) {
+    if (g.show) section.append(tagHeader(g));
+    const list = el("div", "fw-list");
     for (const t of g.items) list.append(renderCard(t));
     section.append(list);
   }
-  buildsEl.append(section);
+  buildsEl.replaceChildren(section);
+}
+
+// search spans every family — results grouped by family (flat list per family)
+function renderSearch() {
+  const shown = ALL.filter(matchesQuery);
+  if (!shown.length) {
+    buildsEl.replaceChildren(emptyBox("No firmware matches your search."));
+    return;
+  }
+  const byLine = new Map();
+  for (const t of shown) {
+    if (!byLine.has(t.product_line)) byLine.set(t.product_line, []);
+    byLine.get(t.product_line).push(t);
+  }
+  const frag = document.createDocumentFragment();
+  for (const key of orderedLines([...byLine.keys()])) {
+    const items = byLine.get(key).sort(recThenName);
+    const total = ALL.filter((t) => t.product_line === key).length;
+    const section = el("section", "fam-section");
+    section.append(familyHeader(key, items.length, total));
+    const list = el("div", "fw-list");
+    for (const t of items) list.append(renderCard(t));
+    section.append(list);
+    frag.append(section);
+  }
+  buildsEl.replaceChildren(frag);
 }
 
 function renderCard(t) {
