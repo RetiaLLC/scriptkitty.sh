@@ -131,10 +131,17 @@ def sync_profile(profile: dict, firmware_dir: str, meta_dir: str) -> bool:
         with open(dest + ".sha256", "w") as f:
             f.write(f"{sha}  {fname}\n")
 
+        # Verification is PER-TARGET: a full release is verified for this target if
+        # its own verification-<target>.json is attached. A full release with no
+        # verification assets at all is legacy-verified (promoted before evidence
+        # sidecars existed). A full release carrying only OTHER targets' evidence
+        # was promoted for those targets — this target's build stays untested.
         verified = not rel.get("prerelease")
         verification = None
         if verified and ver_pattern:
-            vasset = next((a for a in rel.get("assets", []) if fnmatch.fnmatch(a["name"], ver_pattern)), None)
+            assets = rel.get("assets", [])
+            vasset = next((a for a in assets if fnmatch.fnmatch(a["name"], ver_pattern)), None)
+            any_evidence = any(fnmatch.fnmatch(a["name"], "verification-*.json") for a in assets)
             if vasset:
                 try:
                     vtmp = os.path.join(vdir, safe_name(tag) + ".verification.json")
@@ -144,6 +151,8 @@ def sync_profile(profile: dict, firmware_dir: str, meta_dir: str) -> bool:
                     os.remove(vtmp)
                 except Exception as e:
                     print(f"::warning::{pid}: unreadable verification asset on {tag} ({e})")
+            elif any_evidence:
+                verified = False
 
         version, sk_build = parse_version(tag)
         entry = {
