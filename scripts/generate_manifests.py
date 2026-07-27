@@ -53,11 +53,24 @@ def uf2_sidecar(profile: dict, uf2_rel_path: str) -> dict:
     }
 
 
+def load_channel_meta(meta_dir: str, pid: str):
+    """Channel-sync sidecar for a channel-sourced profile (see sync_channels.py)."""
+    if not meta_dir:
+        return None
+    path = os.path.join(meta_dir, f"{pid}.json")
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--profiles-dir", required=True)
     ap.add_argument("--firmware-dir", required=True)
     ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--channels-meta", default=None,
+                    help="dir of per-profile channel metadata written by sync_channels.py")
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -68,6 +81,17 @@ def main() -> int:
             profile = yaml.safe_load(f)
         pid = profile["id"]
         mcu = profile["mcu"]
+
+        # channel profiles: the card's headline version is whatever verified build the
+        # default bin points at (sync_channels.py keeps them in lockstep), NOT the
+        # yaml's static version field — resolve it before writing any manifest.
+        meta = load_channel_meta(args.channels_meta, pid)
+        latest_verified_rel = None
+        if meta:
+            latest_verified_rel = next(
+                (r for r in meta.get("releases", []) if r["tag"] == meta.get("latest_verified")), None)
+            if latest_verified_rel:
+                profile["version"] = latest_verified_rel["version"]
 
         if mcu == "rp2040":
             uf2 = f"{pid}.uf2"
@@ -93,6 +117,29 @@ def main() -> int:
         print(f"-> {out}")
         count += 1
 
+        # channel profiles: one extra manifest per mirrored version, and the release
+        # list (verified + untested) folded into the card's index entry.
+        channel = None
+        if meta and mcu in CHIP_FAMILY:
+            kept = []
+            for rel in meta.get("releases", []):
+                if not os.path.exists(os.path.join(args.firmware_dir, rel["bin"])):
+                    print(f"::warning::{pid}: {rel['tag']} listed but bin missing, dropping")
+                    continue
+                vdoc = esp_manifest(
+                    {**profile, "version": rel["version"]},
+                    f"../firmware/{rel['bin']}",
+                )
+                with open(os.path.join(args.out_dir, rel["manifest"]), "w") as f:
+                    json.dump(vdoc, f, indent=2)
+                kept.append(rel)
+            if kept:
+                channel = {
+                    "repo": meta.get("repo", ""),
+                    "latest_verified": meta.get("latest_verified"),
+                    "releases": kept,
+                }
+
         # catalog entry the static site renders cards from
         index.append({
             "id": pid,
@@ -109,6 +156,7 @@ def main() -> int:
             "recommended": bool(profile.get("recommended", False)),
             "flow": flow,
             "manifest": f"{pid}.json",
+            **({"channel": channel} if channel else {}),
         })
 
     index_path = os.path.join(args.out_dir, "index.json")

@@ -17,6 +17,10 @@ on:
       - ".github/workflows/build-deploy.yml"
   schedule:
     - cron: "0 6 * * 1"      # Mondays 06:00 UTC - catch upstream/toolchain drift
+  # Channel repos (e.g. RetiaLLC/WLEDkitty) ping this after publishing or promoting a
+  # release, so new/verified builds appear on the site without waiting for the cron.
+  repository_dispatch:
+    types: [channel-release]
   workflow_dispatch:
     inputs:
       rebuild_all:
@@ -258,12 +262,27 @@ jobs:
               print("backfill: nothing missing")
           PY
 
+      - name: Sync channel releases (verified + untested versions)
+        # channel profiles track a repo's WHOLE release history: every full release
+        # (= verified) plus the newest prereleases (= untested, flashed behind a
+        # warning). Mirrors bins to site/firmware/versions/<id>/ and refreshes the
+        # default site/firmware/<id>.bin to the newest verified build. Runs after
+        # backfill so a dead channel API still leaves last-known-good in place.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/sync_channels.py \
+            --profiles-dir profiles \
+            --firmware-dir site/firmware \
+            --channels-meta _channels
+
       - name: Generate ESP Web Tools manifests from profiles
         run: |
           python3 scripts/generate_manifests.py \
             --profiles-dir profiles \
             --firmware-dir site/firmware \
-            --out-dir site/manifests
+            --out-dir site/manifests \
+            --channels-meta _channels
 
       - name: Assert self-hosted flashers present (no runtime CDN)
         run: |

@@ -12,9 +12,11 @@ quickstart:
   - "The OLED shows brightness, effect, and network status. Buttons: A on/off, B next effect, UP/DOWN brightness, LEFT/RIGHT color."
   - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 for the full web UI."
 provenance:
-  binary_source: release
-  release:
+  # channel: tracks ALL WLEDkitty releases — full releases are hardware-VERIFIED
+  # (default flash), prereleases are untested auto-builds offered behind a warning.
+  # Verification/promotion happens in the WLEDkitty repo (promote workflow).
+  binary_source: channel
+  channel:
     repo: RetiaLLC/WLEDkitty
-    tag: wledkitty-v0.15.0
     asset_pattern: "wledkitty-nugget.factory.bin"
-    expected_sha256: "a40a2567b6c32e448d254dd3bfee0be942094fc8f28e961d1adc2c7dd8a7f555"
+    verification_pattern: "verification-nugget.json"

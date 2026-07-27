@@ -4,6 +4,9 @@
 Policy rules beyond plain schema:
   - binary_source: static  requires  provenance.exception  (the "static-binary ban")
   - binary_source: release requires  release.{repo,tag,asset_pattern} and tag != latest
+  - binary_source: channel requires  channel.{repo,asset_pattern}, repo under RetiaLLC/
+    (channels track a repo's whole release history, so unlike 'release' there is no
+    pinned sha — restrict them to our own org until third-party channels earn trust)
   - esp32 profiles require flash.{mode,frequency,size} (needed for merge_bin)
   - rp2040 profiles must declare flash.format: uf2
 """
@@ -15,7 +18,7 @@ import sys
 import yaml
 
 VALID_MCU = {"esp8266", "esp32", "esp32-s2", "esp32-s3", "rp2040"}
-VALID_SOURCE = {"ci", "release", "static"}
+VALID_SOURCE = {"ci", "release", "static", "channel"}
 
 
 def changed_files(base_ref: str):
@@ -64,6 +67,14 @@ def validate(path: str) -> list[str]:
                 errs.append(f"{path}: release.{k} required when binary_source=release")
         if rel.get("tag") == "latest":
             errs.append(f"{path}: pin an exact release tag, not 'latest'")
+
+    if src == "channel":
+        ch = prov.get("channel", {})
+        for k in ("repo", "asset_pattern"):
+            if not ch.get(k):
+                errs.append(f"{path}: channel.{k} required when binary_source=channel")
+        if ch.get("repo") and not str(ch["repo"]).startswith("RetiaLLC/"):
+            errs.append(f"{path}: channel.repo must be under RetiaLLC/ (unpinned source)")
 
     if mcu in {"esp32", "esp32-s2", "esp32-s3"} and src == "ci":
         flash = p.get("flash", {})

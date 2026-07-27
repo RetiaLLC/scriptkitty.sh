@@ -379,6 +379,9 @@ function renderCard(t) {
   const chipRow = el("span", "fw-chiprow");
   chipRow.append(el("span", "fw-chip", chip));
   if (ver) chipRow.append(el("span", "fw-ver", ver));
+  // channel cards: surface that newer-but-untested builds exist behind the card
+  const nightlies = t.channel ? t.channel.releases.filter((r) => !r.verified) : [];
+  if (nightlies.length) chipRow.append(el("span", "fw-nightly-count", `+${nightlies.length} untested`));
   main.append(titleRow, chipRow);
   if (desc) main.append(el("span", "fw-short", desc));
 
@@ -400,6 +403,9 @@ function renderCard(t) {
   meta.append(metaItem("Model", t.model || "—"), metaItem("Version", ver || "—"));
   if (t.radio) meta.append(metaItem("Radio", RADIO_LABEL[t.radio] || t.radio));
   detail.append(meta);
+
+  // channel cards: full version history — verified releases plus untested auto-builds
+  if (t.channel && t.channel.releases && t.channel.releases.length) detail.append(versionsBlock(t));
 
   const addons = t.addons || [];
   if (addons.length) detail.append(el("div", "fw-addon", `⚠ needs ${addons.join(", ")}`));
@@ -478,6 +484,101 @@ function makeUf2Action(t) {
     .then((side) => { if (side && side.uf2_path) dl.href = side.uf2_path.replace(/^\.\.\//, ""); })
     .catch(() => {});
   return dl;
+}
+
+// --- release channels: version history, verified badges, untested builds ------
+function relLabel(rel) {
+  return `v${rel.version}${rel.sk_build != null ? ` sk.${rel.sk_build}` : ""}`;
+}
+
+function versionsBlock(t) {
+  const wrap = el("div", "fw-versions");
+  const verified = t.channel.releases.filter((r) => r.verified);
+  const nightlies = t.channel.releases.filter((r) => !r.verified);
+
+  if (verified.length) {
+    wrap.append(el("div", "ver-head", "Verified releases"));
+    for (const rel of verified) wrap.append(verRow(t, rel, rel.tag === t.channel.latest_verified));
+  }
+
+  if (nightlies.length) {
+    const d = document.createElement("details");
+    d.className = "fw-nightlies";
+    const sum = document.createElement("summary");
+    sum.innerHTML = `<span class="adv-caret" aria-hidden="true">▸</span> ⚠ ${nightlies.length} untested auto-build${nightlies.length === 1 ? "" : "s"}`;
+    d.append(sum);
+    d.append(el("p", "ver-nightly-note",
+      "Compiled automatically from the latest source — nobody has confirmed these on real hardware yet. " +
+      "If one misbehaves, flash the verified release above to get back to a known-good setup."));
+    for (const rel of nightlies) d.append(verRow(t, rel, false));
+    wrap.append(d);
+  }
+  return wrap;
+}
+
+function verRow(t, rel, isDefault) {
+  const row = el("div", "ver-row" + (rel.verified ? " verified" : " untested"));
+  const info = el("span", "ver-info");
+  const name = el("span", "ver-name", relLabel(rel));
+  info.append(name);
+  if (rel.verified) {
+    const method = rel.method === "workbench" ? "workbench-verified"
+      : rel.method === "human" ? "human-verified" : "verified";
+    const b = el("span", "ver-badge ok", `✓ ${method}`);
+    if (rel.verified_date || rel.date) b.title = `Verified ${rel.verified_date || rel.date}`;
+    info.append(b);
+  } else {
+    info.append(el("span", "ver-badge warn", "⚠ untested"));
+  }
+  if (isDefault) info.append(el("span", "ver-default", "default"));
+  if (rel.date) info.append(el("span", "ver-date", rel.date));
+  row.append(info);
+
+  if (HAS_SERIAL) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn secondary ver-flash";
+    btn.textContent = "Flash";
+    if (rel.verified) {
+      btn.addEventListener("click", () => flashRelease(t, rel));
+    } else {
+      // untested builds arm on first click and only flash on a deliberate second click
+      let disarm = null;
+      btn.addEventListener("click", () => {
+        if (btn.dataset.armed) {
+          clearTimeout(disarm);
+          delete btn.dataset.armed;
+          btn.classList.remove("armed");
+          btn.textContent = "Flash";
+          flashRelease(t, rel);
+          return;
+        }
+        btn.dataset.armed = "1";
+        btn.classList.add("armed");
+        btn.textContent = "⚠ Untested — flash anyway?";
+        disarm = setTimeout(() => {
+          delete btn.dataset.armed;
+          btn.classList.remove("armed");
+          btn.textContent = "Flash";
+        }, 5000);
+      });
+    }
+    row.append(btn);
+  }
+  return row;
+}
+
+// Flash a specific channel release (any version, verified or untested).
+function flashRelease(t, rel) {
+  return flashImage({
+    name: `${t.name} ${relLabel(rel)}`, manifest: rel.manifest, expectMcu: t.mcu,
+    loadParts: async () => {
+      const resp = await fetch(`firmware/${rel.bin}`, { cache: "no-cache" });
+      if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
+      return [{ data: new Uint8Array(await resp.arrayBuffer()), address: 0 }];
+    },
+    retry: () => flashRelease(t, rel),
+  });
 }
 
 // --- reactive mascot ---------------------------------------------------------

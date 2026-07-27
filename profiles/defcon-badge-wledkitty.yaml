@@ -15,9 +15,11 @@ quickstart:
   - "Buttons: A on/off, B next effect, UP/DOWN brightness, LEFT/RIGHT color."
   - "Join the 'WLED-AP' WiFi network (password 'wled1234') and open http://4.3.2.1 for the full web UI."
 provenance:
-  binary_source: release
-  release:
+  # channel: tracks ALL WLEDkitty releases — full releases are hardware-VERIFIED
+  # (default flash), prereleases are untested auto-builds offered behind a warning.
+  # Verification/promotion happens in the WLEDkitty repo (promote workflow).
+  binary_source: channel
+  channel:
     repo: RetiaLLC/WLEDkitty
-    tag: wledkitty-v0.15.0
     asset_pattern: "wledkitty-badge.factory.bin"
-    expected_sha256: "03899f9eb9587d3ba312a0682d82b9afc20042bd37e45da81e06eaa090b09797"
+    verification_pattern: "verification-badge.json"
