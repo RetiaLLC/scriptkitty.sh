@@ -48,6 +48,9 @@
 
     <div id="detected" class="banner banner-detect" hidden></div>
 
+    <div class="flash-layout">
+      <aside class="app-sidebar">
+
     <!-- advanced options & help -->
     <details class="advanced" id="advanced">
       <summary><span class="adv-caret" aria-hidden="true">▸</span> Advanced options &amp; help</summary>
@@ -98,7 +101,9 @@
     <!-- choose your device -->
     <div class="picker-label">Choose your device</div>
     <div id="tiles" class="tiles" role="group" aria-label="Choose your device"></div>
+      </aside>
 
+      <div class="app-content">
     <!-- selected-family firmware -->
     <div id="builds" aria-live="polite">
       <div class="loading">Loading firmware library…</div>
@@ -126,6 +131,8 @@
         <button id="customFlash" class="btn" type="button" disabled>Flash .bin</button>
       </div>
     </section>
+      </div>
+    </div>
   </main>
 
   <footer class="site-footer">

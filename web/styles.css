@@ -51,6 +51,23 @@ body {
 .wrap { width: min(960px, 92vw); margin-inline: auto; }
 .flash-page .wrap { width: min(600px, 92vw); }
 
+/* Desktop: widen the page and split the picker (sticky sidebar) from the firmware
+   content column. Below 1024px everything stays the original single narrow column. */
+@media (min-width: 1024px) {
+  .flash-page .wrap { width: min(1200px, 94vw); }
+  .flash-layout {
+    display: grid;
+    grid-template-columns: minmax(340px, 380px) 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+  .app-sidebar { position: sticky; top: 1.25rem; }
+  .app-sidebar .tiles { grid-template-columns: 1fr; }
+  .app-content { min-width: 0; }
+  .app-content .custom-flash { margin-top: 2rem; }
+}
+.hero-body { max-width: 640px; }
+
 a { color: var(--accent-2); text-decoration: none; }
 a:hover { color: var(--accent-2-hover); }
 
