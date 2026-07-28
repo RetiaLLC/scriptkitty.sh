@@ -36,6 +36,13 @@ and the card appears automatically.
   Provide `provenance.release.{repo, tag, asset_pattern}` (never `tag: latest`).
 - **`ci`**: don't commit a binary — CI compiles it from `projects/<dir>`. Provide
   `build.{system, environment|fqbn, project_dir}` and, for ESP32, `flash.{mode,frequency,size}`.
+- **`channel`**: the firmware has its own RetiaLLC repo cutting releases through the
+  release-channel system (verified defaults + "untested" prereleases, per-target
+  verification, version picker on the card). Provide `channel.{repo, asset_pattern,
+  verification_pattern}`; repo must be under `RetiaLLC/`. See the user-level
+  `scriptkitty-release-channels` skill for the full contract, promotion flow, and
+  onboarding checklist — prefer this for actively-developed ported projects
+  (WLEDkitty is the worked example: `profiles/defcon-badge-wledkitty.yaml`).
 
 **Critical for ESP boards:** the image must be a **single merged image flashed at
 `0x0`** (bootloader + partitions + app combined, e.g. from `esptool merge_bin`). A raw
@@ -118,7 +125,7 @@ card shows up on scriptkitty.sh automatically; no front-end edits needed.
 | Field | Values |
 |---|---|
 | `mcu` | `esp8266`, `esp32`, `esp32-s2`, `esp32-s3`, `rp2040` |
-| `provenance.binary_source` | `static`, `release`, `ci` |
+| `provenance.binary_source` | `static`, `release`, `ci`, `channel` |
 | `product_line` (reuse existing) | `usb-nugget`, `wifi-nugget`, `bluetooth-nugget`, `nibble`, `pusheen` |
 | `radio` (optional) | `rfm95`, `sx1262` |
 
