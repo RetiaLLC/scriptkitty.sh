@@ -1,0 +1,21 @@
+id: defcon-badge-bus-pirate
+display_name: "ESP32 Bus Pirate"
+product_line: defcon-badge
+model: "Retia DEF CON Badge (2026)"
+mcu: esp32-s3
+version: "1.0.0"
+description: "A Bus Pirate-style multi-protocol hardware & radio analysis multitool on the badge TFT (also USB-serial / Wi-Fi web CLI): I2C/SPI/UART/1-Wire/JTAG bus tools with on-screen bus scan + live register monitor, a BME280 environment dashboard that colours the ears by temperature, Wi-Fi/BLE scanners, and on-board LoRa TX/RX (verified badge-to-badge)."
+program_url: https://github.com/RetiaLLC/ESP32-Bus-Pirate
+quickstart:
+  - "Flash, then tap RESET. The badge auto-boots to the USB-serial CLI (115200) — type 'mode' to pick a protocol, or open the Serial Monitor here."
+  - "I2C targets go on the SAO header (J5): 3V3 / GND / SDA=GPIO35 / SCL=GPIO36 (the Qwiic connectors are pin-reversed — don't use them). Try 'mode i2c' then 'scan'."
+  - "Ears: 'mode led' then 'rainbow'. Wi-Fi: 'mode wifi' then 'scan'. BLE: 'mode bluetooth' then 'scan'. Live sensor: 'mode i2c' then 'bme 0x76'."
+  - "LoRa: 'mode lora', 'setfreq 915', then 'send <text>' / 'receive'. NEVER TX on LoRa without a 915 MHz antenna attached."
+  - "⚠ Transmit- & attack-capable: this build can deauthenticate Wi-Fi, spoof BLE, jam, and transmit RF. Only test hardware, networks, and RF you OWN or have explicit written permission to test — active use against others is illegal in most places and on some radio bands."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/ESP32-Bus-Pirate
+    tag: badge-v1.0
+    asset_pattern: "buspirate-badge.factory.bin"
+    expected_sha256: "9d86bb7b9229dd5b36ede335f711a9949c9cc4ccefdd1b8f25daaa4c6bff75d2"
