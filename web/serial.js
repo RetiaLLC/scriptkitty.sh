@@ -55,7 +55,9 @@ const term = new Terminal({
   scrollback: 100000,
   cursorBlink: false,
   disableStdin: true,          // input goes through the send box below
-  convertEol: false,           // firmware controls its own line endings
+  convertEol: true,            // treat bare \n as \r\n — many sketches use printf("…\n"),
+                               // not println; \r\n stays correct (extra CR is a no-op) and
+                               // bare \r progress redraws still work.
   theme: {
     background: "#07090d",
     foreground: "#4af07a",     // terminal green by default
