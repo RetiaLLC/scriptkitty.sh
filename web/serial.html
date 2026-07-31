@@ -52,9 +52,11 @@
       <label class="ctl ctl-check"><input type="checkbox" id="echo" checked /> Echo</label>
       <label class="ctl ctl-check"><input type="checkbox" id="timestamps" /> Timestamps</label>
       <label class="ctl ctl-check" title="Off by default. When on, reconnects automatically to a board you've already used (e.g. right after flashing)"><input type="checkbox" id="autoReconnect" /> Auto-reconnect</label>
+      <label class="ctl ctl-check" title="Off by default. When on, pulses DTR/RTS right after connecting so you catch the board's boot output. Leave off for native-USB ESP32-S3 boards that can drop into download mode on a signal pulse."><input type="checkbox" id="resetOnConnect" /> Reset on connect</label>
       <button id="reset" class="btn secondary" disabled title="Reboot the board (DTR/RTS pulse)">Reset</button>
       <button id="clear" class="btn secondary">Clear</button>
-      <button id="save" class="btn secondary" title="Download the entire session (never truncated)">Save log</button>
+      <button id="save" class="btn secondary" title="Download the whole session held in memory">Save log</button>
+      <button id="streamLog" class="btn secondary" title="Write the session straight to a file on disk as it arrives — no memory limit for long/high-baud captures">Stream to file</button>
       <input id="search" class="term-search" type="search" placeholder="Search… (Enter / Shift+Enter)" />
       <span id="status" class="term-status">Disconnected</span>
     </div>

@@ -13,6 +13,8 @@ const saveBtn = document.getElementById("save");
 const searchInput = document.getElementById("search");
 const statusEl = document.getElementById("status");
 const autoReconnectChk = document.getElementById("autoReconnect");
+const resetOnConnectChk = document.getElementById("resetOnConnect");
+const streamBtn = document.getElementById("streamLog");
 const quickSendEl = document.getElementById("quickSend");
 const form = document.getElementById("sendForm");
 const inputEl = document.getElementById("input");
@@ -37,7 +39,9 @@ let port = null;
 let reader = null;
 let keepReading = false;
 let readClosed = null;
-let fullLog = "";              // entire session, ANSI-stripped, never truncated
+let fullLog = "";              // entire session, ANSI-stripped (in-memory snapshot for Save log)
+let logFileWriter = null;      // FileSystemWritableFileStream when streaming to disk
+let writeChain = Promise.resolve(); // serialize disk writes so chunks stay ordered
 let atLineStart = true;        // for timestamp insertion
 const history = [];            // sent-command history
 let histIdx = -1;
@@ -75,6 +79,35 @@ const searchAddon = new SearchAddon.SearchAddon();
 term.loadAddon(fitAddon);
 term.loadAddon(searchAddon);
 term.open(document.getElementById("terminal"));
+
+// Clipboard shortcuts: xterm keeps keyboard focus in a hidden textarea, so the browser's
+// native Cmd/Ctrl+C won't grab a mouse-selection in the terminal. Handle it ourselves.
+term.attachCustomKeyEventHandler((e) => {
+  if (e.type !== "keydown") return true;
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return true;
+  const k = e.key.toLowerCase();
+  if (k === "c" && term.hasSelection()) {          // copy selection
+    navigator.clipboard?.writeText(term.getSelection()).catch(() => {});
+    return false;
+  }
+  if (k === "a") { term.selectAll(); return false; } // select all (then Cmd/Ctrl+C)
+  if (k === "v") {                                  // paste into the send box (terminal is read-only)
+    navigator.clipboard?.readText().then((t) => {
+      if (!t) return;
+      inputEl.focus();
+      if (typeof inputEl.setRangeText === "function") {
+        const s = inputEl.selectionStart ?? inputEl.value.length;
+        const en = inputEl.selectionEnd ?? inputEl.value.length;
+        inputEl.setRangeText(t.replace(/[\r\n]+/g, " "), s, en, "end");
+      } else {
+        inputEl.value += t.replace(/[\r\n]+/g, " ");
+      }
+    }).catch(() => {});
+    return false;
+  }
+  return true;
+});
 function refit() { try { fitAddon.fit(); } catch {} }
 // Fit now, next frame, and again after the monospace web font loads — fitting before
 // the font's metrics are known miscomputes row height and clips the top line.
@@ -93,6 +126,10 @@ connectBtn.addEventListener("click", () => (port ? disconnect() : connect()));
 clearBtn.addEventListener("click", () => { term.clear(); fullLog = ""; atLineStart = true; });
 resetBtn.addEventListener("click", resetBoard);
 saveBtn.addEventListener("click", saveLog);
+if (streamBtn) {
+  if (window.showSaveFilePicker) streamBtn.addEventListener("click", toggleStreaming);
+  else streamBtn.hidden = true;   // File System Access API unavailable (e.g. Firefox)
+}
 baudSel.addEventListener("change", () => { if (port) writeLine(`(reconnect to apply ${baudSel.value} baud)`, "sys"); });
 form.addEventListener("submit", (e) => { e.preventDefault(); sendCommand(); });
 searchInput.addEventListener("keydown", (e) => {
@@ -123,6 +160,11 @@ async function openPort(p) {
   setConnected(true);
   writeLine(`Connected at ${baudSel.value} baud.`, "sys");
   readLoop();
+  // Optionally reboot the board so its boot output is captured. Off by default — a signal
+  // pulse can drop a native-USB ESP32-S3 into download mode.
+  if (resetOnConnectChk && resetOnConnectChk.checked) {
+    try { await pulseReset(); writeLine("Reset on connect — showing boot output.", "sys"); } catch {}
+  }
 }
 // Reconnect without a prompt to a board already granted this session (e.g. right
 // after flashing on the Flash page, or when the same board is re-plugged in).
@@ -153,8 +195,15 @@ async function readLoop() {
 }
 
 function onIncoming(text) {
-  fullLog += stripAnsi(text);                      // whole-session log (clean)
+  logSink(stripAnsi(text));                         // whole-session log (clean)
   term.write(timestamps.checked ? stamp(text) : text);
+}
+
+// Session log sink: while streaming, write straight to disk (ordered, no RAM growth);
+// otherwise accumulate the in-memory snapshot used by Save log.
+function logSink(s) {
+  if (logFileWriter) writeChain = writeChain.then(() => logFileWriter.write(s)).catch(() => {});
+  else fullLog += s;
 }
 
 async function sendCommand() {
@@ -231,16 +280,15 @@ async function disconnect() {
   writeLine("Disconnected.", "sys");
 }
 
+async function pulseReset() {
+  await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+  await new Promise((r) => setTimeout(r, 120));
+  await port.setSignals({ requestToSend: false });
+}
 async function resetBoard() {
   if (!port) return;
-  try {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-    await new Promise((r) => setTimeout(r, 120));
-    await port.setSignals({ requestToSend: false });
-    writeLine("Sent reset (DTR/RTS pulse).", "sys");
-  } catch (e) {
-    writeLine(`Reset not supported on this port: ${e.message}`, "err");
-  }
+  try { await pulseReset(); writeLine("Sent reset (DTR/RTS pulse).", "sys"); }
+  catch (e) { writeLine(`Reset not supported on this port: ${e.message}`, "err"); }
 }
 
 function saveLog() {
@@ -251,6 +299,39 @@ function saveLog() {
   a.download = `scriptkitty-serial-${fname}.txt`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// Stream the session straight to a file on disk (File System Access API) so long / high-baud
+// captures don't grow fullLog in memory. Chromium-only; the button is hidden where unsupported.
+async function toggleStreaming() {
+  if (logFileWriter) { await stopStreaming(); return; }
+  if (!window.showSaveFilePicker) {
+    writeLine("Streaming to a file isn't supported in this browser — use Save log instead.", "err");
+    return;
+  }
+  let handle;
+  try {
+    const fname = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    handle = await window.showSaveFilePicker({
+      suggestedName: `scriptkitty-serial-${fname}.txt`,
+      types: [{ description: "Log file", accept: { "text/plain": [".txt", ".log"] } }],
+    });
+  } catch { return; } // user cancelled the picker
+  try { logFileWriter = await handle.createWritable(); }
+  catch (e) { writeLine(`Couldn't open the file for writing: ${e.message}`, "err"); return; }
+  writeChain = Promise.resolve();
+  streamBtn.classList.add("active");
+  streamBtn.textContent = "Streaming…";
+  saveBtn.disabled = true;   // streaming IS the save; the in-memory snapshot would be partial
+  writeLine(`Streaming to ${handle.name} — output is written to disk live.`, "sys");
+}
+async function stopStreaming() {
+  const w = logFileWriter;
+  logFileWriter = null;
+  streamBtn.classList.remove("active");
+  streamBtn.textContent = "Stream to file";
+  saveBtn.disabled = false;
+  if (w) { try { await writeChain; await w.close(); writeLine("Stopped streaming — file saved.", "sys"); } catch {} }
 }
 
 // --- helpers -----------------------------------------------------------------
@@ -274,7 +355,7 @@ function stripAnsi(s) {
 function writeLine(text, kind) {
   const color = kind === "sys" ? "\x1b[38;2;110;168;254m" : kind === "in" ? "\x1b[38;2;124;245;196m" : kind === "err" ? "\x1b[38;2;255;128;128m" : "";
   term.write(`${color}${text}\x1b[0m\r\n`);
-  fullLog += text + "\n";
+  logSink(text + "\n");
   atLineStart = true;
 }
 function unescapeEnding(v) { return v.replace(/\\r/g, "\r").replace(/\\n/g, "\n"); }
@@ -293,7 +374,7 @@ function setConnected(on) {
 function intro() {
   const el = document.getElementById("introCat");
   const art = el ? el.textContent : "";
-  if (art) { term.write(art.replace(/\n/g, "\r\n") + "\r\n"); fullLog += art + "\n"; }
+  if (art) { term.write(art.replace(/\n/g, "\r\n") + "\r\n"); logSink(art + "\n"); }
   writeLine("scriptkitty Serial Monitor — connect a board and go. Output is colorized; the whole session is saved (never truncated).", "sys");
 }
 
@@ -301,9 +382,11 @@ function intro() {
 try {
   const b = localStorage.getItem("sk_serial_baud"); if (b) baudSel.value = b;
   const ar = localStorage.getItem("sk_serial_autoreconnect"); if (ar !== null) autoReconnectChk.checked = ar === "1";
+  const roc = localStorage.getItem("sk_serial_resetonconnect"); if (roc !== null && resetOnConnectChk) resetOnConnectChk.checked = roc === "1";
 } catch {}
 baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_serial_baud", baudSel.value); } catch {} });
 autoReconnectChk.addEventListener("change", () => { try { localStorage.setItem("sk_serial_autoreconnect", autoReconnectChk.checked ? "1" : "0"); } catch {} });
+if (resetOnConnectChk) resetOnConnectChk.addEventListener("change", () => { try { localStorage.setItem("sk_serial_resetonconnect", resetOnConnectChk.checked ? "1" : "0"); } catch {} });
 
 if (supported) {
   navigator.serial.addEventListener("disconnect", (e) => { if (port && e.target === port) disconnect(); });
