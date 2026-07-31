@@ -16,6 +16,6 @@ provenance:
   binary_source: release
   release:
     repo: RetiaLLC/ESP32-Bus-Pirate
-    tag: badge-v1.1
+    tag: badge-v1.2
     asset_pattern: "buspirate-badge.factory.bin"
-    expected_sha256: "6c8542d9a56634e949eca6ff30826b39bda8ecbf594624579013116f0a930046"
+    expected_sha256: "4c87990b5b56fe5b4007f013dbbde34513b6656ed42f592d1bef9c74482c860f"
