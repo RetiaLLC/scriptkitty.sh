@@ -1,0 +1,21 @@
+id: bluetooth-nugget-badusb
+display_name: "Bad Nugget (BadUSB)"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget"
+mcu: esp32-s3
+version: "1.0.0"
+description: "BadUSB keystroke injection (DuckyScript) with a wireless BLE remote, a per-device PIN, an on-phone script editor, and host-OS detection — the USB Nugget's attacks brought to the Bluetooth Nugget."
+program_url: https://github.com/RetiaLLC/USB-Nugget
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nugget."
+  - "It shows up as a small USB drive AND a keyboard — drop .txt DuckyScript payloads on the drive, or write them from your phone over Bluetooth."
+  - "On the device: the d-pad browses payloads, A runs the selected one, B goes back / aborts. Press B from the list for the Connect screen (Wi-Fi AP, nugget.local, and your BLE PIN)."
+  - "For the wireless remote: grab the Nugget Remote Android app from the GitHub release, connect over Bluetooth, and enter the 6-digit PIN shown on the Connect screen."
+  - "Only use this on computers you own or are explicitly authorized to test — it injects real keystrokes."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/USB-Nugget
+    tag: badnugget-v1.0
+    asset_pattern: "badnugget-bluetoothnugget-v1.factory.bin"
+    expected_sha256: "4d9f82da54c37629ab070ca3afcd5d07dfef342dea0363c409e240b389ce2dd5"
