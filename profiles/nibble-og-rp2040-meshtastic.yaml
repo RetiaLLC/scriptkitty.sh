@@ -1,0 +1,31 @@
+id: nibble-og-rp2040-meshtastic
+display_name: "Meshtastic 2.7.26 - Open Source Nibble (RP2040)"
+product_line: nibble
+model: "Nibble OG (RP2040)"
+mcu: rp2040
+version: "2.7.26"
+radio: rfm95
+description: "Meshtastic 2.7.26 for the Open Source Nibble on the Waveshare RP2040-Zero with RFM95. UF2 install over BOOTSEL - no drivers, no esptool, can't be bricked. Ear LED + back NeoPixel both blink the heartbeat out of the box."
+program_url: https://github.com/retiallc/nibble
+recommended: true
+
+flash:
+  format: uf2
+
+recovery:
+  serial_trigger: touch-1200
+  bootloader_entry: bootsel-hold
+
+quickstart:
+  - "Enter install mode: hold BOOT, tap RESET (or hold BOOT while plugging in USB). A drive called RPI-RP2 appears."
+  - "Drag the .uf2 onto RPI-RP2. The board flashes and reboots itself - the drive vanishing means it worked."
+  - "First boot: pick your region with the Meshtastic app or CLI over USB (the USB serial is the protobuf API, not a text console)."
+  - "Heartbeat blink on the ear LED + back NeoPixel is normal (no battery sense = 'critical' pattern)."
+  - "Attach the antenna before transmitting."
+
+provenance:
+  binary_source: static
+  exception: "Hardware-verified 2.7.26 UF2 from the lab lane (upstream env nibble-rp2040, tag v2.7.26.54e0d8d, ~60s clean build; NeoPixel heartbeat defines added to variants/rp2040/nibble_rp2040/variant.h). Flashed to a bare Waveshare RP2040-Zero and confirmed booting via the Meshtastic protobuf API (pioEnv=nibble-rp2040) on 2026-07-31. Migrate to release/channel once the uf2 ships as a RetiaLLC/Nibble release asset."
+  imported_from:
+    repo: meshtastic/firmware
+    path: variants/rp2040/nibble_rp2040 (env nibble-rp2040, tag v2.7.26.54e0d8d, +NeoPixel heartbeat)
