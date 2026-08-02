@@ -24,8 +24,9 @@ quickstart:
   - "Attach the antenna before transmitting."
 
 provenance:
-  binary_source: static
-  exception: "Hardware-verified 2.7.26 UF2 from the lab lane (upstream env nibble-rp2040, tag v2.7.26.54e0d8d, ~60s clean build; NeoPixel heartbeat defines added to variants/rp2040/nibble_rp2040/variant.h). Flashed to a bare Waveshare RP2040-Zero and confirmed booting via the Meshtastic protobuf API (pioEnv=nibble-rp2040) on 2026-07-31. Migrate to release/channel once the uf2 ships as a RetiaLLC/Nibble release asset."
-  imported_from:
-    repo: meshtastic/firmware
-    path: variants/rp2040/nibble_rp2040 (env nibble-rp2040, tag v2.7.26.54e0d8d, +NeoPixel heartbeat)
+  binary_source: release
+  release:
+    repo: RetiaLLC/Robo-Retia-Meshtastic
+    tag: v2.7.26.54e0d8d
+    asset_pattern: "firmware-nibble-rp2040-*.uf2"
+    expected_sha256: "8d47e5fefd4329ee95a6834b18428a0b8094659669e01ab3952333c0232e044e"
