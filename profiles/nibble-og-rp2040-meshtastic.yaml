@@ -26,7 +26,7 @@ quickstart:
 provenance:
   binary_source: release
   release:
-    repo: RetiaLLC/Robo-Retia-Meshtastic
+    repo: RetiaLLC/ScriptkittyMeshtastic
     tag: v2.7.26.54e0d8d
     asset_pattern: "firmware-nibble-rp2040-*.uf2"
     expected_sha256: "8d47e5fefd4329ee95a6834b18428a0b8094659669e01ab3952333c0232e044e"
