@@ -31,6 +31,7 @@ const LINES = [
   ["wifi-nugget", "WiFi Nugget", "Wi-Fi hacking tool"],
   ["bluetooth-nugget", "Bluetooth Nugget", "Bluetooth / LoRa platform"],
   ["nibble", "Nibble", "Meshtastic / Meshcore"],
+  ["nibble-rp2040", "Open Source Nibble (RP2040)", "Meshtastic / Meshcore · UF2"],
   ["defcon-badge", "DEF CON Badge (2026)", "conference badge — mesh, games & more"],
   ["pusheen", "Pusheen", "just for fun"],
 ];
@@ -44,6 +45,7 @@ const BOARD_IMG = {
   "wifi-nugget": "assets/boards/wifi-nugget.png",
   "bluetooth-nugget": "assets/boards/bluetooth-nugget.png",
   "nibble": "assets/boards/nibble.png",
+  "nibble-rp2040": "assets/boards/nibble.png",
   "pusheen": "assets/boards/pusheen.png",
   "defcon-badge": "assets/boards/defcon-badge.png",
 };
@@ -68,6 +70,7 @@ const HELP = {
   "pusheen": "ESP8266 (D1 Mini). Usually flashes automatically. If it fails, hold the FLASH button while plugging in USB, then release.",
   "bluetooth-nugget": "Native USB (ESP32-S3, Wemos S3 Mini). Hold BOOT, tap RESET (or hold BOOT while plugging in USB), then release. After flashing, tap RESET or replug.",
   "nibble": "Native USB (ESP32-S3, Waveshare S3 Zero — no RESET button). Hold BOOT while plugging in USB to enter flashing mode, then release. After flashing, unplug and replug.",
+  "nibble-rp2040": "RP2040 (Waveshare RP2040-Zero). Flashing is drag-and-drop UF2 — no drivers, no esptool, can't be bricked. Hold BOOT while plugging in USB (or hold BOOT + tap RESET) so the RPI-RP2 drive appears, then drop the .uf2 onto it; the drive vanishing means it worked.",
   "defcon-badge": "Native USB (ESP32-S3). Enter flashing mode: hold SW2 (BOOT), tap SW1 (RESET), release SW2. After flashing, tap RESET. The Badge Launcher firmwares REQUIRE a FAT-formatted micro-SD card — grab the SD zip(s) from the release linked on the card.",
 };
 
@@ -635,6 +638,27 @@ async function detectBoard() {
     hideDetected(); // user dismissed the port picker
     return;
   }
+
+  // Raspberry Pi silicon (RP2040 / RP2350, USB vendor 0x2E8A) isn't an Espressif chip —
+  // esptool can't talk to it, and in BOOTSEL/flash mode it's a mass-storage drive with no
+  // serial port at all. If a *running* RP board is on the picked port, route to its UF2
+  // family instead of failing the esptool handshake. (Web Serial exposes only VID/PID, not
+  // the product name — so we key off the vendor ID, not a "Pico" string.)
+  try {
+    const info = port.getInfo ? port.getInfo() : {};
+    if (info.usbVendorId === 0x2e8a) {
+      const fam = ["nibble-rp2040"].find((k) => ALL.some((t) => t.product_line === k));
+      if (fam) {
+        setOpenLines([fam]);
+        setMascot("found", famName(fam));
+        showDetected("Detected a <b>Raspberry Pi RP2040</b> board — flashing is drag-and-drop: hold BOOT while plugging in USB so the <b>RPI-RP2</b> drive appears, then drop the .uf2 (below) onto it.", "ok");
+      } else {
+        showDetected("Detected a Raspberry Pi RP2040 board, but no RP2040 firmware is in the catalog yet.", "err");
+        setMascot("error");
+      }
+      return;
+    }
+  } catch { /* getInfo unsupported — fall through to the esptool path */ }
 
   const term = { clean() {}, writeLine(d) { showDetected(String(d), "busy"); }, write(d) {} };
   const transport = new Transport(port, false);

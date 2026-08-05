@@ -1,6 +1,6 @@
 id: nibble-og-rp2040-meshtastic
 display_name: "Meshtastic 2.7.26 - Open Source Nibble (RP2040)"
-product_line: nibble
+product_line: nibble-rp2040
 model: "Nibble OG (RP2040)"
 mcu: rp2040
 version: "2.7.26"

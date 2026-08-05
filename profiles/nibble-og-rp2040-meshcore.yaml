@@ -1,6 +1,6 @@
 id: nibble-og-rp2040-meshcore
 display_name: "MeshCore - Open Source Nibble (RP2040)"
-product_line: nibble
+product_line: nibble-rp2040
 model: "Nibble OG (RP2040)"
 mcu: rp2040
 version: "1.16.0"
