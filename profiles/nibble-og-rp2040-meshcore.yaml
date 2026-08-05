@@ -1,0 +1,31 @@
+id: nibble-og-rp2040-meshcore
+display_name: "MeshCore - Open Source Nibble (RP2040)"
+product_line: nibble
+model: "Nibble OG (RP2040)"
+mcu: rp2040
+version: "1.16.0"
+radio: rfm95
+description: "MeshCore (companion_radio) for the Open Source Nibble on the Waveshare RP2040-Zero + RFM95. Lightweight off-grid mesh firmware - UF2 install over BOOTSEL, no drivers, can't be bricked. Hardware-verified: radio init + TX confirmed on a real Nibble. Pair over USB serial with the MeshCore app or CLI."
+program_url: https://github.com/meshcore-dev/MeshCore
+recommended: true
+
+flash:
+  format: uf2
+
+recovery:
+  serial_trigger: touch-1200
+  bootloader_entry: bootsel-hold
+
+quickstart:
+  - "Enter install mode: hold BOOT, tap RESET (or hold BOOT while plugging in USB). A drive called RPI-RP2 appears."
+  - "Drag the .uf2 onto RPI-RP2. The board flashes and reboots itself - the drive vanishing means it worked."
+  - "Pair over USB serial with the MeshCore app or meshcore-cli (companion_radio, serial transport)."
+  - "Set your region/channel in the app, and attach the antenna before transmitting."
+
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/Nibble
+    tag: meshcore-rp2040-v1.16.0
+    asset_pattern: "firmware-meshcore-nibble-rp2040-*.uf2"
+    expected_sha256: "c7dfe74da738594d50e4d853113fb63b981987b4502e1a8f173dbb11b06c4f30"
