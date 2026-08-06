@@ -1,0 +1,20 @@
+id: wifi-nugget-motoko-bpi
+display_name: "Motoko BPI"
+product_line: wifi-nugget
+model: "WiFi Nugget"
+mcu: esp8266
+version: "3.0.0"
+description: "Turns the WiFi Nugget into a browser-driven 802.11 'radio pipe' you script live from the Motoko Python Lab — scan, sniff, and visualize Wi-Fi, or (where authorized) transmit beacons, probe responses, and deauth. The board becomes a headless radio; all the UI lives in your browser over Web Serial."
+program_url: https://github.com/skickar/motoko-bpi
+quickstart:
+  - "Flash this firmware to your WiFi Nugget, then unplug and replug it."
+  - "Open the Motoko Python Lab at https://motoko.site and click Connect (Web Serial)."
+  - "Run the 'Diagnostics' script first to confirm the board is healthy, then try 'Scan / recon' or the 'Beacon swarm'."
+  - "Authorized RF only: transmit only on hardware and networks you own or are explicitly permitted to test."
+
+provenance:
+  binary_source: static
+  exception: "Prebuilt 0x0 ESP8266 flash image (Motoko v3) from skickar/motoko-bpi. Bench-validated on a WiFi Nugget (ESP8266): flashes at 0x0 @460800, boots 'Motoko v3 (S-Filter) Ready', RX + on-air TX confirmed against an independent monitor radio. Migrate to release/ci later."
+  imported_from:
+    repo: skickar/motoko-bpi
+    path: site/python-lab/firmware/motoko-v3.bin
