@@ -26,6 +26,6 @@ provenance:
   binary_source: release
   release:
     repo: RetiaLLC/Nibble
-    tag: meshcore-rp2040-v1.16.0
+    tag: meshcore-rp2040-v1.16.0-fs
     asset_pattern: "firmware-meshcore-nibble-rp2040-*.uf2"
-    expected_sha256: "c7dfe74da738594d50e4d853113fb63b981987b4502e1a8f173dbb11b06c4f30"
+    expected_sha256: "6725c34da94dbc346addb3dd77a0f7cc4b3ffddff00e6bbfa77bdf400e293bb7"
