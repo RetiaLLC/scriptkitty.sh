@@ -130,7 +130,7 @@ if (streamBtn) {
   if (window.showSaveFilePicker) streamBtn.addEventListener("click", toggleStreaming);
   else streamBtn.hidden = true;   // File System Access API unavailable (e.g. Firefox)
 }
-baudSel.addEventListener("change", () => { if (port) writeLine(`(reconnect to apply ${baudSel.value} baud)`, "sys"); });
+baudSel.addEventListener("change", changeBaud);
 form.addEventListener("submit", (e) => { e.preventDefault(); sendCommand(); });
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? searchAddon.findPrevious(searchInput.value) : searchAddon.findNext(searchInput.value); }
@@ -270,14 +270,26 @@ function setQuickSendEnabled(on) {
   quickSendEl.querySelectorAll(".qs-btn").forEach((b) => (b.disabled = !on));
 }
 
-async function disconnect() {
+async function disconnect(quiet) {
   keepReading = false;
   try { if (reader) await reader.cancel(); } catch {}
   try { if (readClosed) await readClosed; } catch {}
   try { await port.close(); } catch {}
   port = null; reader = null;
   setConnected(false);
-  writeLine("Disconnected.", "sys");
+  if (!quiet) writeLine("Disconnected.", "sys");
+}
+
+// Change baud live: persist the choice, and if connected, reopen the SAME port at the new
+// rate (no re-prompt). Serial baud can't change on an open port, so close + reopen.
+let baudSwitching = false;
+async function changeBaud() {
+  try { localStorage.setItem("sk_serial_baud", baudSel.value); } catch {}
+  if (!port || baudSwitching) return;   // disconnected: applies on next connect
+  baudSwitching = true;
+  const p = port;
+  writeLine(`Reconnecting at ${baudSel.value} baud…`, "sys");
+  try { await disconnect(true); await openPort(p); } finally { baudSwitching = false; }
 }
 
 async function pulseReset() {
@@ -364,7 +376,6 @@ function setConnected(on) {
   connectBtn.classList.toggle("secondary", on);
   statusEl.textContent = on ? "Connected" : "Disconnected";
   statusEl.classList.toggle("ok", on);
-  baudSel.disabled = on;
   resetBtn.disabled = !on;
   inputEl.disabled = !on;
   sendBtn.disabled = !on;
@@ -384,7 +395,6 @@ try {
   const ar = localStorage.getItem("sk_serial_autoreconnect"); if (ar !== null) autoReconnectChk.checked = ar === "1";
   const roc = localStorage.getItem("sk_serial_resetonconnect"); if (roc !== null && resetOnConnectChk) resetOnConnectChk.checked = roc === "1";
 } catch {}
-baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_serial_baud", baudSel.value); } catch {} });
 autoReconnectChk.addEventListener("change", () => { try { localStorage.setItem("sk_serial_autoreconnect", autoReconnectChk.checked ? "1" : "0"); } catch {} });
 if (resetOnConnectChk) resetOnConnectChk.addEventListener("change", () => { try { localStorage.setItem("sk_serial_resetonconnect", resetOnConnectChk.checked ? "1" : "0"); } catch {} });
 
