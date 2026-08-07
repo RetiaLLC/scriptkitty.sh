@@ -1,10 +1,10 @@
 id: defcon-badge-bus-pirate
-display_name: "ESP32 Bus Pirate"
+display_name: "ESP32 Bit Pirate"
 product_line: defcon-badge
 model: "Retia DEF CON Badge (2026)"
 mcu: esp32-s3
 version: "1.0.0"
-description: "A Bus Pirate-style multi-protocol hardware & radio analysis multitool on the badge TFT (also USB-serial / Wi-Fi web CLI): I2C/SPI/UART/1-Wire/JTAG bus tools with on-screen bus scan + live register monitor, a BME280 environment dashboard that colours the ears by temperature, Wi-Fi/BLE scanners, and on-board LoRa TX/RX (verified badge-to-badge)."
+description: "A Bit Pirate-style multi-protocol hardware & radio analysis multitool on the badge TFT (also USB-serial / Wi-Fi web CLI): I2C/SPI/UART/1-Wire/JTAG bus tools with on-screen bus scan + live register monitor, a BME280 environment dashboard that colours the ears by temperature, Wi-Fi/BLE scanners, and on-board LoRa TX/RX (verified badge-to-badge)."
 program_url: https://github.com/RetiaLLC/ESP32-Bus-Pirate
 quickstart:
   - "Flash, then tap RESET. The badge auto-boots to the USB-serial CLI (115200) — type 'mode' to pick a protocol, or open the Serial Monitor here."
