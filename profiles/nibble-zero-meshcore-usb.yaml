@@ -1,0 +1,22 @@
+id: nibble-zero-meshcore-usb
+display_name: "Meshcore Companion (USB Serial) - Nibble Zero (White Board)"
+product_line: nibble
+model: "Nibble Zero"
+mcu: esp32-s3
+version: "1.16.0"
+radio: sx1262
+description: "Meshcore companion for the Nibble Zero (white board) that connects to the MeshCore web/mobile client over USB serial (Web Serial) — no Bluetooth pairing needed. Flash this if you keep the Nibble plugged into a computer."
+program_url: https://meshcore.co.uk/
+quickstart:
+  - "Flash this firmware, then open the MeshCore client at https://client.meshcore.co.uk"
+  - "Click Connect and choose the Serial (USB) transport, then pick the Nibble's port."
+  - "If the port doesn't appear, unplug/replug; the Nibble Zero has only native USB (no reset needed to connect)."
+
+provenance:
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/MeshCore
+    asset_pattern: "meshcore-nibble-zero-usb.factory.bin"
+    verification_pattern: "verification-nibble-zero-usb.json"
+  # Source: RetiaLLC/MeshCore @ 00d561f (TinyUSB-OTG USB mode + GPIO1 button pull-up).
+  # First verified build: meshcore-v1.16.0-sk.1 (bench: DTR-asserted APP_START -> SELF_INFO).

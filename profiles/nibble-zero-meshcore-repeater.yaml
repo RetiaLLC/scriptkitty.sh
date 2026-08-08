@@ -3,13 +3,17 @@ display_name: "Meshcore Repeater - Nibble Zero (White Board)"
 product_line: nibble
 model: "Nibble Zero"
 mcu: esp32-s3
+version: "1.16.0"
 radio: sx1262
-description: "Meshcore repeater for the Nibble Zero (white board)."
+description: "Meshcore repeater for the Nibble Zero (white board) — extends mesh range; no client connection needed."
 program_url: https://meshcore.co.uk/
 
 provenance:
   binary_source: static
-  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
-  imported_from:
-    repo: RetiaLLC/esp-web-flasher-wifi-nugget
-    path: js/binaries-esp32s3/nibble_zero_meshcore_repeater.bin
+  exception: "Built-from-source static image, not yet channelised: on-air repeater verification (needs an antenna + a second node) hasn't been done, so this build isn't promoted. An untested CI build of the same source exists as meshcore-nibble-zero-repeater in release meshcore-v1.16.0-sk.1; moves to binary_source: channel after that verify + promote."
+  built_from_source:
+    repo: RetiaLLC/MeshCore
+    branch: retia-badge
+    commit: 00d561f
+    env: nibble_zero_connect_repeater_
+    firmware_version: v1.16.0
