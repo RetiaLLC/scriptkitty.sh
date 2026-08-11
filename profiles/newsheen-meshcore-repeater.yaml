@@ -1,0 +1,18 @@
+id: newsheen-meshcore-repeater
+display_name: "MeshCore Repeater"
+product_line: newsheen
+model: "Newsheen (ESP32-S3 Pusheen Puck)"
+mcu: esp32-s3
+version: "1.16.0"
+radio: sx1262
+description: "MeshCore repeater for the Newsheen — extends a MeshCore network by relaying packets. No user messaging; runs headless as infrastructure. Admin over the serial CLI."
+program_url: https://meshcore.co.uk/
+quickstart:
+  - "Flash; the repeater begins relaying on its configured region/preset."
+  - "Admin it over USB serial (default admin password 'password' — change it)."
+provenance:
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/MeshCore
+    asset_pattern: "meshcore-newsheen-repeater.factory.bin"
+    verification_pattern: "verification-newsheen-repeater.json"

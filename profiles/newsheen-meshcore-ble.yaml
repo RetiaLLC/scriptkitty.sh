@@ -1,0 +1,20 @@
+id: newsheen-meshcore-ble
+display_name: "MeshCore Companion (Bluetooth)"
+product_line: newsheen
+model: "Newsheen (ESP32-S3 Pusheen Puck)"
+mcu: esp32-s3
+version: "1.16.0"
+radio: sx1262
+recommended: true
+description: "MeshCore companion for the Newsheen — pairs to the MeshCore phone app over Bluetooth (PIN 123456). Incoming mesh messages flash the 8 NeoPixels (and beep an optional piezo). The wireless 'mesh lamp' build."
+program_url: https://meshcore.co.uk/
+quickstart:
+  - "Flash, then open the MeshCore app and pair to 'MeshCore-xxxx' over Bluetooth (PIN 123456)."
+  - "Incoming messages animate the 8 top LEDs; when no phone is connected the LEDs are the message indicator."
+  - "Set your region/preset in the app before transmitting."
+provenance:
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/MeshCore
+    asset_pattern: "meshcore-newsheen-ble.factory.bin"
+    verification_pattern: "verification-newsheen-ble.json"

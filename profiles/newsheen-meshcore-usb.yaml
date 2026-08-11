@@ -1,0 +1,19 @@
+id: newsheen-meshcore-usb
+display_name: "MeshCore Companion (USB Serial)"
+product_line: newsheen
+model: "Newsheen (ESP32-S3 Pusheen Puck)"
+mcu: esp32-s3
+version: "1.16.0"
+radio: sx1262
+description: "MeshCore companion for the Newsheen that connects to the MeshCore web/desktop client over USB serial (Web Serial) — no Bluetooth pairing. Incoming mesh messages flash the 8 NeoPixels when no client is attached. TinyUSB build."
+program_url: https://meshcore.co.uk/
+quickstart:
+  - "Flash, then open https://client.meshcore.co.uk and Connect over Serial (USB)."
+  - "Incoming messages animate the 8 top LEDs (when no client is connected)."
+  - "Set your region/preset in the client before transmitting."
+provenance:
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/MeshCore
+    asset_pattern: "meshcore-newsheen-usb.factory.bin"
+    verification_pattern: "verification-newsheen-usb.json"
