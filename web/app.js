@@ -34,6 +34,7 @@ const LINES = [
   ["nibble-rp2040", "Open Source Nibble (RP2040)", "Meshtastic / Meshcore · UF2"],
   ["defcon-badge", "DEF CON Badge (2026)", "conference badge — mesh, games & more"],
   ["pusheen", "Pusheen", "just for fun"],
+  ["newsheen", "Newsheen", "ESP32-S3 Pusheen — Meshtastic mesh lamp"],
 ];
 function famName(key) { const l = LINES.find((x) => x[0] === key); return l ? l[1] : key; }
 function famTag(key) { const l = LINES.find((x) => x[0] === key); return l ? l[2] : ""; }
@@ -47,6 +48,7 @@ const BOARD_IMG = {
   "nibble": "assets/boards/nibble.png",
   "nibble-rp2040": "assets/boards/nibble.png",
   "pusheen": "assets/boards/pusheen.png",
+  "newsheen": "assets/boards/pusheen.png",
   "defcon-badge": "assets/boards/defcon-badge.png",
 };
 
@@ -55,12 +57,13 @@ const BOARD_IMG = {
 const LINES_BY_MCU = {
   "esp8266": ["wifi-nugget", "pusheen"],
   "esp32-s2": ["usb-nugget"],
-  "esp32-s3": ["bluetooth-nugget", "nibble", "defcon-badge"],
+  "esp32-s3": ["bluetooth-nugget", "nibble", "defcon-badge", "newsheen"],
 };
 // Flash size resolves same-silicon collisions where it can: every S3 Nugget/Nibble is
-// 4 MB, the DEF CON badge is the only 8 MB ESP32-S3 in the catalog.
+// 4 MB, the DEF CON badge is the only 8 MB ESP32-S3, and the Newsheen (N16R2 Pusheen
+// Puck) is the only 16 MB ESP32-S3 in the catalog.
 const LINES_BY_MCU_FLASH = {
-  "esp32-s3": { 8: ["defcon-badge"], 4: ["bluetooth-nugget", "nibble"] },
+  "esp32-s3": { 16: ["newsheen"], 8: ["defcon-badge"], 4: ["bluetooth-nugget", "nibble"] },
 };
 
 // Per-device flashing / recovery help, keyed by product line.
@@ -68,6 +71,7 @@ const HELP = {
   "usb-nugget": "Native USB (ESP32-S2). Enter flashing mode: hold BOOT (GPIO0), tap RESET, then release BOOT. After flashing, tap RESET to run.",
   "wifi-nugget": "ESP8266 (D1 Mini). Usually flashes automatically. If it fails, hold the FLASH button while plugging in USB, then release.",
   "pusheen": "ESP8266 (D1 Mini). Usually flashes automatically. If it fails, hold the FLASH button while plugging in USB, then release.",
+  "newsheen": "Native USB (ESP32-S3, esp32_base_puck_v2). Hold BOOT while plugging in USB to enter flashing mode, then release; after flashing, unplug and replug. Meshtastic keeps the radio off until you set a region in a client (BLE phone app or the web client).",
   "bluetooth-nugget": "Native USB (ESP32-S3, Wemos S3 Mini). Hold BOOT, tap RESET (or hold BOOT while plugging in USB), then release. After flashing, tap RESET or replug.",
   "nibble": "Native USB (ESP32-S3, Waveshare S3 Zero — no RESET button). Hold BOOT while plugging in USB to enter flashing mode, then release. After flashing, unplug and replug.",
   "nibble-rp2040": "RP2040 (Waveshare RP2040-Zero). Flashing is drag-and-drop UF2 — no drivers, no esptool, can't be bricked. Hold BOOT while plugging in USB (or hold BOOT + tap RESET) so the RPI-RP2 drive appears, then drop the .uf2 onto it; the drive vanishing means it worked.",

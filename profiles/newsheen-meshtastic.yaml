@@ -1,0 +1,20 @@
+id: newsheen-meshtastic
+display_name: "Meshtastic"
+product_line: newsheen
+model: "Newsheen (ESP32-S3 Pusheen Puck)"
+mcu: esp32-s3
+radio: sx1262
+version: "2.7.23"
+recommended: true
+description: "Meshtastic for the Newsheen — the ESP32-S3 Pusheen Puck (esp32_base_puck_v2) with a Seeed Wio-SX1262 LoRa radio. An incoming mesh text message animates the 8 top WS2812B NeoPixels; the lamp glows a node-color at boot. An optional piezo on the buzzer pad beeps on message. Distinct from the legacy ESP8266 Pusheen cat lamp."
+program_url: https://meshtastic.org/
+quickstart:
+  - "Flash, then set your region in a Meshtastic client (phone app over Bluetooth, or the web client) — the radio stays OFF until a region is set."
+  - "Incoming text messages animate the 8 LEDs; the lamp glows a steady node-color at boot."
+  - "Optional: a piezo across the buzzer pad (GPIO15) beeps on message — silent if unpopulated."
+provenance:
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/ScriptkittyMeshtastic
+    asset_pattern: "newsheen-meshtastic.factory.bin"
+    verification_pattern: "verification-newsheen.json"
