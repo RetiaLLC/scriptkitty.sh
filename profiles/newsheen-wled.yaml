@@ -1,0 +1,22 @@
+id: newsheen-wled
+display_name: "WLEDkitty"
+product_line: newsheen
+model: "Newsheen Puck"
+mcu: esp32-s3
+version: "17.0.0-dev"
+recommended: true
+description: "WLEDkitty — WLED for Retia devices, tuned for the Newsheen puck (ESP32-S3). Drives the 8 addressable LEDs inside the translucent cat lamp, makes them dance to sound through the onboard I²S mic, and takes commands from a 21-key IR remote. Boots into the Freqwave audio visualizer; full WLED web UI over its own Wi-Fi AP."
+program_url: https://github.com/wled/WLED
+quickstart:
+  - "Flash this firmware, then unplug and replug the puck (USB-C)."
+  - "It boots into Freqwave — play music or talk near it and the 8 LEDs dance to the sound. (Audio effects go dark in a silent room; that's the effect resting, not a fault.)"
+  - "Point the bundled 21-key IR remote at it for colors, white, brightness, and effects."
+  - "Join its 'WLED-<id>' WiFi network (password 'wled1234') and open http://4.3.2.1 for the full web UI + effect picker (any ♪/♫ effect is sound-reactive)."
+provenance:
+  # channel: tracks ALL WLEDkitty releases — full releases are hardware-VERIFIED
+  # (default flash), prereleases are untested auto-builds offered behind a warning.
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/WLEDkitty
+    asset_pattern: "wledkitty-puck.factory.bin"
+    verification_pattern: "verification-puck.json"
