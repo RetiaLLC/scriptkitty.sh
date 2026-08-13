@@ -1,0 +1,21 @@
+id: newsheen-bitpirate
+display_name: "Bit Pirate"
+product_line: newsheen
+model: "Newsheen Puck"
+mcu: esp32-s3
+version: "1.6"
+description: "ESP32 Bit Pirate — the 'Swiss Army knife' hardware-hacking multitool (inspired by the Bus Pirate), ported to the Newsheen puck (ESP32-S3). A screenless Bus Pirate: talk to I²C / SPI / UART / 1-Wire / JTAG chips, blast infrared, drive the 8-LED ring in the cat lamp, and sniff or talk LoRa on the onboard SX1262 — all from a CLI over USB or the puck's own Wi-Fi web terminal. 26 modes."
+program_url: https://github.com/geo-tp/ESP32-Bit-Pirate
+quickstart:
+  - "Flash this firmware, then unplug and replug the puck (USB-C)."
+  - "Open a serial terminal at 115200 baud (or use the Web-Serial monitor here) — it boots to the 'HIZ>' Bit Pirate prompt."
+  - "Type 'help' to list the 26 modes, or 'mode' to pick one (i2c, spi, uart, infrared, led, lora, jtag, ...)."
+  - "Enter 'led' to light the 8 LEDs inside the cat lamp; enter 'lora' for the onboard SX1262 radio (attach an antenna before transmitting)."
+provenance:
+  # channel: tracks ALL RetiaLLC/ESP32-Bus-Pirate releases — full releases are
+  # hardware-VERIFIED (default flash), prereleases are untested auto-builds.
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/ESP32-Bus-Pirate
+    asset_pattern: "bitpirate-newsheen.factory.bin"
+    verification_pattern: "verification-newsheen.json"
