@@ -1,0 +1,21 @@
+id: newsheen-badusb
+display_name: "Bad Nugget (BadUSB)"
+product_line: newsheen
+model: "Newsheen (ESP32-S3 Pusheen Puck)"
+mcu: esp32-s3
+version: "1.1.0"
+description: "BadUSB keystroke injection (DuckyScript) on the screenless Newsheen. No display — the 8-pixel ring is the status output (warm-white idle, red while a payload runs), and you drive it entirely over its Wi-Fi web UI (payload editor + upload) or by dropping .txt payloads on its USB drive. BLE remote + per-device PIN and host-OS detection included."
+program_url: https://github.com/RetiaLLC/USB-Nugget
+quickstart:
+  - "Flash this firmware, then unplug and replug the puck."
+  - "It has NO screen — all status is the LED ring: warm white when idle, red while a payload runs."
+  - "Interact two ways: (1) join its Wi-Fi AP 'Newsheen' (default password nugget123) and open the web UI to edit/upload/run payloads; (2) mount it as a USB drive and drop .txt DuckyScript payloads on it."
+  - "The user button runs the selected payload; hold it to abort. A BLE remote (PIN-protected) also works."
+  - "Only use this on computers you own or are explicitly authorized to test — it injects real keystrokes."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/USB-Nugget
+    tag: badnugget-v1.1
+    asset_pattern: "badnugget-newsheen.factory.bin"
+    expected_sha256: "75cb98eea053bfaf0cf8edfb4f204cf98be47ff18e89d12a6c313012ff26772c"

@@ -1,0 +1,20 @@
+id: nibble-zero-badusb
+display_name: "Bad Nugget (BadUSB)"
+product_line: nibble
+model: "Nibble Zero"
+mcu: esp32-s3
+version: "1.1.0"
+description: "BadUSB keystroke injection (DuckyScript) on the Nibble Zero — the same attacks as the Bluetooth/USB Nugget, with the Nibble's 128x64 screen, 6-button d-pad, wireless BLE remote + per-device PIN, an on-phone script editor, and host-OS detection."
+program_url: https://github.com/RetiaLLC/USB-Nugget
+quickstart:
+  - "Flash this firmware, then unplug and replug the Nibble."
+  - "It shows up as a small USB drive AND a keyboard — drop .txt DuckyScript payloads on the drive, or write them from your phone over Bluetooth / the Wi-Fi web UI."
+  - "On the device: the d-pad browses payloads, A runs the selected one, B goes back / aborts. Press B from the list for the Connect screen (Wi-Fi AP, nugget.local, and your BLE PIN)."
+  - "Only use this on computers you own or are explicitly authorized to test — it injects real keystrokes."
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/USB-Nugget
+    tag: badnugget-v1.1
+    asset_pattern: "badnugget-nibble-zero.factory.bin"
+    expected_sha256: "d6031f1053855e26427a13a6ef8c1adbfd5d60f4ced02063697386e2c1ee35a2"
