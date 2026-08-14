@@ -397,6 +397,11 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 .state-ok .flash-title { color: var(--accent); }
 .flash-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1.1rem; }
 .flash-actions .btn { width: auto; flex: 1 1 auto; min-width: 120px; }
+.flash-next { text-align: left; margin: 1rem 0 0; background: var(--inset); border: 1px solid var(--border); border-radius: 10px; padding: .75rem .9rem; }
+.flash-next[hidden] { display: none; }
+.flash-next-title { font-weight: 700; font-size: .9rem; color: var(--text); margin-bottom: .4rem; }
+.flash-next ol { margin: 0; padding-left: 1.2rem; color: var(--mid); font-size: .82rem; line-height: 1.5; }
+.flash-next li { margin: .3rem 0; }
 
 /* buttons */
 .btn, esp-web-install-button button {

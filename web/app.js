@@ -578,7 +578,7 @@ function verRow(t, rel, isDefault) {
 // Flash a specific channel release (any version, verified or untested).
 function flashRelease(t, rel) {
   return flashImage({
-    name: `${t.name} ${relLabel(rel)}`, manifest: rel.manifest, expectMcu: t.mcu,
+    name: `${t.name} ${relLabel(rel)}`, manifest: rel.manifest, expectMcu: t.mcu, nextSteps: t.next_steps || [],
     loadParts: async () => {
       const resp = await fetch(`firmware/${rel.bin}`, { cache: "no-cache" });
       if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
@@ -776,7 +776,7 @@ const BOOT_HELP = "hold the BOOT button, tap RESET once, then release BOOT (no R
 // Flash a catalog profile: fetch its (single, merged) bin and run the shared flasher.
 function flashProfile(t) {
   return flashImage({
-    name: t.name, manifest: t.manifest, expectMcu: t.mcu,
+    name: t.name, manifest: t.manifest, expectMcu: t.mcu, nextSteps: t.next_steps || [],
     loadParts: async () => {
       const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
       if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
@@ -877,6 +877,7 @@ function ensureOverlay() {
        <div class="flash-pct"></div>
        <div class="flash-status"></div>
        <div class="flash-hint"></div>
+       <div class="flash-next" hidden></div>
        <div class="flash-actions"></div>
      </div>`;
   document.body.append(overlayEl);
@@ -893,6 +894,7 @@ function openFlash(ctx) {
   setFlashProgress(0, 1);
   setFlashStatus("");
   setFlashHint("");
+  const next = o.querySelector(".flash-next"); if (next) { next.replaceChildren(); next.hidden = true; }
   setMascot("working", ctx.name);
 }
 function setFlashStatus(text) { ensureOverlay().querySelector(".flash-status").textContent = text; }
@@ -913,6 +915,14 @@ function showFlashSuccess(ctx) {
   setFlashProgress(1, 1);
   setFlashStatus("Your board is restarting into the new firmware.");
   setFlashHint("If it doesn't start up, unplug the board and plug it back in.");
+  const next = o.querySelector(".flash-next");
+  if (ctx.nextSteps && ctx.nextSteps.length) {
+    next.replaceChildren(el("div", "flash-next-title", "Next: name your Wi-Fi hotspot"));
+    const ol = document.createElement("ol");
+    for (const s of ctx.nextSteps) { const li = document.createElement("li"); li.textContent = s; ol.append(li); }
+    next.append(ol);
+    next.hidden = false;
+  } else { next.replaceChildren(); next.hidden = true; }
   const actions = o.querySelector(".flash-actions");
   actions.replaceChildren(
     btnEl("a", "btn", "Open Serial Monitor", { href: "serial.html" }),

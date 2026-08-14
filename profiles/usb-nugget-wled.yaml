@@ -1,4 +1,9 @@
 id: usb-nugget-wled
+next_steps:
+  - "Your Sheen is now its own Wi-Fi hotspot. On a phone or laptop, join the network 'WLED-AP' (password: wled1234)."
+  - "A setup page opens automatically — or browse to http://4.3.2.1 — then open Config, then WiFi Setup."
+  - "Under 'Access Point (AP)', set your own AP SSID and AP password to name and secure your Sheen's hotspot, then Save."
+  - "Prefer an existing Wi-Fi network? Enter its Network Name + password at the top of the same page instead."
 display_name: "WLEDkitty"
 product_line: usb-nugget
 model: "USB Nugget"

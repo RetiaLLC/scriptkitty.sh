@@ -153,6 +153,7 @@ def main() -> int:
             "program_url": profile.get("program_url", ""),
             "addons": profile.get("addons", []) or [],
             "quickstart": profile.get("quickstart", []) or [],
+            "next_steps": profile.get("next_steps", []) or [],
             "recommended": bool(profile.get("recommended", False)),
             "flow": flow,
             "manifest": f"{pid}.json",
