@@ -1,0 +1,29 @@
+id: newsheen-reticulum-rnode
+display_name: "Reticulum RNode"
+product_line: newsheen
+model: "Newsheen (ESP32-S3 Pusheen Puck)"
+mcu: esp32-s3
+radio: sx1262
+version: "1.85"
+description: "Turns the Newsheen — the ESP32-S3 Pusheen Puck (esp32_base_puck_v2) with a Seeed Wio-SX1262 — into an RNode: a host-controlled 915 MHz LoRa transceiver for the Reticulum network stack (Sideband, MeshChat, NomadNet, rnsd). Headless (no screen). This build is pre-provisioned, so it boots as a ready RNode out of the box — no rnodeconf step and no 'device not initialised / firmware corrupt' message."
+program_url: https://github.com/RetiaLLC/RNode_Firmware
+quickstart:
+  - "Flash it — this build ships pre-provisioned, so it comes up as a valid RNode immediately (no rnodeconf)."
+  - "Attach a 915 MHz antenna to the ANT pad before transmitting."
+  - "Point Sideband, MeshChat, NomadNet, or rnsd at the puck's USB serial port and set your region/frequency there — you're on the Reticulum network."
+next_steps:
+  - "Install Reticulum (pip install rns) or use Sideband/MeshChat, then add an RNode interface on the puck's serial port."
+  - "Advanced: want a unique serial + your own signing key? Flash the '-unprovisioned' asset from the release and run: rnodeconf <port> -r --platform 80 --product f0 --model fe --hwrev 1"
+
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/RNode_Firmware
+    tag: reticulum-v1.85
+    asset_pattern: "rnode-1.85-newsheen.factory.bin"
+    expected_sha256: "49045e5b5f71e2a9cc9e4c9e88e5e00f8cade411984910cff5cb09946b54f61a"
+  # Pre-provisioned merged 0x0 image (16MB). Source: RetiaLLC/RNode_Firmware @ cad7484
+  # (retia-stable, BOARD_RETIA_NEWSHEEN=0x4B, esp32 core 2.0.17). Wio-SX1262 on custom SPI
+  # pins (NSS10 SCK13 MISO12 MOSI11 DIO1=21 NRST9 BUSY47 RXEN14). Hardware-verified on a
+  # puck (MAC a4:cb:8f:b1:72:0c): erase -> flash -> boots ready; radio comes online in RNS
+  # ('configured and powered up') and transmits over the air (interface txb 0 -> 501).
