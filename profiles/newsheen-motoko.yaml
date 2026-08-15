@@ -1,0 +1,22 @@
+id: newsheen-motoko
+display_name: "Motoko"
+product_line: newsheen
+model: "Newsheen Puck"
+mcu: esp32-s3
+version: "4.0.0"
+description: "Turns the Newsheen puck (ESP32-S3) into a browser-driven 802.11 'radio pipe' you script live over Web Serial / the Motoko Python Lab — scan, sniff, and visualize Wi-Fi, or (where authorized) transmit beacons, probe responses, and deauth. Unlike the ESP8266 Motoko it captures FULL-length frames (no 112-byte truncation), so the same tools read complete RSN/WPS info and it can capture whole WPA handshakes and PMKIDs; it also exposes a WebHID interface so a phone can be the display. Ships INERT: no attack tooling on the device — it only transmits when a host program drives it (materially less loaded than tools that ship ready to attack)."
+program_url: https://motoko.site
+quickstart:
+  - "Flash this firmware, then unplug and replug the puck (USB-C)."
+  - "Open the Motoko Python Lab / visualizer at https://motoko.site and click Connect (Web Serial) — the puck is a headless radio; all the UI lives in your browser."
+  - "Run 'Diagnostics' first to confirm the board is healthy, then 'Scan / recon' or the visualizer to watch Wi-Fi live."
+  - "Authorized RF only: sniff anywhere, but transmit (beacons / probe responses / deauth) ONLY on hardware and networks you own or are explicitly permitted to test — doing otherwise may be illegal."
+
+provenance:
+  # static: prebuilt, committed 0x0 image. This bin is a neutral radio pipe — it ships
+  # inert and bundles NO attack tooling; capability lives in the host-side Motoko tools.
+  binary_source: static
+  exception: "Prebuilt merged 0x0 ESP32-S3 image (Motoko v4-S3, 16MB, DIO). Live-verified on a Newsheen puck (a4:cb:8f:b1:72:0c) 2026-08-14: boots 'Motoko v4-S3 (full-frame) ready ch=6', full-frame capture confirmed on-air (frames up to 1315B — well past the ESP8266 112-byte cap; real WPA2 APs decoded), and bidirectional SLIP commands (STATUS + channel HOP) confirmed over USB-CDC. Byte-compatible with the existing Motoko display protocol. Built from ~/firmware-lab/motoko-s3 (PlatformIO env newsheen-motoko). sha256 24b22b3c745902ed1dbd385b479385cb9a69e672fd79e58d9132608f40cb4ff6. Migrate to a RetiaLLC release channel later."
+  imported_from:
+    repo: skickar/motoko-bpi
+    path: firmware-lab/motoko-s3/dist/newsheen-motoko.factory.bin
