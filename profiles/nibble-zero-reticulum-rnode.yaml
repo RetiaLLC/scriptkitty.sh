@@ -1,0 +1,28 @@
+id: nibble-zero-reticulum-rnode
+display_name: "Reticulum RNode - Nibble Zero (White Board)"
+product_line: nibble
+model: "Nibble Zero"
+mcu: esp32-s3
+version: "1.85"
+radio: sx1262
+description: "Turns the Nibble Zero (white board, SX1262) into an RNode: a host-controlled 915 MHz LoRa transceiver for the Reticulum network stack (Sideband, MeshChat, NomadNet, rnsd). This build is pre-provisioned, so it boots as a ready RNode out of the box — no rnodeconf step and no 'device not initialised / firmware corrupt' message."
+program_url: https://github.com/RetiaLLC/RNode_Firmware
+quickstart:
+  - "Flash it — that's all. This build ships pre-provisioned, so it comes up as a valid RNode immediately (no rnodeconf, no 'device not initialised')."
+  - "Attach a 915 MHz antenna before transmitting."
+  - "Point Sideband, MeshChat, NomadNet, or rnsd at the Nibble's USB serial port and set your region/frequency there — you're on the Reticulum network."
+next_steps:
+  - "Install Reticulum on your computer/phone (pip install rns) or use Sideband/MeshChat."
+  - "Advanced: want a unique serial + your own signing key? Flash the 'unprovisioned' asset from the release instead and run: rnodeconf <port> -r --platform 80 --product f0 --model fe --hwrev 1"
+
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/RNode_Firmware
+    tag: reticulum-v1.85
+    asset_pattern: "rnode-1.85-nibble-zero.factory.bin"
+    expected_sha256: "c43ccb52c0a79e53392737dedf354b5b8e61b4a9958ab769e3fe7ccf83432c81"
+  # Pre-provisioned merged 0x0 image (bootloader+partitions+app+SPIFFS console + provisioned
+  # NVS 'eeprom' blob at 0x9000). Source: RetiaLLC/RNode_Firmware @ 8876fff (retia-stable,
+  # BOARD_MODEL=0xFF, esp32 core 2.0.17). Hardware-verified on a Nibble Zero: erase -> flash
+  # -> boots ready; rnodeconf --info reports "EEPROM checksum correct / signature validated".
