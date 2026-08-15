@@ -1,0 +1,31 @@
+id: nibble-zero-reticulum-rnode-oled
+display_name: "Reticulum RNode (OLED) - Nibble Zero (White Board)"
+product_line: nibble
+model: "Nibble Zero"
+mcu: esp32-s3
+version: "1.85"
+radio: sx1262
+description: "Same pre-provisioned Reticulum RNode as the standard card, but built with the SSD1306 status display enabled (128x64 OLED on I2C SCL=7 / SDA=8) — shows a live RNode status screen. Flash this only if your Nibble Zero has the OLED populated; on a screenless board it works but shows nothing (flash the non-OLED card instead). Pre-provisioned: boots ready, no rnodeconf step, no 'device not initialised'."
+program_url: https://github.com/RetiaLLC/RNode_Firmware
+addons:
+  - "SSD1306 128x64 OLED (I2C, SCL=7 / SDA=8)"
+quickstart:
+  - "Flash it — this build ships pre-provisioned, so it comes up as a valid RNode immediately (no rnodeconf)."
+  - "The OLED shows the RNode status screen. Attach a 915 MHz antenna before transmitting."
+  - "Point Sideband, MeshChat, NomadNet, or rnsd at the Nibble's USB serial port and set your region/frequency there."
+next_steps:
+  - "No OLED on your board? Use the non-OLED 'Reticulum RNode' card instead."
+  - "Advanced: want a unique serial + your own signing key? Flash the '-oled-unprovisioned' asset from the release and run: rnodeconf <port> -r --platform 80 --product f0 --model fe --hwrev 1"
+
+provenance:
+  binary_source: release
+  release:
+    repo: RetiaLLC/RNode_Firmware
+    tag: reticulum-v1.85
+    asset_pattern: "rnode-1.85-nibble-zero-oled.factory.bin"
+    expected_sha256: "485c4f963ebe1d54e52e50811f1dcc5315927ab2923b104a2137c7359f51d569"
+  # Pre-provisioned merged 0x0 image, OLED variant (-DRETIA_NIBBLE_OLED, HAS_DISPLAY=true,
+  # SSD1306 128x64 @ 0x3C). Source: RetiaLLC/RNode_Firmware @ 8876fff (retia-stable, core
+  # 2.0.17). Hardware-verified on a Nibble Zero: erase -> flash -> boots ready (rnodeconf
+  # --info: EEPROM checksum correct) AND the SSD1306 renders the RNode status screen
+  # (CMD_DISP_READ returns a live 1024-byte framebuffer; disp_ready true).
