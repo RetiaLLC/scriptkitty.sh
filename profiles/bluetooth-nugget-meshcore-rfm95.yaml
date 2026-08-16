@@ -1,0 +1,19 @@
+id: bluetooth-nugget-meshcore-rfm95
+display_name: "MeshCore Companion (Bluetooth)"
+product_line: bluetooth-nugget
+model: "Bluetooth Nugget + LoRa"
+mcu: esp32-s3
+version: "1.16.0"
+radio: rfm95
+description: "MeshCore companion for the ESP32-S3 Bluetooth Nugget with the RFM95 LoRa backpack. Pairs to the MeshCore phone app over Bluetooth (PIN 123456); status shows on the OLED and incoming mesh messages flash the 3 NeoPixels. Ships on the US 910.525 MHz / BW62.5 / SF7 preset, so it talks to the Retia DEF CON badge out of the box."
+program_url: https://meshcore.co.uk/
+addons:
+  - "RFM95 LoRa backpack"
+quickstart:
+  - "Flash this firmware (needs the RFM95 LoRa backpack fitted)."
+  - "Open the MeshCore phone app and pair to 'MeshCore-xxxx' over Bluetooth (PIN 123456)."
+  - "The OLED shows node/radio status; incoming messages animate the 3 top NeoPixels."
+  - "Default radio is US 910.525 MHz / BW 62.5 / SF7 — change region/preset in the app before transmitting elsewhere."
+provenance:
+  binary_source: static
+  exception: "Freshly built 0x0 merged image from RetiaLLC/MeshCore (branch retia-badge, variant bluetooth_nugget_rfm95, env companion_radio_ble, MeshCore v1.16.0). Bench-verified on a connected unit: SX1276 radio init + advert TX confirmed over meshcore-cli. Migration to the release-channel system (like newsheen-meshcore-ble) is the tracked follow-up."
