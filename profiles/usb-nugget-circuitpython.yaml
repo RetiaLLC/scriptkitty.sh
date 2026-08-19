@@ -3,12 +3,25 @@ display_name: "CircuitPython"
 product_line: usb-nugget
 model: "USB Nugget"
 mcu: esp32-s2
-description: "Current, working CircuitPython base image for the USB Nugget (Rubber Nugget)."
+version: "8.2.10"
+description: "CircuitPython for the USB Nugget (Rubber Nugget), pre-loaded with the RubberNugget defaults. The onboard SH1106 OLED, the four buttons, and the GPIO12 NeoPixel are all defined and working out of the box, and it boots straight into the 5-payload DuckyScript menu. Everything lives on the editable CIRCUITPY drive."
 program_url: https://github.com/RetiaLLC/RubberNugget-CircuitPython
-
+quickstart:
+  - "Flash this firmware, then unplug and replug to boot CircuitPython."
+  - "A CIRCUITPY drive appears with code.py, boot.py, lib/, faces/ and payload1-4/payload.txt already installed."
+  - "The OLED shows the menu face; the onboard NeoPixel (GPIO12) glows teal = ready, red = a payload is running."
+  - "Press one of the four buttons to run payload1.txt..payload4.txt; edit those files on the CIRCUITPY drive to change them."
+  - "Hold the down button (IO18) while plugging in to hide the CIRCUITPY drive from the host PC."
+next_steps:
+  - "Open the CIRCUITPY drive and edit payload1.txt through payload4.txt (DuckyScript) to set your own keystroke payloads."
+  - "code.py already defines the screen (SH1106 @ 0x3c on SCL/SDA), buttons (IO9/IO18/IO11/IO7), and NeoPixel (GPIO12) — tweak it and CircuitPython re-runs the moment you save."
 provenance:
   binary_source: static
-  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
+  exception: "0x0 flash image: the stock CircuitPython 8.2.10 interpreter (board lolin_s2_mini, imported from RetiaLLC/esp-web-flasher-wifi-nugget) merged with a pre-populated CIRCUITPY (user_fs, FAT @ 0x310000) filesystem carrying the RubberNugget defaults — code.py/boot.py/lib/faces/payloads, with a GPIO12 NeoPixel added to the default code.py. Built + hardware-verified on-bench (ESP32-S2FN4R2, CIRCUITPY mounts read-write and screen+buttons+NeoPixel init clean)."
   imported_from:
     repo: RetiaLLC/esp-web-flasher-wifi-nugget
     path: js/binaries-usb/CircuitPython.bin
+  defaults_source:
+    repo: RetiaLLC/RubberNugget-CircuitPython
+    ref: main
+    note: "code.py modified to define the onboard NeoPixel on GPIO12 (teal=ready, red=running) alongside the existing screen + buttons; lib/neopixel.py bundled."
