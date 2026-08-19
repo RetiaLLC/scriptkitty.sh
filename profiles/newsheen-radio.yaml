@@ -1,0 +1,23 @@
+id: newsheen-radio
+display_name: "Newsheen Radio"
+product_line: newsheen
+model: "Newsheen Puck"
+mcu: esp32-s3
+version: "1.0.0"
+description: "Internet radio for the Newsheen puck. Streams MP3 and AAC over HTTP and HTTPS, searches a directory of tens of thousands of stations, and drives the 8-LED ring from a live frequency analysis of whatever is playing. Includes a spinnable globe you can tap to tune, 15 light effects with 4 audio-reactive visualizers, and a speech synthesiser that reads out the setup instructions. Needs a MAX98357A amplifier and a speaker wired to the J3 header."
+program_url: https://github.com/RetiaLLC/NewsheenRadio
+quickstart:
+  - "Wire a MAX98357A amplifier to the J3 header before flashing: 35_SDA to LRC, 36_SCL to BCLK, 37_WS to DIN, 39_SD to GAIN, 38_SCK to SD, plus GND and 3V3."
+  - "Flash, then unplug and replug the puck. It pulses amber and reads out how to reach it."
+  - "Join the Wi-Fi network 'Newsheen-Audio' with the password 'meowmeow'. The setup page opens by itself."
+  - "Choose your Wi-Fi, then search for a station or spin the globe and tap a light to tune it."
+  - "One press mutes, two play the next favourite, three play something random, and holding the button sets the volume."
+provenance:
+  # channel: tracks every RetiaLLC/NewsheenRadio release. Full releases are
+  # hardware-verified and become the default flash; prereleases are untested
+  # automatic builds.
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/NewsheenRadio
+    asset_pattern: "newsheenradio-newsheen.factory.bin"
+    verification_pattern: "verification-newsheen.json"
