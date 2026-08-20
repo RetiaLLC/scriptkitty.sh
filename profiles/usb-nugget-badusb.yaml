@@ -3,18 +3,18 @@ display_name: "USB Nugget"
 product_line: usb-nugget
 model: "USB Nugget"
 mcu: esp32-s2
-description: "A versatile USB attack platform that lets you hack computers in seconds."
+version: "1.0.0"
+description: "USB BadUSB / keystroke-injection platform for the ESP32-S2 USB Nugget. The stable default is the original USB Nugget firmware (single auto-run payload.dd). An experimental Retia 'Bad Nugget' port is available in the untested-builds section: a multi-payload menu UI with a DuckyScript interpreter, an on-device Wi-Fi payload editor, and composite CDC+MSC+HID."
 program_url: https://github.com/RetiaLLC/USB-Nugget
 recommended: true
 quickstart:
-  - "Flash this firmware, then unplug and replug the USB Nugget."
-  - "It shows up as a USB drive — open it and edit payload.dd with your DuckyScript."
-  - "Plug it into a target computer; the payload runs automatically."
-  - "Press the BOOT button to re-run the payload, or drop in a new one anytime."
+  - "Stable (default): flash, then unplug and replug — it mounts as a USB drive; edit payload.dd to set your DuckyScript and it runs automatically on the next plug-in. Press BOOT to re-run."
+  - "Experimental (Bad Nugget port, in the untested-builds section): flash, then replug — it mounts as a USB drive AND a keyboard. Drop .txt DuckyScript payloads on the drive or manage them from the Wi-Fi web UI; the on-screen d-pad browses and runs them."
+  - "Only use this on computers you own or are explicitly authorized to test — it injects real keystrokes."
 
 provenance:
-  binary_source: static
-  exception: "Prebuilt 0x0 flash image imported from the live nugget.dev catalog (RetiaLLC/esp-web-flasher-wifi-nugget). Reproduced as-is for launch; provenance migration to release/ci is tracked separately."
-  imported_from:
-    repo: RetiaLLC/esp-web-flasher-wifi-nugget
-    path: js/binaries-usb/USBNugget.bin
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/USB-Nugget
+    asset_pattern: "usb-nugget-badusb.factory.bin"      # same asset name in the stable + experimental releases
+    verification_pattern: "verification-usb-nugget.json" # per-target evidence sidecar (attach to promote the port)
