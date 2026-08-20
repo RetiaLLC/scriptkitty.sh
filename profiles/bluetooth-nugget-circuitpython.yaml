@@ -3,20 +3,20 @@ display_name: "CircuitPython"
 product_line: bluetooth-nugget
 model: "Bluetooth Nugget"
 mcu: esp32-s3
-version: "10.2.1"
-description: "CircuitPython 10.2.1 for the Bluetooth Nugget (ESP32-S3), pre-loaded with a starter that defines the onboard peripherals out of the box: the 128x64 SSD1306 OLED, all 6 buttons, and the two GPIO10 NeoPixel ears. Boots to a welcome screen; press any key to cycle the NeoPixels. Everything lives on the editable CIRCUITPY drive."
-program_url: https://github.com/RetiaLLC/BluetoothNugget
+description: "CircuitPython for the Bluetooth Nugget (ESP32-S3), pre-loaded with a starter that defines the onboard peripherals out of the box: the 128x64 SSD1306 OLED, all 6 buttons, and the two GPIO10 NeoPixel ears. Boots to a welcome screen; press any key to cycle the NeoPixels. Everything lives on the editable CIRCUITPY drive. Tracks upstream CircuitPython automatically."
+program_url: https://github.com/RetiaLLC/CircuitPython
 quickstart:
-  - "Flash this firmware, then unplug and replug the Nugget to boot CircuitPython 10.2.1."
+  - "Flash this firmware, then unplug and replug the Nugget to boot CircuitPython."
   - "A CIRCUITPY drive appears with code.py and lib/ already installed."
   - "The 128x64 OLED shows a welcome screen; the two onboard NeoPixel ears (GPIO10) glow teal."
   - "Press any of the 6 keys to cycle the NeoPixel color and show which key was pressed."
 next_steps:
   - "Open the CIRCUITPY drive and edit code.py to build your own project."
-  - "code.py already defines the screen (SSD1306 128x64 @ 0x3c on SDA IO35 / SCL IO36), the 6 buttons (A IO44, B IO43, UP IO13, DOWN IO18, LEFT IO11, RIGHT IO12), and the 2 NeoPixels (IO10) — CircuitPython re-runs the moment you save."
+  - "code.py already defines the screen (SSD1306 128x64 @ 0x3c on SDA IO35 / SCL IO36, rotation 180), the 6 buttons (A IO44, B IO43, UP IO13, DOWN IO18, LEFT IO11, RIGHT IO12), and the 2 NeoPixels (IO10) — CircuitPython re-runs the moment you save."
 provenance:
-  binary_source: static
-  exception: "0x0 flash image: the official CircuitPython 10.2.1 interpreter for board lolin_s3_mini (downloads.circuitpython.org) merged with a pre-populated CIRCUITPY (ffat, FAT @ 0x310000) filesystem carrying a Retia starter code.py + the CircuitPython 10.x Adafruit libraries (adafruit_displayio_ssd1306, adafruit_display_text, neopixel, adafruit_debouncer, adafruit_ticks). The starter defines the SSD1306 128x64 OLED (rotation 180), 6 buttons, and 2 GPIO10 NeoPixel ears. Built + hardware-verified on Workbench5 (ESP32-S3, CIRCUITPY mounts read-write and code.py runs clean with no traceback; OLED responds at 0x3C on IO35/IO36 right-side-up, NeoPixels init on IO10)."
-  imported_from:
-    repo: adafruit/circuitpython
-    path: bin/lolin_s3_mini/en_US/adafruit-circuitpython-lolin_s3_mini-en_US-10.2.1.bin
+  # channel: tracks ALL RetiaLLC/CircuitPython releases (full = verified default, prerelease = untested).
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/CircuitPython
+    asset_pattern: "bluetooth-nugget-circuitpython.factory.bin"
+    verification_pattern: "verification-bluetooth-nugget.json"
