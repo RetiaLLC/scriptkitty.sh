@@ -1,0 +1,25 @@
+id: newsheen-radio-catalog
+display_name: "Newsheen Radio (with offline atlas)"
+product_line: newsheen
+model: "Newsheen Puck"
+mcu: esp32-s3
+version: "1.1.0"
+description: "Newsheen Radio with 37,963 stations from 227 countries stored on the puck itself, so the globe and the country browser work without asking any directory service. Every station carries coordinates: spin the world, zoom into a region and the puck loads the stations actually in view. Otherwise identical to Newsheen Radio. The download is about 16 MB rather than 1.6 MB because it carries the whole filesystem; flashing takes roughly a minute. Needs a MAX98357A amplifier and a speaker wired to the J3 header."
+program_url: https://github.com/RetiaLLC/NewsheenRadio
+quickstart:
+  - "Wire a MAX98357A amplifier to the J3 header before flashing: 35_SDA to LRC, 36_SCL to BCLK, 37_WS to DIN, 39_SD to GAIN, 38_SCK to SD, plus GND and 3V3."
+  - "This image is about 16 MB and replaces the whole filesystem, so it also clears any MP3 files you uploaded. Flashing takes roughly a minute."
+  - "Flash, then unplug and replug the puck. It pulses amber and reads out how to reach it."
+  - "Join the Wi-Fi network 'Newsheen-Audio' with the password 'meowmeow'. The setup page opens by itself."
+  - "Open the Globe tab and pick a country, or spin the world and zoom in — the atlas is already on the puck, so nothing is downloaded."
+provenance:
+  # Same repo and release as newsheen-radio; this channel tracks the image that
+  # has the station catalogue merged in at the filesystem offset.
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/NewsheenRadio
+    asset_pattern: "newsheenradio-newsheen-catalog.factory.bin"
+    verification_pattern: "verification-newsheen-catalog.json"
+    # These images are ~16 MB each. Keep few untested builds mirrored so the
+    # published site does not grow by that much per automatic build.
+    max_prereleases: 2
