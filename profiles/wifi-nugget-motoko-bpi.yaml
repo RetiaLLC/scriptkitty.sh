@@ -13,8 +13,11 @@ quickstart:
   - "Authorized RF only: transmit only on hardware and networks you own or are explicitly permitted to test."
 
 provenance:
-  binary_source: static
-  exception: "Prebuilt 0x0 ESP8266 flash image (Motoko v3) from skickar/motoko-bpi. Bench-validated on a WiFi Nugget (ESP8266): flashes at 0x0 @460800, boots 'Motoko v3 (S-Filter) Ready', RX + on-air TX confirmed against an independent monitor radio. Migrate to release/ci later."
-  imported_from:
-    repo: skickar/motoko-bpi
-    path: site/python-lab/firmware/motoko-v3.bin
+  # channel: tracks ALL RetiaLLC/motoko-firmware releases. The WiFi Nugget asset is the
+  # verified patched-SDK prebuilt (stock cores drop deauth); full releases are verified,
+  # prereleases untested. Source is in the repo (firmware/wifi-nugget/bridge).
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/motoko-firmware
+    asset_pattern: "motoko-wifi-nugget.bin"
+    verification_pattern: "verification-wifi-nugget.json"
