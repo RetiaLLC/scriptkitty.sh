@@ -6,7 +6,7 @@ mcu: rp2040
 version: "1.16.0"
 radio: rfm95
 description: "MeshCore (companion_radio) for the Open Source Nibble on the Waveshare RP2040-Zero + RFM95. Lightweight off-grid mesh firmware - UF2 install over BOOTSEL, no drivers, can't be bricked. Hardware-verified: radio init + TX confirmed on a real Nibble. Pair over USB serial with the MeshCore app or CLI."
-program_url: https://github.com/meshcore-dev/MeshCore
+program_url: https://github.com/RetiaLLC/MeshCore
 recommended: true
 
 flash:

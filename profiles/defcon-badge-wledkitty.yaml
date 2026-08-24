@@ -11,7 +11,7 @@ mcu: esp32-s3
 version: "0.15.0"
 radio: rfm95
 description: "WLEDkitty — WLED for Retia devices, tuned for the DEF CON badge. Drives the ear NeoPixels plus a 300-LED strip on the J8 connector, shows live status + a color-preview bar on the TFT, and adds on-badge control (A on/off, B effects, d-pad brightness/color). Boots into a Pride rainbow. Standalone flash — replaces the SD launcher."
-program_url: https://github.com/wled/WLED
+program_url: https://github.com/RetiaLLC/WLEDkitty
 addons:
   - "optional: external WS2812 strip on the J8 connector (data + GND; strip on its own 5V)"
 quickstart:

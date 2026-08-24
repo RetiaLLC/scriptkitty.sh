@@ -7,7 +7,7 @@ version: "1.16.0"
 radio: sx1262
 recommended: true
 description: "MeshCore companion for the Newsheen — pairs to the MeshCore phone app over Bluetooth (PIN 123456). Incoming mesh messages flash the 8 NeoPixels (and beep an optional piezo). The wireless 'mesh lamp' build."
-program_url: https://meshcore.co.uk/
+program_url: https://github.com/RetiaLLC/MeshCore
 quickstart:
   - "Flash, then open the MeshCore app and pair to 'MeshCore-xxxx' over Bluetooth (PIN 123456)."
   - "Incoming messages animate the 8 top LEDs; when no phone is connected the LEDs are the message indicator."

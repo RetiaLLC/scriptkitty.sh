@@ -6,7 +6,7 @@ mcu: esp32-s3
 version: "1.16.0"
 radio: rfm95
 description: "MeshCore companion for the ESP32-S3 Bluetooth Nugget with the RFM95 LoRa backpack. Pairs to the MeshCore phone app over Bluetooth (PIN 123456); status shows on the OLED and incoming mesh messages flash the 3 NeoPixels. Ships on the US 910.525 MHz / BW62.5 / SF7 preset, so it talks to the Retia DEF CON badge out of the box."
-program_url: https://meshcore.co.uk/
+program_url: https://github.com/RetiaLLC/MeshCore
 addons:
   - "RFM95 LoRa backpack"
 quickstart:

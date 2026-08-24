@@ -5,7 +5,7 @@ model: "Newsheen Puck"
 mcu: esp32-s3
 version: "4.0.0"
 description: "Turns the Newsheen puck (ESP32-S3) into a browser-driven 802.11 'radio pipe' you script live over Web Serial / the Motoko Python Lab — scan, sniff, and visualize Wi-Fi, or (where authorized) transmit beacons, probe responses, and deauth. Unlike the ESP8266 Motoko it captures FULL-length frames (no 112-byte truncation), so the same tools read complete RSN/WPS info and it can capture whole WPA handshakes and PMKIDs; it also exposes a WebHID interface so a phone can be the display. Ships INERT: no attack tooling on the device — it only transmits when a host program drives it (materially less loaded than tools that ship ready to attack)."
-program_url: https://motoko.site
+program_url: https://github.com/RetiaLLC/motoko-firmware
 quickstart:
   - "Flash this firmware, then unplug and replug the puck (USB-C)."
   - "Open the Motoko Python Lab / visualizer at https://motoko.site and click Connect (Web Serial) — the puck is a headless radio; all the UI lives in your browser."

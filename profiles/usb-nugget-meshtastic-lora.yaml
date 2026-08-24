@@ -5,7 +5,7 @@ model: "USB Nugget + LoRa"
 mcu: esp32-s2
 radio: rfm95
 description: "Meshtastic for the USB Nugget with the RFM95 LoRa backpack. NOTE: upstream catalog labels this a Bluetooth Nugget entry but serves it from the S2 set; verify chip target."
-program_url: https://meshtastic.org/
+program_url: https://github.com/RetiaLLC/ScriptkittyMeshtastic
 addons:
   - "RFM95 LoRa backpack"
 

@@ -4,7 +4,7 @@ product_line: wifi-nugget
 model: "WiFi Nugget"
 mcu: esp8266
 description: "A Wi-Fi deauthentication & disassociation attack detector."
-program_url: https://github.com/RetiaLLC/HaxxDetector
+program_url: https://github.com/skickar/DeauthDetector
 
 provenance:
   binary_source: static

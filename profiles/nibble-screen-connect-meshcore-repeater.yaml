@@ -6,7 +6,7 @@ mcu: esp32-s3
 version: "1.9.1"
 radio: sx1262
 description: "Meshcore 1.9.1 repeater for the Nibble Screen Connect (green board)."
-program_url: https://meshcore.co.uk/
+program_url: https://github.com/RetiaLLC/MeshCore
 
 provenance:
   binary_source: static

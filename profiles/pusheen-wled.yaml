@@ -11,7 +11,7 @@ mcu: esp8266
 version: "0.15.0"
 recommended: true
 description: "WLEDkitty — WLED tuned for Retia hardware, on the ESP8266 Pusheen cat lamp. Boots straight into a Pride rainbow across the 4 onboard LEDs, with the front button for on/off, brightness, and palettes."
-program_url: https://github.com/wled/WLED
+program_url: https://github.com/RetiaLLC/WLEDkitty
 quickstart:
   - "Flash this firmware; the Pusheen reboots into a Pride rainbow on its 4 LEDs (D1 / GPIO5)."
   - "Button (D3 / GPIO0): tap = on/off, hold = brightness, double-tap = next palette."

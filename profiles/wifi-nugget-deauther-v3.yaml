@@ -4,7 +4,7 @@ product_line: wifi-nugget
 model: "WiFi Nugget"
 mcu: esp8266
 description: "The Wi-Fi Deauther V3 by @spacehuhn, a Wi-Fi scanning & attack platform for the ESP8266."
-program_url: https://github.com/RetiaLLC/esp8266_deauther
+program_url: https://github.com/SpacehuhnTech/esp8266_deauther
 
 provenance:
   binary_source: static

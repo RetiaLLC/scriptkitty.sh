@@ -10,7 +10,7 @@ model: "USB Nugget"
 mcu: esp32-s2
 version: "0.15.0"
 description: "WLEDkitty — WLED tuned for Retia hardware, on the USB Nugget. Boots straight into a Pride rainbow on the onboard NeoPixel, shows live status on the OLED, and maps the d-pad to brightness, color, on/off, and effects."
-program_url: https://github.com/wled/WLED
+program_url: https://github.com/RetiaLLC/WLEDkitty
 quickstart:
   - "Flash this firmware, then tap the RST button (or unplug and replug) to boot."
   - "The onboard NeoPixel (GPIO12) lights up in a Pride rainbow immediately."

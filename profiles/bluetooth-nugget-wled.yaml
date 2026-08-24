@@ -10,7 +10,7 @@ model: "Bluetooth Nugget"
 mcu: esp32-s3
 version: "0.15.0"
 description: "WLEDkitty — WLED for Retia devices, tuned for the Bluetooth Nugget. Drives the onboard RGB ears (GPIO10, chainable to an external strip) and shows live status on the 128x64 OLED, with on-device control (A on/off, B effects, d-pad brightness/color). Boots into a Pride rainbow. No LoRa backpack needed."
-program_url: https://github.com/wled/WLED
+program_url: https://github.com/RetiaLLC/WLEDkitty
 quickstart:
   - "Flash this firmware, then unplug and replug the Nugget."
   - "The onboard RGB ears (GPIO10) boot into a Pride rainbow; chain an external WS2812 strip out J4 and set the count in the web UI for more."

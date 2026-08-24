@@ -5,7 +5,7 @@ model: "Nibble Connect"
 mcu: esp32-s3
 radio: sx1262
 description: "Meshtastic for the Nibble Connect (purple board, Seeed SX1262)."
-program_url: https://meshtastic.org/
+program_url: https://github.com/RetiaLLC/ScriptkittyMeshtastic
 recommended: true
 
 provenance:

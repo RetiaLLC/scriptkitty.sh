@@ -5,7 +5,7 @@ model: "WiFi Nugget"
 mcu: esp8266
 version: "3.0.0"
 description: "Turns the WiFi Nugget into a browser-driven 802.11 'radio pipe' you script live from the Motoko Python Lab — scan, sniff, and visualize Wi-Fi, or (where authorized) transmit beacons, probe responses, and deauth. The board becomes a headless radio; all the UI lives in your browser over Web Serial."
-program_url: https://github.com/skickar/motoko-bpi
+program_url: https://github.com/RetiaLLC/motoko-firmware
 quickstart:
   - "Flash this firmware to your WiFi Nugget, then unplug and replug it."
   - "Open the Motoko Python Lab at https://motoko.site and click Connect (Web Serial)."
