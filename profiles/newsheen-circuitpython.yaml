@@ -1,0 +1,23 @@
+id: newsheen-circuitpython
+display_name: "CircuitPython"
+product_line: newsheen
+model: "Newsheen Puck"
+mcu: esp32-s3
+description: "CircuitPython for the Newsheen puck (ESP32-S3, 16MB), pre-loaded with a starter that defines the onboard peripherals out of the box. The puck is screenless, so it shows life through the LEDs and serial: the 8x WS2812 chain on IO16 runs a rainbow/comet demo, the plain debug LED on IO48 blinks a heartbeat, and the two buttons (A IO17, B IO0) change mode and brightness. Everything lives on the editable CIRCUITPY drive. Tracks upstream CircuitPython automatically."
+program_url: https://github.com/RetiaLLC/CircuitPython
+quickstart:
+  - "Flash this firmware, then 1200-baud touch or hold BOOT + tap RESET and let it re-enumerate to boot CircuitPython."
+  - "A CIRCUITPY drive appears with code.py and lib/ already installed."
+  - "The debug LED (IO48) blinks a ~1 Hz heartbeat, and the 8 WS2812 pixels (IO16) run a rainbow."
+  - "Press A (IO17) to change the pixel mode/color; press B (IO0) to change brightness."
+next_steps:
+  - "Open the CIRCUITPY drive and edit code.py to build your own project — CircuitPython re-runs the moment you save."
+  - "code.py already defines the 8x WS2812 (IO16), the debug LED (IO48), and the two buttons (A IO17, B IO0), and documents the rest of the pinout (buzzer IO15, IR RX IO4, LoRa SX1262, J3 sensor header, battery sense)."
+  - "Dark pixels? On un-bodged puck units the WS2812 level shifter (U5) DIR pin is strapped low, so IO16 never reaches the LEDs until a hardware bodge (U5.5->U5.1/+3V3). If the IO48 heartbeat blinks, the board is alive."
+provenance:
+  # channel: tracks ALL RetiaLLC/CircuitPython releases (full = verified default, prerelease = untested).
+  binary_source: channel
+  channel:
+    repo: RetiaLLC/CircuitPython
+    asset_pattern: "newsheen-circuitpython.factory.bin"
+    verification_pattern: "verification-newsheen.json"
