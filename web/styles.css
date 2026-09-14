@@ -42,7 +42,6 @@ body {
 }
 
 @keyframes catbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-@keyframes blink { 0%, 92%, 100% { opacity: 1; } 96% { opacity: .35; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; }
@@ -86,7 +85,10 @@ a:hover { color: var(--accent-2-hover); }
   font-family: var(--mono); font-weight: 700; font-size: clamp(1.15rem, 3.4vw, 1.3rem);
   letter-spacing: -.5px;
 }
-.brand-mark { color: var(--accent); font-weight: 400; animation: blink 4s infinite; }
+.brand-mark { width: 36px; height: auto; display: block; align-self: center;
+  /* the mark is black line work on white paper, so it needs no recolouring on
+     the dark shell - just a hair of lift so it reads as part of the wordmark */
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / .5)); }
 .brand-name { color: var(--text); }
 .tld { color: var(--accent); }
 

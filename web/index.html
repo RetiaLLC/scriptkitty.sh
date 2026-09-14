@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>scriptkitty.sh — flash your board in the browser</title>
   <meta name="description" content="Plug in your Nugget or Nibble and flash it straight from the browser — no drivers, no CLI. Detect your board or pick it from the list." />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='6,4 13,13 4,12' fill='%237bf1ad'/%3E%3Cpolygon points='26,4 19,13 28,12' fill='%237bf1ad'/%3E%3Ccircle cx='16' cy='19' r='9' fill='%237bf1ad'/%3E%3Ccircle cx='12.5' cy='18' r='1.4' fill='%23070a0f'/%3E%3Ccircle cx='19.5' cy='18' r='1.4' fill='%23070a0f'/%3E%3C/svg%3E" />
+  <link rel="icon" href="favicon.ico" sizes="32x32" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
   <!-- classic-flasher fallback engine (offered when the primary esptool-js flash fails) -->
   <script type="module" src="vendor/esp-web-tools/install-button.js"></script>
@@ -15,7 +17,7 @@
     <div class="wrap">
       <div class="topbar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">ᓚᘏᗢ</span>
+          <img class="brand-mark" src="assets/scriptkitty-logo.svg" alt="" width="36" height="30" />
           <span class="brand-name">scriptkitty<span class="tld">.sh</span></span>
         </div>
         <nav class="nav">
