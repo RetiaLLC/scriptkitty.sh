@@ -61,7 +61,7 @@ body {
     align-items: start;
   }
   .app-sidebar { position: sticky; top: 1.25rem; }
-  .app-sidebar .tiles { grid-template-columns: 1fr; }
+  .app-sidebar .tiles { grid-template-columns: minmax(0, 1fr); }
   .app-content { min-width: 0; }
   .app-content .custom-flash { margin-top: 2rem; }
 }
@@ -217,7 +217,17 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
   font-family: var(--mono); font-size: 12px; letter-spacing: .3px; text-transform: uppercase;
   color: var(--muted); margin: 0 0 11px;
 }
-.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 0 0 28px; }
+/* minmax(0, 1fr) rather than 1fr: a grid item's automatic minimum is min-content,
+   so plain 1fr lets the longest device name ("Open Source Nibble (RP2040)") floor
+   its column, which makes the two columns unequal and pushes the grid past the
+   viewport on a phone. Flooring at 0 lets the ellipsis do its job. */
+.tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; margin: 0 0 28px; }
+/* Two tiles can't show a full device name below this: the longest needs ~271px of
+   tile, so 2 x 271 + gap stops fitting around a 600px viewport. One column reads
+   far better than two columns of "Open Sourc..." / "DEF CON Ba...". */
+@media (max-width: 600px) {
+  .tiles { grid-template-columns: minmax(0, 1fr); }
+}
 .tile {
   display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer;
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
