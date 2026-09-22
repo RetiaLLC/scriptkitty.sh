@@ -98,6 +98,7 @@ let ALL = [];
 let openLines = new Set();       // device families whose firmware section is expanded (multi-open)
 let query = "";                  // free-text search (spans every family when set)
 let openCards = new Set();       // ids of expanded firmware cards
+let detectedModels = new Set();  // board variants Detect narrowed a family down to (e.g. "Nibble Zero")
 
 const linePresent = (k) => ALL.some((t) => t.product_line === k);
 
@@ -106,6 +107,12 @@ let _esptool = null;
 function loadEsptool() {
   if (!_esptool) _esptool = import("./vendor/esptool-js/bundle.js");
   return _esptool;
+}
+// Same-silicon board identification (pins / display / firmware env) — see boardprobe.js.
+let _probe = null;
+function loadProbe() {
+  if (!_probe) _probe = import("./boardprobe.js");
+  return _probe;
 }
 // A port the user has already granted this session — reuse it so Detect→Flash
 // (or repeat flashes) don't re-prompt the browser port picker.
@@ -133,7 +140,7 @@ async function init() {
 
   buildTiles();
   if (searchEl) searchEl.addEventListener("input", () => { query = searchEl.value.trim().toLowerCase(); render(); });
-  detectBtn.addEventListener("click", detectBoard);
+  detectBtn.addEventListener("click", () => detectBoard());
   // remember the user's flash-speed choice across visits
   try { const saved = localStorage.getItem("sk_baud"); if (saved && baudSel) baudSel.value = saved; } catch {}
   if (baudSel) baudSel.addEventListener("change", () => { try { localStorage.setItem("sk_baud", baudSel.value); } catch {} });
@@ -203,13 +210,16 @@ function toggleLine(key) {
   if (openLines.has(key)) openLines.delete(key); else openLines.add(key);
   query = "";
   if (searchEl) searchEl.value = "";
+  detectedModels = new Set();
   hideDetected();
   syncHash();
   render();
 }
-// Detection sets exactly which families are shown (single or all applicable).
-function setOpenLines(keys) {
+// Detection sets exactly which families are shown (single or all applicable) and,
+// when it could tell, which variant(s) inside the family the board is.
+function setOpenLines(keys, models = []) {
   openLines = new Set(keys);
+  detectedModels = new Set(models);
   openCards = new Set();   // fresh context → every card collapsed
   query = "";
   if (searchEl) searchEl.value = "";
@@ -246,7 +256,9 @@ function groupsFor(items) {
     if (!by.has(m)) { by.set(m, []); order.push(m); }
     by.get(m).push(t);
   }
-  return order.map((m) => ({ tag: m, show: true, items: by.get(m) }));
+  // detected variant(s) float to the top; everything else keeps catalog order
+  order.sort((a, b) => detectedModels.has(b) - detectedModels.has(a));
+  return order.map((m) => ({ tag: m, show: true, items: by.get(m), detected: detectedModels.has(m) }));
 }
 
 const recThenName = (a, b) =>
@@ -275,9 +287,10 @@ function familyHeader(key, count, total) {
 }
 
 function tagHeader(g) {
-  const gh = el("div", "tag-head");
+  const gh = el("div", g.detected ? "tag-head tag-head-detected" : "tag-head");
   gh.innerHTML =
     `<span class="tag-name">${escapeHtml(g.tag)}</span>` +
+    (g.detected ? `<span class="tag-detected">${detectedModels.size > 1 ? "could be yours" : "your board"}</span>` : "") +
     `<span class="tag-count">${g.items.length} build${g.items.length === 1 ? "" : "s"}</span>` +
     `<span class="tag-rule" aria-hidden="true"></span>`;
   return gh;
@@ -623,7 +636,9 @@ function setMascot(phase, name) {
 }
 
 // --- auto-detect via vendored esptool-js -------------------------------------
-async function detectBoard() {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function detectBoard({ touched = false } = {}) {
   if (!HAS_SERIAL) return;
   showDetected("Loading detector…", "busy");
   let mod;
@@ -634,6 +649,9 @@ async function detectBoard() {
     return;
   }
   const { ESPLoader, Transport } = mod;
+  // Same-silicon disambiguation is a bonus layer — detect still works if it can't load.
+  let probe = null;
+  try { probe = await loadProbe(); } catch { /* fall back to chip + flash size only */ }
 
   let port;
   try {
@@ -643,46 +661,123 @@ async function detectBoard() {
     return;
   }
 
+  let info = {};
+  try { info = (port.getInfo && port.getInfo()) || {}; } catch { /* getInfo unsupported */ }
+
   // Raspberry Pi silicon (RP2040 / RP2350, USB vendor 0x2E8A) isn't an Espressif chip —
   // esptool can't talk to it, and in BOOTSEL/flash mode it's a mass-storage drive with no
   // serial port at all. If a *running* RP board is on the picked port, route to its UF2
   // family instead of failing the esptool handshake. (Web Serial exposes only VID/PID, not
   // the product name — so we key off the vendor ID, not a "Pico" string.)
-  try {
-    const info = port.getInfo ? port.getInfo() : {};
-    if (info.usbVendorId === 0x2e8a) {
-      const fam = ["nibble-rp2040"].find((k) => ALL.some((t) => t.product_line === k));
-      if (fam) {
-        setOpenLines([fam]);
-        setMascot("found", famName(fam));
-        showDetected("Detected a <b>Raspberry Pi RP2040</b> board — flashing is drag-and-drop: hold BOOT while plugging in USB so the <b>RPI-RP2</b> drive appears, then drop the .uf2 (below) onto it.", "ok");
-      } else {
-        showDetected("Detected a Raspberry Pi RP2040 board, but no RP2040 firmware is in the catalog yet.", "err");
-        setMascot("error");
-      }
-      return;
+  if (info.usbVendorId === 0x2e8a) {
+    const fam = ["nibble-rp2040"].find((k) => ALL.some((t) => t.product_line === k));
+    if (fam) {
+      setOpenLines([fam]);
+      setMascot("found", famName(fam));
+      showDetected("Detected a <b>Raspberry Pi RP2040</b> board — flashing is drag-and-drop: hold BOOT while plugging in USB so the <b>RPI-RP2</b> drive appears, then drop the .uf2 (below) onto it.", "ok");
+    } else {
+      showDetected("Detected a Raspberry Pi RP2040 board, but no RP2040 firmware is in the catalog yet.", "err");
+      setMascot("error");
     }
-  } catch { /* getInfo unsupported — fall through to the esptool path */ }
+    return;
+  }
+  // What the running firmware's USB ID says the board is — a hint for when the hardware
+  // can't be reached or doesn't match a known signature, never a verdict on its own.
+  const hint = probe ? probe.usbHint(info) : null;
 
   const term = { clean() {}, writeLine(d) { showDetected(String(d), "busy"); }, write(d) {} };
   const transport = new Transport(port, false);
   const loader = new ESPLoader({ transport, baudrate: 115200, romBaudrate: 115200, terminal: term, debugLogging: false });
+  let failure = null;
   try {
     showDetected("Connecting to board…", "busy");
-    const chipName = await loader.main();              // connects, detects chip
+    const chipName = await loader.main();              // connects, detects chip, starts the stub
     const mcu = mapChip(chipName);
     let flash = "";
     try { flash = flashLabel(await loader.readFlashId()); } catch {}
-    applyDetection(mcu, chipName, flash);
+    // Chip + flash size is as far as esptool can see, and the Bluetooth Nugget and every
+    // ESP32-S3 Nibble are identical there. Look at the carrier PCB instead.
+    let hw = null;
+    if (probe && mcu === "esp32-s3" && parseInt(flash, 10) === 4) {
+      showDetected("Checking which ESP32-S3 board this is…", "busy");
+      try {
+        hw = await probe.probeS3FourMeg({
+          readReg: (a) => loader.readReg(a),
+          writeReg: (a, v) => loader.writeReg(a, v),
+          readFlash: async (a, n) => {
+            const data = await loader.readFlash(a, n);
+            // the stub follows the data with an MD5 packet esptool-js never reads — drain it
+            try { await transport.read(250); } catch {}
+            return data;
+          },
+        });
+        console.info("[detect] board probe", hw);
+      } catch (e) {
+        console.warn("[detect] board probe failed — falling back to chip + flash size", e);
+      }
+    }
+    applyDetection(mcu, chipName, flash, hw, hint);
   } catch (e) {
-    // Drop the port so the next "Detect my board" click re-opens the browser picker —
-    // lets the user choose a different port (or the same one, in download mode) on retry.
-    grantedPort = null;
-    showDetected(`Detect failed: ${e.message}. Put the board in download mode (see Flashing help), then click Detect to try again — you can pick a different port.`, "err");
-    setMascot("error");
+    failure = e;
   } finally {
     try { await transport.disconnect(); } catch {}
   }
+  if (!failure) return;
+
+  // Firmware with its own USB stack (TinyUSB: stock Nibble Meshtastic, CircuitPython, …)
+  // ignores esptool's DTR/RTS reset, so the connect above can't succeed while it runs.
+  // The Arduino/CircuitPython "1200-baud touch" asks that firmware to reboot into the ROM
+  // loader. The board re-enumerates as a different USB device, so its old port is dead:
+  // carry on by ourselves if the browser already trusts the new one, else ask for a click.
+  if (!touched && info.usbVendorId === 0x303a) {
+    showDetected("The running firmware ignored the reset — asking it to reboot into flashing mode…", "busy");
+    const rebooted = await bootloaderTouch(port);
+    if (rebooted.fresh) {
+      grantedPort = rebooted.fresh;
+      return detectBoard({ touched: true });
+    }
+    if (rebooted.gone) {
+      grantedPort = null;
+      setMascot("idle");
+      showDetected("Your board was running firmware that can't be reset over USB, so it's been rebooted into <b>flashing mode</b> and shows up as a new port. Click <b>Detect my board</b> again and pick it — usually “USB JTAG/serial debug unit”.", "ok");
+      return;
+    }
+  }
+  // Drop the port so the next "Detect my board" click re-opens the browser picker —
+  // lets the user choose a different port (or the same one, in download mode) on retry.
+  grantedPort = null;
+  const hinted = hint && linePresent(hint) ? hint : null;
+  if (hinted) setOpenLines([hinted]);
+  showDetected(
+    `Detect failed: ${escapeHtml(failure.message)}. ` +
+    (hinted ? `Its USB ID says it's a <b>${escapeHtml(famName(hinted))}</b>, so that's open below. To confirm, put` : "Put") +
+    " the board in download mode (see Flashing help), then click Detect to try again — you can pick a different port.", "err");
+  setMascot("error");
+}
+
+// 1200-baud touch: open at 1200, drop DTR, close. Reports whether the old port vanished
+// (`gone` — the firmware took the hint) and the already-permitted port that replaced it
+// (`fresh`), ignoring ports that were there before so another plugged-in board is never
+// mistaken for this one. Harmless to firmware that doesn't implement it.
+async function bootloaderTouch(port) {
+  const before = new Set(await navigator.serial.getPorts());
+  try {
+    await port.open({ baudRate: 1200 });
+    try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch {}
+    await sleep(250);
+  } catch { /* vanishing mid-touch is the success case */ }
+  try { await port.close(); } catch {}
+  let gone = false;
+  for (let waited = 0; waited < 4000; waited += 250) {
+    await sleep(250);
+    const now = await navigator.serial.getPorts();
+    gone = gone || !now.includes(port);
+    const fresh = now.find((p) => !before.has(p) && (p.getInfo().usbVendorId === 0x303a));
+    if (fresh) return { gone: true, fresh };
+    if (!gone && waited >= 1500) break;  // still there: this firmware doesn't do the touch
+    if (gone && waited >= 3000) break;   // re-enumerated, but not as a port we're allowed to open
+  }
+  return { gone, fresh: null };
 }
 
 function mapChip(chipName) {
@@ -700,7 +795,7 @@ function flashLabel(flashId) {
   return Number.isInteger(mb) ? `${mb} MB flash` : "";
 }
 
-function applyDetection(mcu, chipName, flash) {
+function applyDetection(mcu, chipName, flash, hw = null, hint = null) {
   if (!mcu) {
     showDetected(`Detected ${chipName || "an unknown chip"} — not a recognized Nugget/Nibble chip.`, "err");
     setMascot("error");
@@ -714,10 +809,26 @@ function applyDetection(mcu, chipName, flash) {
   lines = lines.filter((k) => ALL.some((t) => t.product_line === k));
   const chipTxt = `${MCU_LABEL[mcu]}${flash ? " · " + flash : ""}`;
 
+  // Same silicon, several boards: let the board probe (pins, then installed firmware)
+  // pick — but only among the families the chip + flash size already allow.
+  let models = [], why = "";
+  if (lines.length > 1 && hw && hw.line && lines.includes(hw.line)) {
+    lines = [hw.line];
+    models = hw.models.filter((m) => ALL.some((t) => t.product_line === hw.line && t.model === m));
+    why = hw.source === "firmware"
+      ? " It matches no known board wiring, so this is going by the firmware installed on it."
+      : "";
+  } else if (lines.length > 1 && hint && lines.includes(hint)) {
+    lines = [hint];
+    why = " Going by its USB ID — the board's wiring didn't match a known signature.";
+  }
+
   if (lines.length === 1) {
-    setOpenLines(lines);
-    setMascot("found", famName(lines[0]));
-    showDetected(`Detected <b>${famName(lines[0])}</b> (${chipTxt}) — showing its firmware.`, "ok");
+    setOpenLines(lines, models);
+    const name = models.length === 1 ? models[0] : famName(lines[0]);
+    setMascot("found", name);
+    const either = models.length > 1 ? ` — a ${models.map(escapeHtml).join(" or ")}` : "";
+    showDetected(`Detected <b>${escapeHtml(name)}</b> (${chipTxt})${either} — showing its firmware.${why}`, "ok");
   } else if (lines.length > 1) {
     // ambiguous chip: open every applicable board (all highlighted green) so the user
     // collapses whichever isn't theirs
@@ -758,6 +869,7 @@ function joinBoards(keys) {
 function clearDetection() {
   hideDetected();
   setMascot("idle");
+  if (detectedModels.size) { detectedModels = new Set(); render(); }
 }
 
 // --- flashing via vendored esptool-js ----------------------------------------

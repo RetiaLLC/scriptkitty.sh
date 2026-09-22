@@ -264,6 +264,11 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 .tag-head { display: flex; align-items: center; gap: 9px; margin: 22px 0 12px; }
 .tag-name { font-weight: 700; font-size: 13px; color: var(--secondary); white-space: nowrap; }
 .tag-count { font-family: var(--mono); font-size: 11px; color: var(--dim); white-space: nowrap; }
+.tag-head-detected .tag-name { color: var(--accent); }
+.tag-detected {
+  font-family: var(--mono); font-weight: 600; font-size: 9px; color: var(--on-accent);
+  background: var(--accent); padding: 2px 6px; border-radius: 999px; white-space: nowrap;
+}
 .tag-rule { flex: 1; height: 1px; background: var(--border); }
 
 .fw-list { display: flex; flex-direction: column; gap: 11px; }
