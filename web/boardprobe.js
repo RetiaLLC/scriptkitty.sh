@@ -165,15 +165,17 @@ export async function i2cAck(io, sda, scl, addr) {
 
 // Signatures. "measured" = read off real hardware (scripts/fingerprints/); the rest come
 // from the KiCad netlists and still want a bench confirmation.
-//   Bluetooth Nugget   35,36 HIGH  4.7k display I2C pull-ups            (netlist: v3.14 + v4)
+//   Bluetooth Nugget   35,36 HIGH  4.7k display I2C pull-ups            (measured: 1 unit)
 //                      — and the S3-Zero doesn't even bond out GPIO33-37, so no Nibble can
 //                        ever load these two pins.
 //   Nibble OG (S3)     4,9 HIGH    10k on RFM95 RESET/NSS; 5 = DIO0     (netlist)
-//   Nibble Zero /      6,10 HIGH   10k on SX1262 RESET/NSS              (measured: Zero)
-//   Connect / Screen   7,8 HIGH    10k I2C; 4,5 LOW = DIO1/BUSY idle
-// 12/13/18 (Nugget buttons) and 21/47 (the two dev modules' RGB LED pins) don't vote yet —
-// they're sampled so the console log can turn them into signatures once measured.
-const S3_PROBE_PINS = [4, 5, 6, 7, 8, 9, 10, 12, 13, 18, 21, 35, 36, 47];
+//   Nibble Zero /      6,10 HIGH   10k on SX1262 RESET/NSS              (measured: 2 Zeros,
+//   Connect / Screen   7,8 HIGH    10k I2C; 4,5 LOW = DIO1/BUSY idle     pin-for-pin identical)
+// Not signatures: the Nugget's button lines float (the schematic's 10k pull-ups aren't
+// fitted), and GPIO38 LOW / 39-40 HIGH show up on every S3 in ROM mode (JTAG pins).
+// 21/47 — the two dev modules' RGB LED data pins — read HIGH on the S3-Zero and LOW on the
+// S3 Mini respectively (one unit each); sampled and logged, not voting until that's confirmed.
+const S3_PROBE_PINS = [4, 5, 6, 7, 8, 9, 10, 21, 35, 36, 47];
 const OLED_ADDR = 0x3c;
 
 export function classifyS3FourMeg(fp, { oled = null } = {}) {

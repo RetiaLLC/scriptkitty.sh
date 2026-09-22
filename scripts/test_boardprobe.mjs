@@ -7,6 +7,11 @@
 //                  required for the flash (firmware env) layer
 //   node scripts/test_boardprobe.mjs --serial /dev/cu.X    research only: ask RUNNING Meshtastic
 //        [--expect-line nibble] [--expect-model "Nibble Zero"]
+//        [--no-reset]    leave the board in the ROM loader afterwards (a board whose app
+//                        firmware has no usable USB must never be rebooted by a test)
+//        [--all-pins]    also dump every probe-safe GPIO (signature research for new boards)
+//        [--ssh pi@host] run the bridge on a workbench Pi (direct USB) instead of locally;
+//                        expects ~/sk/probe_bridge.py + ~/sk/with_port.sh there
 //
 // Hardware modes go through scripts/probe_bridge.py (pyserial / esptool).
 import { spawn } from "node:child_process";
@@ -192,7 +197,8 @@ class BridgePort {
   constructor(dev) { this.dev = dev; }
   getInfo() { return {}; }
   async open() {
-    this.child = spawn("python3", [BRIDGE, "serial", this.dev], { stdio: ["pipe", "pipe", "inherit"] });
+    const [cmd, cargs] = bridgeCmd(["serial", this.dev], this.dev);
+    this.child = spawn(cmd, cargs, { stdio: ["pipe", "pipe", "inherit"] });
     const it = lines(this.child);
     const first = await it.next();
     if (first.value !== "READY") throw new Error(`bridge: ${first.value}`);
@@ -214,8 +220,19 @@ class BridgePort {
   async close() { try { this.child.stdin.write("Q\n"); } catch {} this.child.kill(); }
 }
 
+// Local: python3 bridge …   Remote: ssh host ~/sk/with_port.sh DEV python3 ~/sk/probe_bridge.py …
+// (with_port.sh pauses whatever holds DEV — the slot's RFC2217 proxy — for the duration.)
+function bridgeCmd(args, dev) {
+  const ssh = opt("--ssh");
+  if (!ssh) return ["python3", [BRIDGE, ...args]];
+  return ["ssh", ["-T", "-o", "BatchMode=yes", ssh, "~/sk/with_port.sh", dev, "python3", "~/sk/probe_bridge.py", ...args]];
+}
+
 async function romIo(dev, stub) {
-  const child = spawn("python3", [BRIDGE, "esptool", dev, ...(stub ? ["--stub"] : [])], { stdio: ["pipe", "pipe", "inherit"] });
+  const extra = [...(stub ? ["--stub"] : []), ...(argv.includes("--no-reset") ? ["--no-reset"] : [])];
+  const before = opt("--before"); if (before) extra.push("--before", before);
+  const [cmd, cargs] = bridgeCmd(["esptool", dev, ...extra], dev);
+  const child = spawn(cmd, cargs, { stdio: ["pipe", "pipe", "inherit"] });
   const it = lines(child);
   const hello = JSON.parse((await it.next()).value);
   const rpc = async (req) => { child.stdin.write(JSON.stringify(req) + "\n"); return JSON.parse((await it.next()).value); };
@@ -253,6 +270,13 @@ if (opt("--rom")) {
     if (expectLine) assert.equal(r.line, expectLine);
     if (expectModel) assert.ok(r.models.includes(expectModel), `models ${JSON.stringify(r.models)}`);
   });
+  if (argv.includes("--all-pins")) {
+    const all = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 47, 48];
+    const fp = await probe.pullFollow(io, all);
+    const by = {};
+    for (const [p, s] of Object.entries(fp)) (by[s] ||= []).push(Number(p));
+    console.log("        all-pins ->", JSON.stringify(by));
+  }
   await test("i2cAck: nothing answers at 0x3D, and a second pull-follow still matches (pins restored)", async () => {
     const before = await probe.pullFollow(io, [7, 8]);
     if (before[7] === "HIGH" && before[8] === "HIGH") assert.equal(await probe.i2cAck(io, 8, 7, 0x3d), false);

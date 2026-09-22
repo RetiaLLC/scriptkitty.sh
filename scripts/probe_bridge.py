@@ -4,7 +4,10 @@ against a real board, since Node has no Web Serial. Line-oriented over stdin/std
 
   probe_bridge.py serial PORT        raw duplex at 115200, DTR high / RTS low
         -> "READY", then "D <base64>" per read;   <- "W <base64>" to write, "Q" to quit
-  probe_bridge.py esptool PORT [--stub]   ROM loader (or flasher stub) register access
+  probe_bridge.py esptool PORT [--stub] [--no-reset] [--before MODE]
+        ROM loader (or flasher stub) register access. --no-reset leaves the board in the
+        loader on quit (a board whose app firmware has no usable USB must NOT be rebooted);
+        --before is esptool's connect mode (default_reset | no_reset | usb_reset).
         -> {"ready":..} then one JSON reply per request
         <- {"op":"r","a":addr} | {"op":"w","a":addr,"v":val} | {"op":"f","a":addr,"n":len}
            | {"op":"q"}     (f = read_flash, needs --stub, replies base64; q hard-resets)
@@ -52,11 +55,11 @@ def serial_mode(port):
     p.close()
 
 
-def esptool_mode(port, stub):
+def esptool_mode(port, stub, reset=True, before="default_reset"):
     import contextlib
     with contextlib.redirect_stdout(sys.stderr):       # keep esptool's chatter off the RPC pipe
         from esptool.cmds import detect_chip
-        esp = detect_chip(port)
+        esp = detect_chip(port, connect_mode=before)
         chip = esp.get_chip_description()
         mac = ":".join(f"{b:02x}" for b in esp.read_mac())
         flash_id = None
@@ -78,11 +81,12 @@ def esptool_mode(port, stub):
         elif req["op"] == "q":
             break
     with contextlib.redirect_stdout(sys.stderr):
-        try:
-            esp.hard_reset()
-        except Exception:
-            pass
-    out(json.dumps({"bye": True}))
+        if reset:
+            try:
+                esp.hard_reset()
+            except Exception:
+                pass
+    out(json.dumps({"bye": True, "reset": reset}))
 
 
 if __name__ == "__main__":
@@ -90,4 +94,6 @@ if __name__ == "__main__":
     if mode == "serial":
         serial_mode(port)
     else:
-        esptool_mode(port, "--stub" in sys.argv)
+        args = sys.argv[3:]
+        before = args[args.index("--before") + 1] if "--before" in args else "default_reset"
+        esptool_mode(port, "--stub" in args, reset="--no-reset" not in args, before=before)

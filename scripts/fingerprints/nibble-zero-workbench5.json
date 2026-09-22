@@ -1,0 +1,59 @@
+{
+ "board": "Nibble Zero #2 (workbench5 unit), Meshtastic 2.7.x TinyUSB build, reached via 1200-baud touch",
+ "measured": "2026-09-21, workbench5 (Raspberry Pi 5) via scripts/probe_bridge.py over ssh, flasher stub",
+ "chip_artefacts_ignored": "GPIO38 LOW, GPIO39/40 HIGH on every ESP32-S3 measured so far (JTAG pins in ROM mode) \u2014 not board signatures",
+ "chip": "ESP32-S3 (QFN56) (revision v0.2)",
+ "mac_oui": "3c:0f:02",
+ "pull_follow": {
+  "HIGH": [
+   6,
+   7,
+   8,
+   10,
+   21,
+   39,
+   40
+  ],
+  "LOW": [
+   4,
+   5,
+   38
+  ],
+  "float": [
+   1,
+   2,
+   9,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   33,
+   34,
+   35,
+   36,
+   37,
+   41,
+   42,
+   47,
+   48
+  ]
+ },
+ "verdict": {
+  "line": "nibble",
+  "models": [
+   "Nibble Zero"
+  ],
+  "source": "pins+firmware",
+  "env": "nibble-zero-connect",
+  "oled": true,
+  "ops": 104
+ },
+ "notes": [
+  "pin-for-pin identical to the first Nibble Zero (scripts/fingerprints/nibble-zero-connect.json)",
+  "touch: open /dev/ttyACM0 @1200, DTR+RTS low, close -> re-enumerated as USB JTAG/serial debug unit within 1 s; hard reset afterwards returned it to Meshtastic"
+ ]
+}

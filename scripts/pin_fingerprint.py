@@ -109,6 +109,8 @@ def main():
     ap.add_argument("port")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--no-flash", action="store_true", help="skip the stub + flash reads")
+    ap.add_argument("--no-reset", action="store_true",
+                    help="leave the board in the ROM loader (use when its app firmware has no usable USB)")
     args = ap.parse_args()
 
     esp = detect_chip(args.port)
@@ -144,10 +146,11 @@ def main():
         print("floating pins:    ", ", ".join(str(p) for p, s in fp.items() if s == "float"))
         print(f"\nverdict: {result['verdict']}")
 
-    try:
-        esp.hard_reset()
-    except Exception:
-        pass
+    if not args.no_reset:
+        try:
+            esp.hard_reset()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
