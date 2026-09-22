@@ -1,5 +1,5 @@
 {
- "board": "Bluetooth Nugget (LOLIN S3 Mini), production unit, CircuitPython installed, probed in ROM download mode (never reset)",
+ "board": "Bluetooth Nugget (LOLIN S3 Mini), production unit. First probed in ROM download mode with CircuitPython installed (never reset); then reflashed with WLEDkitty (bluetooth-nugget-wled, sha256 abc94829\u2026) and probed again from the running HWCDC app via esptool default_reset -> hard_reset",
  "measured": "2026-09-21, workbench5 (Raspberry Pi 5) via scripts/probe_bridge.py over ssh, flasher stub",
  "chip_artefacts_ignored": "GPIO38 LOW, GPIO39/40 HIGH on every ESP32-S3 measured so far (JTAG pins in ROM mode) \u2014 not board signatures",
  "chip": "ESP32-S3 (QFN56) (revision v0.1)",
@@ -48,12 +48,16 @@
   "ops": 62,
   "evidence": [
    "display pull-ups on GPIO35/36"
-  ]
+  ],
+  "ops_from_running_app": 50
  },
  "notes": [
   "GPIO35/36 HIGH = the 4.7k OLED I2C pull-ups \u2014 the family discriminator, now measured on both sides",
   "button lines 11/12/13/18 FLOAT: the 10k pull-ups on the nugget_v3 3.14 schematic are not on this board (firmware uses internal pull-ups)",
   "GPIO47 (S3 Mini onboard WS2812 data) reads LOW; on the S3-Zero the LED pin GPIO21 reads HIGH \u2014 possible module-level tell, n=1 each",
-  "flash/env layer not run: pins alone were decisive (no readFlash needed)"
+  "flash/env layer not run: pins alone were decisive (no readFlash needed)",
+  "HWCDC round trip verified: default_reset out of running WLED -> probe -> hard_reset -> SPI_FAST_FLASH_BOOT, app-region Saved PC (0x420e0286) on the next check",
+  "HWCDC DTR trap reproduced: opening the CDC with DTR asserted then releasing RTS reset the running app into DOWNLOAD (boot:0x0); open with DTR+RTS both low (the slot proxy's sequence) boots it normally",
+  "open question: WLEDkitty 17.0.0-dev-sk.1 never showed a WLED-AP SSID to workbench5's scan radio over several minutes, although the app was running; UART0 console not wired on the bench so it could not be read"
  ]
 }
