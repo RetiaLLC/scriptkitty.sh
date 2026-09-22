@@ -54,6 +54,8 @@
  },
  "notes": [
   "pin-for-pin identical to the first Nibble Zero (scripts/fingerprints/nibble-zero-connect.json)",
-  "touch: open /dev/ttyACM0 @1200, DTR+RTS low, close -> re-enumerated as USB JTAG/serial debug unit within 1 s; hard reset afterwards returned it to Meshtastic"
- ]
+  "touch: open /dev/ttyACM0 @1200, DTR+RTS low, close -> re-enumerated as USB JTAG/serial debug unit within 1 s; hard reset afterwards returned it to Meshtastic",
+  "GPIO4 (SX1262 DIO1, the radio's IRQ output) read LOW twice and HIGH once \u2014 it follows the radio's interrupt state at the moment the firmware was interrupted, so it must never be part of a signature (it isn't: the SX1262-family signature is 6/10 + 7/8)"
+ ],
+ "repeat_runs": "3 runs on 2026-09-21/22 (incl. after the operator power-reset the bench): verdict identical every time"
 }

@@ -59,5 +59,6 @@
   "HWCDC round trip verified: default_reset out of running WLED -> probe -> hard_reset -> SPI_FAST_FLASH_BOOT, app-region Saved PC (0x420e0286) on the next check",
   "HWCDC DTR trap reproduced: opening the CDC with DTR asserted then releasing RTS reset the running app into DOWNLOAD (boot:0x0); open with DTR+RTS both low (the slot proxy's sequence) boots it normally",
   "open question: WLEDkitty 17.0.0-dev-sk.1 never showed a WLED-AP SSID to workbench5's scan radio over several minutes, although the app was running; UART0 console not wired on the bench so it could not be read"
- ]
+ ],
+ "repeat_runs": "3 runs (ROM/CP, then twice from running WLEDkitty via default_reset, incl. after the operator power-reset the bench): GPIO35/36 HIGH every time, 50-62 ops"
 }
