@@ -53,6 +53,23 @@ def uf2_sidecar(profile: dict, uf2_rel_path: str) -> dict:
     }
 
 
+def app_elf_sha256(bin_path: str):
+    """ELF SHA-256 esptool stamps into the app's esp_app_desc_t (app+0x20, magic
+    0xABCD5432, digest at +0x90). Unique per build; scriptkitty's Detect reads it off a
+    board to tell which catalog image is installed. None for non-ESP-app images."""
+    try:
+        with open(bin_path, "rb") as f:
+            img = f.read(0x10000 + 0x100)
+    except OSError:
+        return None
+    if len(img) < 0x10000 + 0x100 or img[0x10000] != 0xE9:
+        return None
+    desc = img[0x10000 + 0x20:]
+    if desc[:4] != b"\x32\x54\xcd\xab":
+        return None
+    return desc[0x90:0xB0].hex()
+
+
 def load_channel_meta(meta_dir: str, pid: str):
     """Channel-sync sidecar for a channel-sourced profile (see sync_channels.py)."""
     if not meta_dir:
@@ -132,13 +149,17 @@ def main() -> int:
                 )
                 with open(os.path.join(args.out_dir, rel["manifest"]), "w") as f:
                     json.dump(vdoc, f, indent=2)
-                kept.append(rel)
+                rel_sha = app_elf_sha256(os.path.join(args.firmware_dir, rel["bin"]))
+                kept.append({**rel, **({"app_elf_sha256": rel_sha} if rel_sha else {})})
             if kept:
                 channel = {
                     "repo": meta.get("repo", ""),
                     "latest_verified": meta.get("latest_verified"),
                     "releases": kept,
                 }
+
+        # the installed-image hash Detect matches against (ESP images only)
+        app_sha = app_elf_sha256(os.path.join(args.firmware_dir, f"{pid}.bin")) if flow == "esp-serial" else None
 
         # catalog entry the static site renders cards from
         index.append({
@@ -158,6 +179,7 @@ def main() -> int:
             "flow": flow,
             "manifest": f"{pid}.json",
             **({"channel": channel} if channel else {}),
+            **({"app_elf_sha256": app_sha} if app_sha else {}),
         })
 
     index_path = os.path.join(args.out_dir, "index.json")

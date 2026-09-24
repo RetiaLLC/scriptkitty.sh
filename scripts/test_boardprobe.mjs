@@ -12,6 +12,10 @@
 //        [--all-pins]    also dump every probe-safe GPIO (signature research for new boards)
 //        [--ssh pi@host] run the bridge on a workbench Pi (direct USB) instead of locally;
 //                        expects ~/sk/probe_bridge.py + ~/sk/with_port.sh there
+//        [--images live | path/to/index.json]  catalog image table for the hash layer:
+//                        "live" hashes every ESP32-S3 image on scriptkitty.sh via HTTP
+//                        range reads (~70 requests); a local index.json uses its
+//                        app_elf_sha256 fields (present once CI has run the new generator)
 //
 // Hardware modes go through scripts/probe_bridge.py (pyserial / esptool).
 import { spawn } from "node:child_process";
@@ -94,7 +98,7 @@ await test("MeshtasticSniffer: survives garbage, bogus lengths and a false magic
 });
 
 await test("classifyS3FourMeg: every board signature, plus the ambiguous cases", () => {
-  const fp = (over) => ({ 4: "float", 5: "float", 6: "float", 7: "float", 8: "float", 9: "float", 10: "float",
+  const fp = (over) => ({ 1: "float", 2: "float", 4: "float", 5: "float", 6: "float", 7: "float", 8: "float", 9: "float", 10: "float",
     12: "float", 13: "float", 18: "float", 21: "float", 35: "float", 36: "float", 47: "float", ...over });
   const c = (over, extra) => { const r = probe.classifyS3FourMeg(fp(over), extra); return [r.line, r.models]; };
   assert.deepEqual(c({ 35: "HIGH", 36: "HIGH", 12: "HIGH", 13: "HIGH", 18: "HIGH" }), ["bluetooth-nugget", []]);
@@ -105,6 +109,10 @@ await test("classifyS3FourMeg: every board signature, plus the ambiguous cases",
   assert.deepEqual(c(zero, { oled: true }), ["nibble", ["Nibble Zero", "Nibble Screen Connect"]]);
   assert.deepEqual(c(zero, { oled: false }), ["nibble", ["Nibble Connect"]]);
   assert.deepEqual(c(zero), ["nibble", []]);
+  // measured on a real Nibble Screen Connect, 2026-09-24: same as a Zero plus A/B pull-ups
+  const sc = { ...zero, 1: "HIGH", 2: "HIGH" };
+  assert.deepEqual(c(sc, { oled: true }), ["nibble", ["Nibble Screen Connect", "Nibble Zero"]]);
+  assert.deepEqual(c({ 35: "HIGH", 36: "HIGH", 1: "HIGH", 2: "HIGH" }), ["bluetooth-nugget", []], "A/B pull-ups never outvote the Nugget display pins");
   assert.deepEqual(c({}), [null, []], "bare dev board");
   assert.deepEqual(c({ 35: "HIGH", 36: "HIGH", 6: "HIGH", 10: "HIGH" }), [null, []], "contradictory");
   assert.deepEqual(c({ 35: "HIGH" }), [null, []], "one display line only is not a Nugget");
@@ -150,9 +158,11 @@ await test("pullFollow: refuses USB, flash/PSRAM, strap and UART0 pins", async (
 });
 
 // A flash image: ESP app header at 0x10000, env path planted `at` bytes into the app.
-function fakeFlash(env, at) {
+function fakeFlash(env, at, sha = null) {
   const img = new Uint8Array(0x10000 + 0x40000).fill(0xff);
   img[0x10000] = 0xe9;
+  img.set([0x32, 0x54, 0xcd, 0xab], 0x10000 + 0x20);                    // esp_app_desc_t magic
+  if (sha) img.set(Buffer.from(sha, "hex"), 0x10000 + 0x20 + 0x90);     // ELF sha256
   if (env) img.set(new TextEncoder().encode(`/x/.pio/libdeps/${env}/NimBLE/src/a.cpp\0`), 0x10000 + at);
   let reads = 0, bytes = 0;
   return { get reads() { return reads; }, get bytes() { return bytes; },
@@ -171,6 +181,36 @@ await test("envFromFlash: Meshtastic-style hit costs one 16 KB read; deep hit, s
   assert.equal(await probe.envFromFlash(fakeFlash(null, 0).readFlash), null);
   const blank = { readFlash: async (a, n) => new Uint8Array(n).fill(0xff) };
   assert.equal(await probe.envFromFlash(blank.readFlash), null, "erased flash: no app header, one read");
+});
+
+const SC_SHA = "be5c7052c8bc12ae76861288a35b00cf23f2b15b9fa9c592edb48a79c2c1fafa";   // real: nibble-screen-connect-meshcore-companion 1.9.1
+const IMAGES = { [SC_SHA]: { id: "nibble-screen-connect-meshcore-companion", name: "MeshCore Companion", version: "1.9.1", line: "nibble", model: "Nibble Screen Connect" } };
+
+await test("appInfoFromFlash: hash from the head read; env lookup skipped when the hash is known", async () => {
+  let f = fakeFlash(null, 0, SC_SHA);
+  let r = await probe.appInfoFromFlash(f.readFlash, { needEnv: (sha) => !IMAGES[sha] });
+  assert.deepEqual([r.elfSha, r.env, f.reads], [SC_SHA, null, 1]);
+  f = fakeFlash("nibble-esp32", 6000, SC_SHA);
+  r = await probe.appInfoFromFlash(f.readFlash);
+  assert.deepEqual([r.elfSha, r.env, f.reads], [SC_SHA, "nibble-esp32", 1]);
+  const blank = { readFlash: async (a, n) => new Uint8Array(n).fill(0xff) };
+  assert.deepEqual(await probe.appInfoFromFlash(blank.readFlash), { env: null, elfSha: null });
+});
+
+await test("probeS3FourMeg: a catalog image on the board names the exact model, but never the family", async () => {
+  // Screen Connect wiring (no I2C slave model in fakeChip -> no ACK -> "Connect" guess) …
+  const scPins = { 1: "pullup", 2: "pullup", 5: "low", 6: "pullup", 7: "pullup", 8: "pullup", 10: "pullup", 21: "pullup" };
+  let r = await probe.probeS3FourMeg({ ...fakeChip(scPins), ...fakeFlash(null, 0, SC_SHA) }, { images: IMAGES });
+  assert.deepEqual([r.line, r.models, r.source], ["nibble", ["Nibble Connect"], "pins"], "pins were already decisive: flash never consulted");
+  // … pins undecided between two models: the catalog hash picks one, one flash read only
+  const f = fakeFlash(null, 0, SC_SHA);
+  const undecided = { ...fakeChip({}), readFlash: f.readFlash };
+  r = await probe.probeS3FourMeg(undecided, { images: IMAGES });
+  assert.deepEqual([r.line, r.models, r.source, r.installed && r.installed.id, f.reads],
+    ["nibble", ["Nibble Screen Connect"], "catalog", "nibble-screen-connect-meshcore-companion", 1]);
+  // Nugget pins + a Nibble catalog image: pins win, catalog never asked
+  r = await probe.probeS3FourMeg({ ...fakeChip({ 35: "pullup", 36: "pullup" }), ...fakeFlash(null, 0, SC_SHA) }, { images: IMAGES });
+  assert.deepEqual([r.line, r.source, r.installed], ["bluetooth-nugget", "pins", null]);
 });
 
 await test("probeS3FourMeg: firmware narrows the model but can never override the pins", async () => {
@@ -247,6 +287,41 @@ async function romIo(dev, stub) {
 
 const expectLine = opt("--expect-line"), expectModel = opt("--expect-model");
 
+// Catalog image table for the hash layer (see --images in the header).
+async function loadImages() {
+  const src = opt("--images");
+  if (!src) return null;
+  const table = {};
+  const add = (sha, t, extra) => { if (sha) table[sha] = { id: t.id, name: t.name, line: t.product_line, model: t.model || null, ...extra }; };
+  if (src !== "live") {
+    const idx = JSON.parse(await (await import("node:fs/promises")).readFile(src, "utf8"));
+    for (const t of idx.targets || []) {
+      add(t.app_elf_sha256, t, { version: t.version });
+      for (const r of (t.channel && t.channel.releases) || []) add(r.app_elf_sha256, t, { version: r.version, tag: r.tag });
+    }
+    return table;
+  }
+  const BASE = "https://scriptkitty.sh/";
+  const idx = await (await fetch(BASE + "manifests/index.json")).json();
+  const jobs = [];
+  for (const t of idx.targets || []) {
+    if (t.mcu !== "esp32-s3") continue;
+    const rels = (t.channel && t.channel.releases) || [];
+    if (rels.length) for (const r of rels) jobs.push([t, { version: r.version, tag: r.tag }, `firmware/versions/${t.id}/${r.tag}.bin`]);
+    else jobs.push([t, { version: t.version }, `firmware/${t.id}.bin`]);
+  }
+  await Promise.all(jobs.map(async ([t, extra, path]) => {
+    try {
+      const res = await fetch(BASE + path, { headers: { Range: "bytes=65568-65743" } });   // app+0x20 .. +0xB0
+      const b = new Uint8Array(await res.arrayBuffer());
+      if (b[0] === 0x32 && b[1] === 0x54 && b[2] === 0xcd && b[3] === 0xab) add(Buffer.from(b.subarray(0x90, 0xb0)).toString("hex"), t, extra);
+    } catch { /* leave that image out */ }
+  }));
+  console.log(`images: ${Object.keys(table).length} catalog hashes (${src})`);
+  return table;
+}
+const images = await loadImages();
+
 if (opt("--serial")) {
   console.log(`hardware: running firmware on ${opt("--serial")}`);
   await test("queryMeshtastic identifies the board without resetting it", async () => {
@@ -264,9 +339,9 @@ if (opt("--rom")) {
   const io = await romIo(opt("--rom"), stub);
   console.log("        ", JSON.stringify(io.hello));
   await test("probeS3FourMeg identifies the board", async () => {
-    const r = await probe.probeS3FourMeg(io);
+    const r = await probe.probeS3FourMeg(io, { images });
     console.log("        ->", JSON.stringify(r));
-    if (expectModel && stub) assert.deepEqual(r.models, [expectModel], "with flash access the model should be exact");
+    if (expectModel && stub && images) assert.deepEqual(r.models, [expectModel], "with flash + catalog access the model should be exact");
     if (expectLine) assert.equal(r.line, expectLine);
     if (expectModel) assert.ok(r.models.includes(expectModel), `models ${JSON.stringify(r.models)}`);
   });

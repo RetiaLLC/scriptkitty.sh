@@ -98,7 +98,8 @@ let ALL = [];
 let openLines = new Set();       // device families whose firmware section is expanded (multi-open)
 let query = "";                  // free-text search (spans every family when set)
 let openCards = new Set();       // ids of expanded firmware cards
-let detectedModels = new Set();  // board variants Detect narrowed a family down to (e.g. "Nibble Zero")
+let detectedModels = new Set();  // board variants Detect narrowed a family down to, likeliest first
+let IMAGES = {};                 // app_elf_sha256 -> catalog image, for "which of our builds is on this board"
 
 const linePresent = (k) => ALL.some((t) => t.product_line === k);
 
@@ -107,6 +108,20 @@ let _esptool = null;
 function loadEsptool() {
   if (!_esptool) _esptool = import("./vendor/esptool-js/bundle.js");
   return _esptool;
+}
+// Every image the catalog ships, keyed by the ELF hash esptool stamps into its app header
+// (index.json `app_elf_sha256`, per target and per channel release). Detect reads that hash
+// off the board, so a board running one of our builds is named exactly.
+function imageTable(targets) {
+  const t = {};
+  for (const x of targets) {
+    const base = { id: x.id, name: x.name, line: x.product_line, model: x.model || null };
+    if (x.app_elf_sha256) t[x.app_elf_sha256] = { ...base, version: x.version };
+    for (const r of (x.channel && x.channel.releases) || []) {
+      if (r.app_elf_sha256) t[r.app_elf_sha256] = { ...base, version: r.version, tag: r.tag };
+    }
+  }
+  return t;
 }
 // Same-silicon board identification (pins / display / firmware env) — see boardprobe.js.
 let _probe = null;
@@ -136,6 +151,7 @@ async function init() {
     return;
   }
   ALL = (data && data.targets) || [];
+  IMAGES = imageTable(ALL);
   if (!ALL.length) { renderEmpty(); return; }
 
   buildTiles();
@@ -256,9 +272,11 @@ function groupsFor(items) {
     if (!by.has(m)) { by.set(m, []); order.push(m); }
     by.get(m).push(t);
   }
-  // detected variant(s) float to the top; everything else keeps catalog order
-  order.sort((a, b) => detectedModels.has(b) - detectedModels.has(a));
-  return order.map((m) => ({ tag: m, show: true, items: by.get(m), detected: detectedModels.has(m) }));
+  // detected variant(s) float to the top, likeliest first; everything else keeps catalog order
+  const ranked = [...detectedModels];
+  const rank = (m) => { const i = ranked.indexOf(m); return i < 0 ? ranked.length : i; };
+  order.sort((a, b) => rank(a) - rank(b));
+  return order.map((m) => ({ tag: m, show: true, items: by.get(m), detected: detectedModels.has(m), rank: rank(m) }));
 }
 
 const recThenName = (a, b) =>
@@ -290,7 +308,7 @@ function tagHeader(g) {
   const gh = el("div", g.detected ? "tag-head tag-head-detected" : "tag-head");
   gh.innerHTML =
     `<span class="tag-name">${escapeHtml(g.tag)}</span>` +
-    (g.detected ? `<span class="tag-detected">${detectedModels.size > 1 ? "could be yours" : "your board"}</span>` : "") +
+    (g.detected ? `<span class="tag-detected">${detectedModels.size === 1 ? "your board" : g.rank === 0 ? "likely yours" : "could be yours"}</span>` : "") +
     `<span class="tag-count">${g.items.length} build${g.items.length === 1 ? "" : "s"}</span>` +
     `<span class="tag-rule" aria-hidden="true"></span>`;
   return gh;
@@ -710,7 +728,7 @@ async function detectBoard({ touched = false } = {}) {
             try { await transport.read(250); } catch {}
             return data;
           },
-        });
+        }, { images: IMAGES });
         console.info("[detect] board probe", hw);
       } catch (e) {
         console.warn("[detect] board probe failed — falling back to chip + flash size", e);
@@ -815,9 +833,10 @@ function applyDetection(mcu, chipName, flash, hw = null, hint = null) {
   if (lines.length > 1 && hw && hw.line && lines.includes(hw.line)) {
     lines = [hw.line];
     models = hw.models.filter((m) => ALL.some((t) => t.product_line === hw.line && t.model === m));
-    why = hw.source === "firmware"
+    why = hw.source === "firmware" || hw.source === "catalog"
       ? " It matches no known board wiring, so this is going by the firmware installed on it."
       : "";
+    if (hw.installed) why += ` It's currently running our <b>${escapeHtml(hw.installed.name)}${hw.installed.version ? " " + escapeHtml(String(hw.installed.version)) : ""}</b> build.`;
   } else if (lines.length > 1 && hint && lines.includes(hint)) {
     lines = [hint];
     why = " Going by its USB ID — the board's wiring didn't match a known signature.";
@@ -827,7 +846,7 @@ function applyDetection(mcu, chipName, flash, hw = null, hint = null) {
     setOpenLines(lines, models);
     const name = models.length === 1 ? models[0] : famName(lines[0]);
     setMascot("found", name);
-    const either = models.length > 1 ? ` — a ${models.map(escapeHtml).join(" or ")}` : "";
+    const either = models.length > 1 ? ` — probably a ${escapeHtml(models[0])}, possibly a ${models.slice(1).map(escapeHtml).join(" or ")}` : "";
     showDetected(`Detected <b>${escapeHtml(name)}</b> (${chipTxt})${either} — showing its firmware.${why}`, "ok");
   } else if (lines.length > 1) {
     // ambiguous chip: open every applicable board (all highlighted green) so the user

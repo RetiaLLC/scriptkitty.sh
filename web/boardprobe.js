@@ -6,10 +6,11 @@
 // READ_REG / WRITE_REG / READ_FLASH let us look — no firmware needs to be running.
 // Layers, cheapest first; each one only runs if it can still change the answer:
 //
-//   usbHint()         USB PID of a running TinyUSB firmware          free      hint only
-//   pullFollow()      which pins have external pull-ups / drivers    ~60 ops   decides the family
-//   i2cAck()          is there a display on the Nibble I2C bus       ~45 ops   Connect vs the rest
-//   envFromFlash()    PlatformIO env name baked into the app image   16 KB     picks the exact model
+//   usbHint()          USB PID of a running TinyUSB firmware          free      hint only
+//   pullFollow()       which pins have external pull-ups / drivers    ~60 ops   decides the family
+//   i2cAck()           is there a display on the Nibble I2C bus       ~45 ops   Connect vs the rest
+//   appInfoFromFlash() ELF hash + PlatformIO env of the installed app  16 KB     picks the exact model
+//                      (hash -> catalog image when it's one of ours; env name otherwise)
 //
 // No DOM and no esptool import — I/O arrives as
 //   io = { readReg(addr), writeReg(addr, value), readFlash(addr, size) }
@@ -65,17 +66,28 @@ const ENV_HEAD = 0x4000;             // Meshtastic: env is in the first 16 KB
 const ENV_MORE = 0x2c000;            // MeshCore & co: look 176 KB further, once
 const ENV_RE = /\.pio\/libdeps\/([A-Za-z0-9_.-]+)\//;
 const latin1 = new TextDecoder("latin1");
+// esp_app_desc_t sits at app+0x20 (magic 0xABCD5432); esptool patches the build's ELF
+// SHA-256 in at desc+0x90. Unique per build — the catalog's index.json carries it as
+// `app_elf_sha256` per image, so 32 bytes identify "which of our images is on here".
+const APP_DESC = 0x20, APP_DESC_MAGIC = [0x32, 0x54, 0xcd, 0xab], ELF_SHA_AT = 0x90;
 
-export async function envFromFlash(readFlash, { deep = true } = {}) {
+// One 16 KB read answers both questions; the 176 KB follow-up only happens when the env
+// wasn't in the head AND the caller still needs it (a catalog hash hit makes it moot).
+export async function appInfoFromFlash(readFlash, { deep = true, needEnv = () => true } = {}) {
   const head = await readFlash(APP_OFFSET, ENV_HEAD);
-  if (!head || head[0] !== 0xe9) return null;                         // no ESP app image here
+  if (!head || head[0] !== 0xe9) return { env: null, elfSha: null };  // no ESP app image here
+  let elfSha = null;
+  if (APP_DESC_MAGIC.every((b, i) => head[APP_DESC + i] === b)) {
+    elfSha = [...head.subarray(APP_DESC + ELF_SHA_AT, APP_DESC + ELF_SHA_AT + 32)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
   let m = ENV_RE.exec(latin1.decode(head));
-  if (!m && deep) {
+  if (!m && deep && needEnv(elfSha)) {
     const overlap = 96;                                               // a path may straddle the seam
     m = ENV_RE.exec(latin1.decode(await readFlash(APP_OFFSET + ENV_HEAD - overlap, ENV_MORE + overlap)));
   }
-  return m ? m[1] : null;
+  return { env: m ? m[1] : null, elfSha };
 }
+export async function envFromFlash(readFlash, opts) { return (await appInfoFromFlash(readFlash, opts)).env; }
 
 // ---------------------------------------------------------------------------
 // Electrical fingerprint (ESP32-S3 register map).
@@ -169,13 +181,15 @@ export async function i2cAck(io, sda, scl, addr) {
 //                      — and the S3-Zero doesn't even bond out GPIO33-37, so no Nibble can
 //                        ever load these two pins.
 //   Nibble OG (S3)     4,9 HIGH    10k on RFM95 RESET/NSS; 5 = DIO0     (netlist)
-//   Nibble Zero /      6,10 HIGH   10k on SX1262 RESET/NSS              (measured: 2 Zeros,
-//   Connect / Screen   7,8 HIGH    10k I2C; 4,5 LOW = DIO1/BUSY idle     pin-for-pin identical)
-// Not signatures: the Nugget's button lines float (the schematic's 10k pull-ups aren't
-// fitted), and GPIO38 LOW / 39-40 HIGH show up on every S3 in ROM mode (JTAG pins).
-// 21/47 — the two dev modules' RGB LED data pins — read HIGH on the S3-Zero and LOW on the
-// S3 Mini respectively (one unit each); sampled and logged, not voting until that's confirmed.
-const S3_PROBE_PINS = [4, 5, 6, 7, 8, 9, 10, 21, 35, 36, 47];
+//   Nibble Zero /      6,10 HIGH   10k on SX1262 RESET/NSS              (measured: 2 Zeros +
+//   Connect / Screen   7,8 HIGH    10k I2C; 5 LOW = BUSY idle            1 Screen Connect)
+//   Screen Connect     1,2 HIGH    pull-ups on the A/B buttons — both Zeros float here.
+//                      (1 unit; treated as a preference between the two, not a verdict)
+// Not signatures: GPIO4 (SX1262 DIO1) follows the radio's IRQ state; the Nugget's button
+// lines float (the schematic's 10k pull-ups aren't fitted); GPIO38 LOW / 39-40 HIGH show up
+// on every S3 in ROM mode (JTAG pins). 21/47 — the two dev modules' RGB LED data pins — read
+// HIGH on the S3-Zero and LOW on the S3 Mini (one unit each); logged, not voting.
+const S3_PROBE_PINS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 21, 35, 36, 47];
 const OLED_ADDR = 0x3c;
 
 export function classifyS3FourMeg(fp, { oled = null } = {}) {
@@ -190,6 +204,8 @@ export function classifyS3FourMeg(fp, { oled = null } = {}) {
   if (og) evidence.push("RFM95 reset/select pull-ups on GPIO4/9");
   if (nibbleBus) evidence.push("I2C pull-ups on GPIO7/8");
   if (oled === true) evidence.push("display answers at 0x3C on GPIO8/7");
+  const abPullups = high(1, 2);
+  if (abPullups && oled === true) evidence.push("button pull-ups on GPIO1/2 (Screen Connect)");
 
   const nibble = sx1262Family || og || nibbleBus;
   if (nugget === nibble) return { line: null, models: [], evidence };   // neither, or contradictory
@@ -199,8 +215,10 @@ export function classifyS3FourMeg(fp, { oled = null } = {}) {
   // so a provisional guess here is cheap to be wrong about.
   let models = [];
   if (og) models = ["Nibble OG (S3)"];
-  // Zero vs Screen Connect: same radio, same display bus — no measured discriminator yet.
-  else if (oled === true) models = ["Nibble Zero", "Nibble Screen Connect"];
+  // Zero vs Screen Connect: same radio, same display bus. The one Screen Connect measured
+  // has pull-ups on the A/B buttons and both Zeros don't — enough to order the two, not
+  // to drop one. Firmware/catalog evidence narrows it further when available.
+  else if (oled === true) models = abPullups ? ["Nibble Screen Connect", "Nibble Zero"] : ["Nibble Zero", "Nibble Screen Connect"];
   // Screenless SX1262 board = Connect (from the product line-up; not yet bench-confirmed).
   else if (sx1262Family && oled === false) models = ["Nibble Connect"];
   return { line: "nibble", models, evidence };
@@ -208,10 +226,11 @@ export function classifyS3FourMeg(fp, { oled = null } = {}) {
 
 // Full pass for an ESP32-S3 with 4 MB flash. `io` talks to the ROM loader or the flasher
 // stub (readFlash needs the stub; leave it off and the firmware layer is skipped).
-// Hardware decides the family; firmware may only narrow the model *within* that family,
-// or speak up when the pins match nothing — a board flashed with the wrong build must not
-// be able to talk its way into the wrong family.
-export async function probeS3FourMeg(io) {
+// `images` maps app_elf_sha256 -> { line, model, id, name, version } for every catalog image.
+// Hardware decides the family; firmware (catalog hash first, env name second) may only
+// narrow the model *within* that family, or speak up when the pins match nothing — a board
+// flashed with the wrong build must not be able to talk its way into the wrong family.
+export async function probeS3FourMeg(io, { images = null } = {}) {
   let ops = 0;
   const counted = {
     readReg: (a) => { ops++; return io.readReg(a); },
@@ -228,17 +247,24 @@ export async function probeS3FourMeg(io) {
     oled = bus ? await i2cAck(counted, 8, 7, OLED_ADDR) : false;   // no pulled-up bus -> nothing to ACK
   }
   let { line, models, evidence } = classifyS3FourMeg(fingerprint, { oled });
-  let source = line ? "pins" : null, env = null;
+  let source = line ? "pins" : null, env = null, elfSha = null, installed = null;
 
   if (io.readFlash && (!line || (line === "nibble" && models.length !== 1))) {
-    try { env = await envFromFlash(io.readFlash, { deep: true }); } catch { env = null; }
-    const fw = env ? lineForPioEnv(env) : null;
+    try {
+      ({ env, elfSha } = await appInfoFromFlash(io.readFlash, { deep: true, needEnv: (sha) => !(images && sha && images[sha]) }));
+    } catch { env = null; elfSha = null; }
+    installed = (images && elfSha && images[elfSha]) || null;
+    // what the installed firmware says the board is: exact catalog image beats env name
+    const fw = installed ? { line: installed.line, model: installed.model || null }
+             : env ? lineForPioEnv(env) : null;
+    const via = installed ? "catalog" : "firmware";
     if (fw && !line) {
-      ({ line } = fw); models = fw.model ? [fw.model] : []; source = "firmware";
+      ({ line } = fw); models = fw.model ? [fw.model] : []; source = via;
     } else if (fw && fw.line === line && fw.model && (!models.length || models.includes(fw.model))) {
-      models = [fw.model]; source = "pins+firmware";
+      models = [fw.model]; source = `pins+${via}`;
     }
-    if (env) evidence = [...evidence, `installed firmware was built for "${env}"`];
+    if (installed) evidence = [...evidence, `running our ${installed.name}${installed.version ? " " + installed.version : ""} image`];
+    else if (env) evidence = [...evidence, `installed firmware was built for "${env}"`];
   }
-  return { line, models, source, evidence, fingerprint, oled, env, ops, ms: Date.now() - t0 };
+  return { line, models, source, evidence, fingerprint, oled, env, elfSha, installed, ops, ms: Date.now() - t0 };
 }
