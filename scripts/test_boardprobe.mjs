@@ -198,32 +198,40 @@ await test("appInfoFromFlash: hash from the head read; env lookup skipped when t
 });
 
 await test("probeS3FourMeg: a catalog image on the board names the exact model, but never the family", async () => {
-  // Screen Connect wiring (no I2C slave model in fakeChip -> no ACK -> "Connect" guess) …
-  const scPins = { 1: "pullup", 2: "pullup", 5: "low", 6: "pullup", 7: "pullup", 8: "pullup", 10: "pullup", 21: "pullup" };
-  let r = await probe.probeS3FourMeg({ ...fakeChip(scPins), ...fakeFlash(null, 0, SC_SHA) }, { images: IMAGES });
-  assert.deepEqual([r.line, r.models, r.source], ["nibble", ["Nibble Connect"], "pins"], "pins were already decisive: flash never consulted");
+  // Connect wiring (SX1262 pull-ups, no I2C pull-ups) + a Screen Connect image on it: pins
+  // decide, the head is still read once so the mismatched image is reported, not obeyed
+  const connectPins = { 5: "low", 6: "pullup", 10: "pullup", 21: "pullup" };
+  let f = fakeFlash(null, 0, SC_SHA);
+  let r = await probe.probeS3FourMeg({ ...fakeChip(connectPins), readFlash: f.readFlash }, { images: IMAGES });
+  assert.deepEqual([r.line, r.models, r.source, r.installed && r.installed.id, f.reads],
+    ["nibble", ["Nibble Connect"], "pins", "nibble-screen-connect-meshcore-companion", 1]);
+  assert.ok(r.evidence.at(-1).endsWith("(built for a different board)"), r.evidence.at(-1));
   // … pins undecided between two models: the catalog hash picks one, one flash read only
-  const f = fakeFlash(null, 0, SC_SHA);
+  f = fakeFlash(null, 0, SC_SHA);
   const undecided = { ...fakeChip({}), readFlash: f.readFlash };
   r = await probe.probeS3FourMeg(undecided, { images: IMAGES });
   assert.deepEqual([r.line, r.models, r.source, r.installed && r.installed.id, f.reads],
     ["nibble", ["Nibble Screen Connect"], "catalog", "nibble-screen-connect-meshcore-companion", 1]);
-  // Nugget pins + a Nibble catalog image: pins win, catalog never asked
+  // Nugget pins + a Nibble catalog image: pins win; the image is reported as a mismatch
   r = await probe.probeS3FourMeg({ ...fakeChip({ 35: "pullup", 36: "pullup" }), ...fakeFlash(null, 0, SC_SHA) }, { images: IMAGES });
-  assert.deepEqual([r.line, r.source, r.installed], ["bluetooth-nugget", "pins", null]);
+  assert.deepEqual([r.line, r.models, r.source, r.installed && r.installed.model], ["bluetooth-nugget", [], "pins", "Nibble Screen Connect"]);
+  // matching image simply confirms the pins' single answer
+  const connectImg = { ["11".repeat(32)]: { id: "nibble-connect-meshtastic", name: "Meshtastic", version: "2.7", line: "nibble", model: "Nibble Connect" } };
+  r = await probe.probeS3FourMeg({ ...fakeChip(connectPins), ...fakeFlash(null, 0, "11".repeat(32)) }, { images: connectImg });
+  assert.deepEqual([r.models, r.source], [["Nibble Connect"], "pins+catalog"]);
 });
 
 await test("probeS3FourMeg: firmware narrows the model but can never override the pins", async () => {
   const zeroPins = { 4: "low", 5: "low", 6: "pullup", 7: "pullup", 8: "pullup", 10: "pullup", 21: "pullup" };
   // I2C slave model is out of scope for fakeChip, so SDA just stays high -> no ACK -> "Connect" guess…
   let r = await probe.probeS3FourMeg({ ...fakeChip(zeroPins), ...fakeFlash("nibble-zero-connect", 6000) });
-  assert.deepEqual([r.line, r.models, r.source], ["nibble", ["Nibble Connect"], "pins"], "single model: flash never read");
+  assert.deepEqual([r.line, r.models, r.source, r.env], ["nibble", ["Nibble Connect"], "pins", "nibble-zero-connect"], "single model from pins: env read but can't widen it");
   // …pins that match nothing: firmware may name the board
   r = await probe.probeS3FourMeg({ ...fakeChip({}), ...fakeFlash("nibble-screen-connect", 6000) });
   assert.deepEqual([r.line, r.models, r.source], ["nibble", ["Nibble Screen Connect"], "firmware"]);
   // Nugget pins + Nibble firmware (the mis-flash this whole feature exists to prevent): pins win
   r = await probe.probeS3FourMeg({ ...fakeChip({ 35: "pullup", 36: "pullup" }), ...fakeFlash("nibble-esp32", 6000) });
-  assert.deepEqual([r.line, r.models, r.source, r.env], ["bluetooth-nugget", [], "pins", null]);
+  assert.deepEqual([r.line, r.models, r.source, r.env], ["bluetooth-nugget", [], "pins", "nibble-esp32"], "env is read and reported, never obeyed across families");
   // no readFlash (ROM loader, no stub): pins only, no throw
   r = await probe.probeS3FourMeg(fakeChip({}));
   assert.deepEqual([r.line, r.source], [null, null]);

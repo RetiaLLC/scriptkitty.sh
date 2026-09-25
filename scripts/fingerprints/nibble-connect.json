@@ -1,0 +1,67 @@
+{
+ "board": "Nibble Connect (purple, Seeed Wio-SX1262), workbench5 SLOT13; running catalog nibble-connect-meshtastic (TinyUSB) \u2014 reached via 1200-baud touch",
+ "measured": "2026-09-25, workbench5 via scripts/probe_bridge.py over ssh (LAN), flasher stub",
+ "chip": "ESP32-S3 (QFN56) (revision v0.2), Embedded Flash 4MB (XMC) + Embedded PSRAM 2MB \u2014 FH4R2 class, same as Zero / Screen Connect",
+ "mac_oui": "b8:f8:62",
+ "pull_follow": {
+  "HIGH": [
+   6,
+   10,
+   21,
+   39,
+   40
+  ],
+  "LOW": [
+   4,
+   5,
+   38
+  ],
+  "float": [
+   1,
+   2,
+   7,
+   8,
+   9,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   33,
+   34,
+   35,
+   36,
+   37,
+   41,
+   42,
+   47,
+   48
+  ]
+ },
+ "verdict": {
+  "line": "nibble",
+  "models": [
+   "Nibble Connect"
+  ],
+  "source": "pins",
+  "ops": 58
+ },
+ "flash": {
+  "partitions": "nvs@0x9000 otadata@0xe000 app@0x10000(0x250000) flashApp@0x260000(0xa0000) spiffs@0x300000",
+  "otadata": "slot0 seq 1 active, slot1 empty (0xFF)",
+  "app0": {
+   "app_elf_sha256_prefix": "00f16bd7aab23835",
+   "env": "nibble-esp32_sx1262",
+   "catalog_id": "nibble-connect-meshtastic"
+  }
+ },
+ "notes": [
+  "the discriminator inside the SX1262 family: 6/10 HIGH with 7/8 FLOAT (no I2C pull-ups, no display) = Connect; Zero adds 7/8 HIGH; Screen Connect adds 7/8 + 1/2 HIGH",
+  "oled probe never ran (no pulled-up bus) -> oled=false -> Connect from pins alone",
+  "GPIO1 (LED_DEBUG in the variant) floats \u2014 the LED does not load the pin enough to register",
+  "first probe reported env/elfSha null only because the flash layer was skipped when pins were decisive; changed the probe to always read the 16 KB head (cheap on native USB) so the installed image is reported"
+ ]
+}

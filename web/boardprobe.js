@@ -181,10 +181,12 @@ export async function i2cAck(io, sda, scl, addr) {
 //                      — and the S3-Zero doesn't even bond out GPIO33-37, so no Nibble can
 //                        ever load these two pins.
 //   Nibble OG (S3)     4,9 HIGH    10k on RFM95 RESET/NSS; 5 = DIO0     (netlist)
-//   Nibble Zero /      6,10 HIGH   10k on SX1262 RESET/NSS              (measured: 2 Zeros +
-//   Connect / Screen   7,8 HIGH    10k I2C; 5 LOW = BUSY idle            1 Screen Connect)
-//   Screen Connect     1,2 HIGH    pull-ups on the A/B buttons — both Zeros float here.
-//                      (1 unit; treated as a preference between the two, not a verdict)
+//   SX1262 Nibbles     6,10 HIGH   10k on SX1262 RESET/NSS; 5 LOW = BUSY idle
+//     Connect          7,8 float   no I2C pull-ups, no display            (measured: 1 unit)
+//     Zero             7,8 HIGH    10k I2C + 128x64 display at 0x3C       (measured: 2 units)
+//     Screen Connect   7,8 HIGH    10k I2C + 128x32 display at 0x3C, plus (measured: 1 unit)
+//                      1,2 HIGH    pull-ups on the A/B buttons — both Zeros float here
+//                      (one unit, so it orders Zero vs Screen Connect, not a verdict)
 // Not signatures: GPIO4 (SX1262 DIO1) follows the radio's IRQ state; the Nugget's button
 // lines float (the schematic's 10k pull-ups aren't fitted); GPIO38 LOW / 39-40 HIGH show up
 // on every S3 in ROM mode (JTAG pins). 21/47 — the two dev modules' RGB LED data pins — read
@@ -219,7 +221,7 @@ export function classifyS3FourMeg(fp, { oled = null } = {}) {
   // has pull-ups on the A/B buttons and both Zeros don't — enough to order the two, not
   // to drop one. Firmware/catalog evidence narrows it further when available.
   else if (oled === true) models = abPullups ? ["Nibble Screen Connect", "Nibble Zero"] : ["Nibble Zero", "Nibble Screen Connect"];
-  // Screenless SX1262 board = Connect (from the product line-up; not yet bench-confirmed).
+  // Screenless SX1262 board = Connect (measured: no I2C pull-ups at all on the Connect).
   else if (sx1262Family && oled === false) models = ["Nibble Connect"];
   return { line: "nibble", models, evidence };
 }
@@ -249,9 +251,15 @@ export async function probeS3FourMeg(io, { images = null } = {}) {
   let { line, models, evidence } = classifyS3FourMeg(fingerprint, { oled });
   let source = line ? "pins" : null, env = null, elfSha = null, installed = null;
 
-  if (io.readFlash && (!line || (line === "nibble" && models.length !== 1))) {
+  // The 16 KB head read is cheap on native USB (~50-100 ms) and names the installed
+  // image, so it always runs when the stub is up. The 176 KB env follow-up only runs when
+  // the pins left the model open and the hash didn't settle it.
+  if (io.readFlash) {
+    const undecided = !line || (line === "nibble" && models.length !== 1);
     try {
-      ({ env, elfSha } = await appInfoFromFlash(io.readFlash, { deep: true, needEnv: (sha) => !(images && sha && images[sha]) }));
+      ({ env, elfSha } = await appInfoFromFlash(io.readFlash, {
+        deep: undecided, needEnv: (sha) => undecided && !(images && sha && images[sha]),
+      }));
     } catch { env = null; elfSha = null; }
     installed = (images && elfSha && images[elfSha]) || null;
     // what the installed firmware says the board is: exact catalog image beats env name
@@ -261,10 +269,13 @@ export async function probeS3FourMeg(io, { images = null } = {}) {
     if (fw && !line) {
       ({ line } = fw); models = fw.model ? [fw.model] : []; source = via;
     } else if (fw && fw.line === line && fw.model && (!models.length || models.includes(fw.model))) {
-      models = [fw.model]; source = `pins+${via}`;
+      models = [fw.model]; source = `pins+${via}`;   // narrows, or simply agrees with, the pins
     }
-    if (installed) evidence = [...evidence, `running our ${installed.name}${installed.version ? " " + installed.version : ""} image`];
-    else if (env) evidence = [...evidence, `installed firmware was built for "${env}"`];
+    if (installed) {
+      const mismatch = fw && (fw.line !== line || (fw.model && models.length && !models.includes(fw.model)));
+      evidence = [...evidence, `running our ${installed.name}${installed.version ? " " + installed.version : ""} image` +
+        (mismatch ? " (built for a different board)" : "")];
+    } else if (env) evidence = [...evidence, `installed firmware was built for "${env}"`];
   }
   return { line, models, source, evidence, fingerprint, oled, env, elfSha, installed, ops, ms: Date.now() - t0 };
 }
