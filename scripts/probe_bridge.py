@@ -9,7 +9,7 @@ against a real board, since Node has no Web Serial. Line-oriented over stdin/std
         loader on quit (a board whose app firmware has no usable USB must NOT be rebooted);
         --before is esptool's connect mode (default_reset | no_reset | usb_reset).
         -> {"ready":..} then one JSON reply per request
-        <- {"op":"r","a":addr} | {"op":"w","a":addr,"v":val} | {"op":"f","a":addr,"n":len}
+        <- {"op":"r","a":addr} | {"op":"w","a":addr,"v":val[,"m":mask]} | {"op":"f","a":addr,"n":len}
            | {"op":"q"}     (f = read_flash, needs --stub, replies base64; q hard-resets)
 
 RESEARCH/TEST TOOL — not used by the site or CI.
@@ -72,8 +72,11 @@ def esptool_mode(port, stub, reset=True, before="default_reset"):
         if req["op"] == "r":
             out(json.dumps({"v": esp.read_reg(req["a"])}))
         elif req["op"] == "w":
-            esp.write_reg(req["a"], req["v"])
-            out(json.dumps({"ok": True}))
+            try:
+                esp.write_reg(req["a"], req["v"], req.get("m", 0xFFFFFFFF))
+                out(json.dumps({"ok": True}))
+            except Exception as e:  # a reset write may kill the link mid-reply
+                out(json.dumps({"ok": False, "error": str(e)}))
         elif req["op"] == "f":
             with contextlib.redirect_stdout(sys.stderr):
                 data = esp.read_flash(req["a"], req["n"])

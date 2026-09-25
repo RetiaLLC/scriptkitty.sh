@@ -735,6 +735,9 @@ async function detectBoard({ touched = false } = {}) {
       }
     }
     applyDetection(mcu, chipName, flash, hw, hint);
+    // Hand the board back to its firmware. Only the S3 gets this (its watchdog reset is
+    // measured reliable); other chips keep today's behaviour of staying in the loader.
+    if (mcu === "esp32-s3") { try { await resetToApp(loader, mcu); } catch {} }
   } catch (e) {
     failure = e;
   } finally {
@@ -891,6 +894,27 @@ function clearDetection() {
   if (detectedModels.size) { detectedModels = new Set(); render(); }
 }
 
+// Leave the ROM loader and boot the installed firmware. On the ESP32-S3 the RTS "hard
+// reset" is unreliable and can't clear the FORCE_DOWNLOAD_BOOT latch a TinyUSB 1200-baud
+// touch leaves behind (the board then sits in download mode until replugged — the "it
+// never starts after flashing" report). Use esptool's S3 recipe instead: clear the latch,
+// then a watchdog reset written over the protocol. See boardprobe.js.
+async function resetToApp(loader, mcu) {
+  if (mcu === "esp32-s3") {
+    try {
+      const probe = await loadProbe();
+      await probe.s3ResetToApp({
+        readReg: (a) => loader.readReg(a),
+        writeReg: (a, v, m) => (m == null ? loader.writeReg(a, v) : loader.writeReg(a, v, m)),
+      });
+      return;
+    } catch (e) {
+      console.warn("[reset] S3 watchdog reset failed, falling back to RTS", e);
+    }
+  }
+  await loader.after("hard_reset");
+}
+
 // --- flashing via vendored esptool-js ----------------------------------------
 // D1 Mini (ESP8266) boards use a CH340 that is unreliable over Web Serial above
 // 115200; native-USB ESP32-S2/S3 have no such adapter and handle high baud fine.
@@ -980,7 +1004,7 @@ async function flashImage(ctx) {
       },
     });
     setFlashStatus("Finishing up…");
-    await loader.after("hard_reset");
+    await resetToApp(loader, mcu);
     showFlashSuccess(ctx);
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);

@@ -90,6 +90,34 @@ export async function appInfoFromFlash(readFlash, { deep = true, needEnv = () =>
 export async function envFromFlash(readFlash, opts) { return (await appInfoFromFlash(readFlash, opts)).env; }
 
 // ---------------------------------------------------------------------------
+// Leaving the ROM loader on an ESP32-S3 — measured on workbench5, 2026-09-25.
+// The TinyUSB 1200-baud touch (and any USB-persist reboot) sets FORCE_DOWNLOAD_BOOT in
+// RTC_CNTL_OPTION1_REG; it lives in the RTC domain and survives resets, so an RTS "hard
+// reset" lands straight back in download mode — the board looks like it never starts
+// until it's replugged. esptool (Python) clears the bit before pulsing RTS; esptool-js 0.6.0
+// doesn't. Even cleared, the RTS pulse through the USB-JTAG unit is flaky (Nibble OG:
+// 2 of 6). A watchdog reset written over the serial protocol is 6 of 6 and needs no pins,
+// so that is what the site uses on the S3, after flashing and after detect.
+// Register map: esptool ESP32S3ROM (RTCCNTL base 0x60008000).
+const S3_RTC_CNTL_OPTION1_REG = 0x6000812c, S3_FORCE_DOWNLOAD_BOOT = 0x1;
+const S3_RTC_CNTL_WDTCONFIG0_REG = 0x60008098, S3_RTC_CNTL_WDTCONFIG1_REG = 0x6000809c;
+const S3_RTC_CNTL_WDTWPROTECT_REG = 0x600080b0, S3_RTC_CNTL_WDT_WKEY = 0x50d83aa1;
+// WDT: enable | stage0 = chip reset | pause-in-sleep | chip-reset width
+const S3_WDT_RESET_CONFIG = ((1 << 31) | (5 << 28) | (1 << 8) | 2) >>> 0;
+
+// `io.writeReg(addr, value, mask)` — the mask must be honoured (esptool-js writeReg's third
+// argument; the bridge passes it to esptool's write_reg). Resolves once the reset has been
+// issued; the USB device usually re-enumerates right after, so callers must expect the
+// transport to be dead.
+export async function s3ResetToApp(io) {
+  await io.writeReg(S3_RTC_CNTL_OPTION1_REG, 0, S3_FORCE_DOWNLOAD_BOOT);     // drop the latch
+  await io.writeReg(S3_RTC_CNTL_WDTWPROTECT_REG, S3_RTC_CNTL_WDT_WKEY);       // unlock
+  await io.writeReg(S3_RTC_CNTL_WDTCONFIG1_REG, 2000);                        // stage-0 timeout
+  await io.writeReg(S3_RTC_CNTL_WDTCONFIG0_REG, S3_WDT_RESET_CONFIG);         // arm: reset the chip
+  await io.writeReg(S3_RTC_CNTL_WDTWPROTECT_REG, 0);                          // lock
+}
+
+// ---------------------------------------------------------------------------
 // Electrical fingerprint (ESP32-S3 register map).
 const GPIO = 0x60004000;
 const OUT_W1TC = GPIO + 0x0c;

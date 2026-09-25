@@ -10,6 +10,9 @@
 //        [--no-reset]    leave the board in the ROM loader afterwards (a board whose app
 //                        firmware has no usable USB must never be rebooted by a test)
 //        [--all-pins]    also dump every probe-safe GPIO (signature research for new boards)
+//        [--js-reset]    leave the ROM the way the site will: boardprobe.s3ResetToApp() (clear the
+//                        FORCE_DOWNLOAD latch + watchdog reset over the protocol) instead of the
+//                        bridge's RTS hard reset — implies --no-reset for the bridge
 //        [--ssh pi@host] run the bridge on a workbench Pi (direct USB) instead of locally;
 //                        expects ~/sk/probe_bridge.py + ~/sk/with_port.sh there
 //        [--images live | path/to/index.json]  catalog image table for the hash layer:
@@ -221,6 +224,18 @@ await test("probeS3FourMeg: a catalog image on the board names the exact model, 
   assert.deepEqual([r.models, r.source], [["Nibble Connect"], "pins+catalog"]);
 });
 
+await test("s3ResetToApp: exact esptool register sequence, masked latch clear first", async () => {
+  const writes = [];
+  await probe.s3ResetToApp({ readReg: async () => 0, writeReg: async (a, v, m) => { writes.push([a, v >>> 0, m]); } });
+  assert.deepEqual(writes, [
+    [0x6000812c, 0, 1],                    // RTC_CNTL_OPTION1_REG: clear FORCE_DOWNLOAD_BOOT only
+    [0x600080b0, 0x50d83aa1, undefined],   // WDT unlock
+    [0x6000809c, 2000, undefined],         // WDTCONFIG1 timeout
+    [0x60008098, 0xd0000102, undefined],   // WDTCONFIG0: enable, stage0 = chip reset
+    [0x600080b0, 0, undefined],            // lock
+  ]);
+});
+
 await test("probeS3FourMeg: firmware narrows the model but can never override the pins", async () => {
   const zeroPins = { 4: "low", 5: "low", 6: "pullup", 7: "pullup", 8: "pullup", 10: "pullup", 21: "pullup" };
   // I2C slave model is out of scope for fakeChip, so SDA just stays high -> no ACK -> "Connect" guess…
@@ -277,7 +292,7 @@ function bridgeCmd(args, dev) {
 }
 
 async function romIo(dev, stub) {
-  const extra = [...(stub ? ["--stub"] : []), ...(argv.includes("--no-reset") ? ["--no-reset"] : [])];
+  const extra = [...(stub ? ["--stub"] : []), ...(argv.includes("--no-reset") || argv.includes("--js-reset") ? ["--no-reset"] : [])];
   const before = opt("--before"); if (before) extra.push("--before", before);
   const [cmd, cargs] = bridgeCmd(["esptool", dev, ...extra], dev);
   const child = spawn(cmd, cargs, { stdio: ["pipe", "pipe", "inherit"] });
@@ -287,7 +302,7 @@ async function romIo(dev, stub) {
   return {
     hello,
     readReg: async (a) => (await rpc({ op: "r", a })).v,
-    writeReg: async (a, v) => { await rpc({ op: "w", a, v: v >>> 0 }); },
+    writeReg: async (a, v, m) => { const r = await rpc({ op: "w", a, v: v >>> 0, ...(m != null ? { m: m >>> 0 } : {}) }); if (r.ok === false) throw new Error(r.error); },
     ...(stub ? { readFlash: async (a, n) => new Uint8Array(Buffer.from((await rpc({ op: "f", a, n })).d, "base64")) } : {}),
     close: async () => { await rpc({ op: "q" }); child.kill(); },
   };
@@ -365,7 +380,12 @@ if (opt("--rom")) {
     if (before[7] === "HIGH" && before[8] === "HIGH") assert.equal(await probe.i2cAck(io, 8, 7, 0x3d), false);
     assert.deepEqual(await probe.pullFollow(io, [7, 8]), before);
   });
-  await io.close();
+  if (argv.includes("--js-reset")) {
+    await test("s3ResetToApp: latch cleared + watchdog reset issued over the protocol", async () => {
+      await probe.s3ResetToApp(io);            // the last write arms the WDT; the link dies ~2 s later
+    });
+  }
+  try { await io.close(); } catch { /* the chip may already be rebooting */ }
 }
 
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
