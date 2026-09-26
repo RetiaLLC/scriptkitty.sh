@@ -130,12 +130,33 @@ function loadProbe() {
   return _probe;
 }
 // A port the user has already granted this session — reuse it so Detect→Flash
-// (or repeat flashes) don't re-prompt the browser port picker.
+// (or repeat flashes) don't re-prompt the browser port picker. Chrome also remembers
+// grants across sessions for USB devices with a serial number, so a board that has been
+// picked once is offered by getPorts() every time it's plugged in: when exactly one such
+// board is attached, use it without a chooser. Several (or none) → ask.
 let grantedPort = null;
-async function acquirePort() {
-  if (grantedPort) return grantedPort;
+async function acquirePort({ pick = false } = {}) {
+  if (grantedPort && !pick) return grantedPort;
+  if (!pick) {
+    const known = (await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId != null);
+    if (known.length === 1) { grantedPort = known[0]; return grantedPort; }
+  }
   grantedPort = await navigator.serial.requestPort();
   return grantedPort;
+}
+// After a 1200-baud touch the board comes back as the ROM's "USB JTAG/serial debug unit" —
+// a different USB device, which the browser can only grant through a chooser. Filter it to
+// Espressif native-USB devices so the list is just the rebooted board.
+async function pickRebootedPort() {
+  grantedPort = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
+  return grantedPort;
+}
+// Native-USB Espressif boards answer esptool at once (ROM, HWCDC) or never (TinyUSB app);
+// don't spend esptool's 7 reset-and-sync rounds finding that out before the touch.
+function limitConnectAttempts(loader, info, attempts = 3) {
+  if (info.usbVendorId !== 0x303a || typeof loader.connect !== "function") return;
+  const orig = loader.connect.bind(loader);
+  loader.connect = (mode, _attempts, detecting) => orig(mode, attempts, detecting);
 }
 
 init();
@@ -656,7 +677,7 @@ function setMascot(phase, name) {
 // --- auto-detect via vendored esptool-js -------------------------------------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function detectBoard({ touched = false } = {}) {
+async function detectBoard({ touched = false, pick = false } = {}) {
   if (!HAS_SERIAL) return;
   showDetected("Loading detector…", "busy");
   let mod;
@@ -673,7 +694,7 @@ async function detectBoard({ touched = false } = {}) {
 
   let port;
   try {
-    port = await acquirePort();
+    port = await acquirePort({ pick });
   } catch {
     hideDetected(); // user dismissed the port picker
     return;
@@ -706,6 +727,7 @@ async function detectBoard({ touched = false } = {}) {
   const term = { clean() {}, writeLine(d) { showDetected(String(d), "busy"); }, write(d) {} };
   const transport = new Transport(port, false);
   const loader = new ESPLoader({ transport, baudrate: 115200, romBaudrate: 115200, terminal: term, debugLogging: false });
+  limitConnectAttempts(loader, info);
   let failure = null;
   try {
     showDetected("Connecting to board…", "busy");
@@ -760,7 +782,11 @@ async function detectBoard({ touched = false } = {}) {
     if (rebooted.gone) {
       grantedPort = null;
       setMascot("idle");
-      showDetected("Your board was running firmware that can't be reset over USB, so it's been rebooted into <b>flashing mode</b> and shows up as a new port. Click <b>Detect my board</b> again and pick it — usually “USB JTAG/serial debug unit”.", "ok");
+      showDetected("Your board's firmware can't be reset over USB, so it's been rebooted into <b>flashing mode</b>. It shows up as a new device the browser hasn't seen before — one more pick (first time only; after this it's automatic):", "ok",
+        { label: "Connect to the rebooted board", onclick: async () => {
+          try { await pickRebootedPort(); } catch { return; }
+          detectBoard({ touched: true });
+        } });
       return;
     }
   }
@@ -864,18 +890,19 @@ function applyDetection(mcu, chipName, flash, hw = null, hint = null) {
   }
 }
 
-function showDetected(html, kind) {
+function showDetected(html, kind, primary = null) {
   detectedEl.hidden = false;
   detectedEl.className = `banner banner-detect banner-${kind}`;
   const actions = (kind === "ok" || kind === "err")
     ? ` <button class="link-repick" type="button">use a different port</button> <button class="link-clear" type="button">clear</button>`
     : "";
-  detectedEl.innerHTML = html + actions;
+  detectedEl.innerHTML = html + (primary ? ` <button class="btn btn-inline" type="button">${escapeHtml(primary.label)}</button>` : "") + actions;
+  if (primary) detectedEl.querySelector(".btn-inline").addEventListener("click", primary.onclick);
   const clearBtn = detectedEl.querySelector(".link-clear");
   if (clearBtn) clearBtn.addEventListener("click", () => clearDetection());
   // Picked the wrong serial port? Drop it and re-prompt the browser port picker.
   const repick = detectedEl.querySelector(".link-repick");
-  if (repick) repick.addEventListener("click", () => { grantedPort = null; detectBoard(); });
+  if (repick) repick.addEventListener("click", () => { grantedPort = null; detectBoard({ pick: true }); });
 }
 
 function hideDetected() { detectedEl.hidden = true; detectedEl.innerHTML = ""; }
@@ -900,6 +927,9 @@ function clearDetection() {
 // never starts after flashing" report). Use esptool's S3 recipe instead: clear the latch,
 // then a watchdog reset written over the protocol. See boardprobe.js.
 async function resetToApp(loader, mcu) {
+  // The rebooted board re-enumerates (a TinyUSB app is a different USB device from the
+  // ROM), so the port we hold is about to die. acquirePort() finds the right one next time.
+  grantedPort = null;
   if (mcu === "esp32-s3") {
     try {
       const probe = await loadProbe();
@@ -970,6 +1000,8 @@ async function flashImage(ctx) {
   let port;
   try { port = await acquirePort(); }
   catch { closeFlash(); setMascot("idle"); return; } // user dismissed the browser port picker
+  let info = {};
+  try { info = (port.getInfo && port.getInfo()) || {}; } catch {}
 
   const term = { clean() {}, writeLine() {}, write() {} };
   const transport = new Transport(port, false);
@@ -978,9 +1010,27 @@ async function flashImage(ctx) {
     serialOptions: { bufferSize: 8192, flowControl: "none" },
     terminal: term, debugLogging: false,
   });
+  limitConnectAttempts(loader, info);
   try {
     setFlashStatus("Connecting to your board…");
-    const chipName = await loader.main();
+    let chipName;
+    try {
+      chipName = await loader.main();
+    } catch (e) {
+      // TinyUSB firmware ignores the reset: touch it into the ROM loader and carry on —
+      // silently if the browser already trusts the rebooted device, else with one pick.
+      if (ctx.touched || info.usbVendorId !== 0x303a) throw e;
+      try { await transport.disconnect(); } catch {}
+      setFlashStatus("The running firmware ignored the reset — rebooting it into flashing mode…");
+      const rebooted = await bootloaderTouch(port);
+      if (rebooted.fresh) { grantedPort = rebooted.fresh; return flashImage({ ...ctx, touched: true }); }
+      if (rebooted.gone) {
+        grantedPort = null;
+        showFlashRebooted(ctx);
+        return;
+      }
+      throw e;
+    }
     const mcu = mapChip(chipName);
     if (ctx.expectMcu && mcu && mcu !== ctx.expectMcu) {
       const err = new Error(`This board is a ${chipName}, but “${ctx.name}” is built for ${MCU_LABEL[ctx.expectMcu] || ctx.expectMcu}.`);
@@ -1100,6 +1150,25 @@ function mapFlashError(raw, info) {
     return { title: "The connection dropped", body: "The board disconnected while flashing. Check the USB cable and port, then Retry. If it keeps happening, use the classic flasher below.", classic: true };
   return { title: "Flashing didn't finish", body: raw + " Try again, or use the classic flasher below.", classic: true };
 }
+// The touch worked but the rebooted board is a USB device this browser hasn't been granted
+// yet (first time for this board): one pick, then the flash continues by itself.
+function showFlashRebooted(ctx) {
+  const o = ensureOverlay();
+  o.className = "flash-overlay";
+  o.querySelector(".flash-title").textContent = "One more pick";
+  o.querySelector(".flash-bar").style.display = "none";
+  setFlashStatus("Your board's firmware can't be reset over USB, so it's been rebooted into flashing mode. It shows up as a new device — pick it once and the flash carries on (after this it's automatic).");
+  setFlashHint("");
+  const actions = o.querySelector(".flash-actions");
+  actions.replaceChildren();
+  actions.append(btnEl("button", "btn", "Connect to the rebooted board", { onclick: async () => {
+    try { await pickRebootedPort(); } catch { return; }
+    flashImage({ ...ctx, touched: true });
+  } }));
+  actions.append(btnEl("button", "btn secondary", "Cancel", { onclick: () => { closeFlash(); setMascot("idle"); } }));
+  setMascot("working", ctx.name);
+}
+
 function showFlashError(ctx, msg, info) {
   info = info || {};
   const o = ensureOverlay();
