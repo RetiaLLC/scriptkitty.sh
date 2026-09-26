@@ -107,7 +107,7 @@ main { flex: 1 0 auto; padding-bottom: 3rem; }
 .banner-detect { padding: .7rem 1rem; font-size: .9rem; margin: -.4rem 0 1.5rem; }
 .banner-busy { border-color: var(--accent-2); color: var(--muted); }
 .banner-ok { border-color: rgba(123, 241, 173, .4); background: #0c2019; color: #a9f4c9; }
-.banner .btn-inline { margin: 8px 8px 0 0; padding: 6px 12px; font-size: 12px; }
+.banner .btn-inline { display: inline-block; width: auto; margin: 8px 8px 0 0; padding: 6px 12px; font-size: 12px; }
 .banner-err { border-color: #6b2b2b; background: #2a1414; color: #f0c0c0; }
 .banner-detect b { color: var(--text); }
 .link-clear, .link-repick {

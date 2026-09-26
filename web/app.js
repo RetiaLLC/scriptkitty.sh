@@ -135,10 +135,19 @@ function loadProbe() {
 // picked once is offered by getPorts() every time it's plugged in: when exactly one such
 // board is attached, use it without a chooser. Several (or none) → ask.
 let grantedPort = null;
-async function acquirePort({ pick = false } = {}) {
+let sessionBoard = null;         // what Detect last found this session: { line, models }
+async function knownPorts() {
+  return (await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId != null);
+}
+// `reuse`: allowed to take a remembered board without a chooser. Detect always may — the
+// result is shown and "use a different port" is one click away. Flash may only once this
+// session has looked at the board (a Detect result, or an earlier flash), never blind: with
+// two boards attached, silently writing firmware to the remembered one would be worse than
+// a chooser.
+async function acquirePort({ pick = false, reuse = true } = {}) {
   if (grantedPort && !pick) return grantedPort;
-  if (!pick) {
-    const known = (await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId != null);
+  if (!pick && reuse) {
+    const known = await knownPorts();
     if (known.length === 1) { grantedPort = known[0]; return grantedPort; }
   }
   grantedPort = await navigator.serial.requestPort();
@@ -262,6 +271,20 @@ function setOpenLines(keys, models = []) {
   if (searchEl) searchEl.value = "";
   syncHash();
   render();
+}
+
+// After Detect, open the build the user most likely wants — the recommended card of the
+// detected model (or family) — and bring it into view, so the next click is Flash.
+function revealRecommended(line, models) {
+  const pool = ALL.filter((t) => t.product_line === line && (!models.length || models.includes(t.model)));
+  const pick = pool.sort(recThenName)[0];
+  if (!pick) return;
+  openCards = new Set([pick.id]);
+  render();
+  requestAnimationFrame(() => {
+    const card = buildsEl.querySelector(`[data-id="${CSS.escape(pick.id)}"]`) || buildsEl.querySelector(".fam-section");
+    if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 // --- device firmware sections ------------------------------------------------
@@ -630,7 +653,7 @@ function verRow(t, rel, isDefault) {
 // Flash a specific channel release (any version, verified or untested).
 function flashRelease(t, rel) {
   return flashImage({
-    name: `${t.name} ${relLabel(rel)}`, manifest: rel.manifest, expectMcu: t.mcu, nextSteps: t.next_steps || [],
+    name: `${t.name} ${relLabel(rel)}`, manifest: rel.manifest, expectMcu: t.mcu, productLine: t.product_line, nextSteps: t.next_steps || [],
     loadParts: async () => {
       const resp = await fetch(`firmware/${rel.bin}`, { cache: "no-cache" });
       if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
@@ -872,7 +895,9 @@ function applyDetection(mcu, chipName, flash, hw = null, hint = null) {
   }
 
   if (lines.length === 1) {
+    sessionBoard = { line: lines[0], models };
     setOpenLines(lines, models);
+    revealRecommended(lines[0], models);
     const name = models.length === 1 ? models[0] : famName(lines[0]);
     setMascot("found", name);
     const either = models.length > 1 ? ` — probably a ${escapeHtml(models[0])}, possibly a ${models.slice(1).map(escapeHtml).join(" or ")}` : "";
@@ -927,9 +952,10 @@ function clearDetection() {
 // never starts after flashing" report). Use esptool's S3 recipe instead: clear the latch,
 // then a watchdog reset written over the protocol. See boardprobe.js.
 async function resetToApp(loader, mcu) {
-  // The rebooted board re-enumerates (a TinyUSB app is a different USB device from the
-  // ROM), so the port we hold is about to die. acquirePort() finds the right one next time.
-  grantedPort = null;
+  let before = null;
+  try { before = new Set(await navigator.serial.getPorts()); } catch { before = new Set(); }
+  const old = grantedPort;
+  let done = false;
   if (mcu === "esp32-s3") {
     try {
       const probe = await loadProbe();
@@ -937,12 +963,31 @@ async function resetToApp(loader, mcu) {
         readReg: (a) => loader.readReg(a),
         writeReg: (a, v, m) => (m == null ? loader.writeReg(a, v) : loader.writeReg(a, v, m)),
       });
-      return;
+      done = true;
     } catch (e) {
       console.warn("[reset] S3 watchdog reset failed, falling back to RTS", e);
     }
   }
-  await loader.after("hard_reset");
+  if (!done) await loader.after("hard_reset");
+  await followReenumeration(before, old);
+}
+
+// A TinyUSB app is a different USB device from the ROM it just left, so the port we hold
+// dies when the board reboots and the app's own port comes back (already granted — it was
+// the first pick). Follow that swap so the next Flash/Detect uses the right port without a
+// chooser. An HWCDC board keeps its port: if it's still there after a second, nothing is
+// going to change and we stop waiting. Capped so a success overlay is never held long.
+async function followReenumeration(before, old, { maxMs = 3000, settledMs = 1000 } = {}) {
+  for (let waited = 0; waited < maxMs; waited += 250) {
+    await sleep(250);
+    let now;
+    try { now = await navigator.serial.getPorts(); } catch { return; }
+    const fresh = now.find((p) => !before.has(p) && p.getInfo().usbVendorId != null);
+    if (fresh) { if (grantedPort === old) grantedPort = fresh; return; }
+    const oldGone = old && !now.includes(old);
+    if (oldGone && grantedPort === old) grantedPort = null;            // dead port: never reuse it
+    if (!oldGone && waited + 250 >= settledMs) return;                 // HWCDC: same device, still here
+  }
 }
 
 // --- flashing via vendored esptool-js ----------------------------------------
@@ -961,7 +1006,7 @@ const BOOT_HELP = "hold the BOOT button, tap RESET once, then release BOOT (no R
 // Flash a catalog profile: fetch its (single, merged) bin and run the shared flasher.
 function flashProfile(t) {
   return flashImage({
-    name: t.name, manifest: t.manifest, expectMcu: t.mcu, nextSteps: t.next_steps || [],
+    name: t.name, manifest: t.manifest, expectMcu: t.mcu, productLine: t.product_line, nextSteps: t.next_steps || [],
     loadParts: async () => {
       const resp = await fetch(`firmware/${t.id}.bin`, { cache: "no-cache" });
       if (!resp.ok) throw new Error(`Couldn't download the firmware (HTTP ${resp.status}).`);
@@ -998,7 +1043,8 @@ async function flashImage(ctx) {
   if (NATIVE_USB.has(ctx.expectMcu)) setFlashHint(`If your board won't connect, put it in install mode: ${BOOT_HELP}.`);
 
   let port;
-  try { port = await acquirePort(); }
+  const seen = !!sessionBoard && (!ctx.productLine || sessionBoard.line === ctx.productLine);
+  try { port = await acquirePort({ reuse: seen || !!ctx.touched }); }
   catch { closeFlash(); setMascot("idle"); return; } // user dismissed the browser port picker
   let info = {};
   try { info = (port.getInfo && port.getInfo()) || {}; } catch {}
@@ -1054,7 +1100,9 @@ async function flashImage(ctx) {
       },
     });
     setFlashStatus("Finishing up…");
-    await resetToApp(loader, mcu);
+    // The firmware is written and verified at this point; a hiccup while rebooting the board
+    // must not turn that into a failure screen.
+    try { await resetToApp(loader, mcu); } catch (e) { console.warn("[flash] reset after write failed", e); }
     showFlashSuccess(ctx);
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
