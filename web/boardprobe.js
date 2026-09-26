@@ -119,20 +119,20 @@ export async function s3ResetToApp(io) {
 
 // ---------------------------------------------------------------------------
 // Electrical fingerprint (ESP32-S3 register map).
-const GPIO = 0x60004000;
+export const GPIO = 0x60004000;
 const OUT_W1TC = GPIO + 0x0c;
-const EN_W1TS = [GPIO + 0x24, GPIO + 0x30];
-const EN_W1TC = [GPIO + 0x28, GPIO + 0x34];
-const IN = [GPIO + 0x3c, GPIO + 0x40];
-const funcOutSel = (pin) => GPIO + 0x554 + 4 * pin;
-const ioMux = (pin) => 0x60009004 + 4 * pin;
-const FUN_PD = 1 << 7, FUN_PU = 1 << 8, FUN_IE = 1 << 9, MCU_SEL_GPIO = 1 << 12;
-const bank = (pin) => (pin < 32 ? 0 : 1);
-const bit = (pin) => (1 << (pin % 32)) >>> 0;
+export const EN_W1TS = [GPIO + 0x24, GPIO + 0x30];
+export const EN_W1TC = [GPIO + 0x28, GPIO + 0x34];
+export const IN = [GPIO + 0x3c, GPIO + 0x40];
+export const funcOutSel = (pin) => GPIO + 0x554 + 4 * pin;
+export const ioMux = (pin) => 0x60009004 + 4 * pin;
+export const FUN_PD = 1 << 7, FUN_PU = 1 << 8, FUN_IE = 1 << 9, MCU_SEL_GPIO = 1 << 12;
+export const bank = (pin) => (pin < 32 ? 0 : 1);
+export const bit = (pin) => (1 << (pin % 32)) >>> 0;
 
 // Never probed: 0/3/45/46 straps, 19/20 USB D-/D+, 26-32 in-package flash + PSRAM,
 // 43/44 UART0 (the ROM drives TX).
-const UNSAFE = new Set([0, 3, 19, 20, 26, 27, 28, 29, 30, 31, 32, 43, 44, 45, 46]);
+export const UNSAFE = new Set([0, 3, 19, 20, 26, 27, 28, 29, 30, 31, 32, 43, 44, 45, 46]);
 
 // Pull-follow test, entirely passive (only the chip's ~45 k internal pulls are switched,
 // nothing is driven): sample every pin with pull-DOWN on, again with pull-UP on.
@@ -172,17 +172,20 @@ export async function pullFollow(io, pins) {
 // One I2C address probe, bit-banged open-drain: a line is only ever pulled LOW (output
 // latch 0, toggle output-enable) and released to the board's own pull-ups — never driven
 // high. Only call this on pins pullFollow() reported HIGH (i.e. a real pulled-up bus).
+const OUT_W1TC_BANK = [GPIO + 0x0c, GPIO + 0x18];
 export async function i2cAck(io, sda, scl, addr) {
-  if (sda >= 32 || scl >= 32) throw new Error("i2cAck: bank-0 pins only");
   const pins = [sda, scl], saved = [];
   for (const p of pins) for (const reg of [ioMux(p), funcOutSel(p)]) saved.push([reg, await io.readReg(reg)]);
-  const lo = (p) => io.writeReg(EN_W1TS[0], bit(p));
-  const hi = (p) => io.writeReg(EN_W1TC[0], bit(p));
+  const lo = (p) => io.writeReg(EN_W1TS[bank(p)], bit(p));
+  const hi = (p) => io.writeReg(EN_W1TC[bank(p)], bit(p));
+  const sdaLevel = async () => (((await io.readReg(IN[bank(sda)])) >>> 0) & bit(sda)) !== 0;
   let ack = false;
   try {
-    await io.writeReg(EN_W1TC[0], (bit(sda) | bit(scl)) >>> 0);
-    await io.writeReg(OUT_W1TC, (bit(sda) | bit(scl)) >>> 0);
-    for (const p of pins) { await io.writeReg(funcOutSel(p), 0x100); await io.writeReg(ioMux(p), MCU_SEL_GPIO | FUN_IE); }
+    for (const p of pins) {
+      await io.writeReg(EN_W1TC[bank(p)], bit(p));
+      await io.writeReg(OUT_W1TC_BANK[bank(p)], bit(p));
+      await io.writeReg(funcOutSel(p), 0x100); await io.writeReg(ioMux(p), MCU_SEL_GPIO | FUN_IE);
+    }
     await lo(sda); await lo(scl);                                    // START (bus idles high)
     const byte = (addr << 1) & 0xff;                                 // write direction
     let sdaLow = true;
@@ -193,11 +196,11 @@ export async function i2cAck(io, sda, scl, addr) {
     }
     if (sdaLow) await hi(sda);                                       // release for the ACK slot
     await hi(scl);
-    ack = (((await io.readReg(IN[0])) >>> 0) & bit(sda)) === 0;
+    ack = !(await sdaLevel());
     await lo(scl);
     await lo(sda); await hi(scl); await hi(sda);                     // STOP
   } finally {
-    await io.writeReg(EN_W1TC[0], (bit(sda) | bit(scl)) >>> 0);
+    for (const p of pins) await io.writeReg(EN_W1TC[bank(p)], bit(p));
     for (const [reg, val] of saved) await io.writeReg(reg, val);
   }
   return ack;

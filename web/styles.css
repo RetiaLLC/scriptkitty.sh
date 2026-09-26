@@ -565,3 +565,26 @@ esp-web-install-button[install-unsupported] { display: block; }
 .term-input input:focus { outline: none; border-color: var(--accent-2); }
 .term-input .btn { width: auto; padding-inline: 1.3rem; }
 .term-input input:disabled { opacity: .5; }
+
+/* --- vet page ("Diagnose my cat") -------------------------------------------- */
+.vet-main { max-width: 760px; padding-bottom: 40px; }
+.vet-controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 10px; }
+.vet-controls .ctl select { margin-left: 6px; }
+.detect-hero[data-phase="healthy"] .hero-cat { color: var(--accent); }
+.detect-hero[data-phase="rework"] .hero-cat { color: #ff7b7b; }
+.detect-hero[data-phase="check"] .hero-cat { color: var(--amber, #f6c453); }
+.vet-report { margin-top: 18px; }
+.vet-summary { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
+.vet-verdict { font-weight: 800; font-size: 18px; }
+.verdict-healthy { border-color: rgba(123, 241, 173, .4); background: #0c2019; } .verdict-healthy .vet-verdict { color: var(--accent); }
+.verdict-check { border-color: rgba(246, 196, 83, .4); background: #221c0c; } .verdict-check .vet-verdict { color: var(--amber, #f6c453); }
+.verdict-needs-rework { border-color: rgba(255, 123, 123, .4); background: #251010; } .verdict-needs-rework .vet-verdict { color: #ff7b7b; }
+.vet-counts { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.vet-row { display: flex; gap: 12px; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+.vet-icon { font-family: var(--mono); font-weight: 700; width: 18px; flex: none; text-align: center; }
+.vet-pass .vet-icon { color: var(--accent); } .vet-warn .vet-icon { color: var(--amber, #f6c453); } .vet-fail .vet-icon { color: #ff7b7b; } .vet-info .vet-icon, .vet-skip .vet-icon { color: var(--dim); }
+.vet-title { font-weight: 600; font-size: 13.5px; } .vet-detail { font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.vet-hint { font-size: 12.5px; color: var(--secondary); margin-top: 4px; }
+.vet-fail .vet-hint { color: #ffb4b4; }
+.vet-actions { display: flex; gap: 10px; margin-top: 14px; } .vet-actions .btn { width: auto; }
+.vet-foot { margin-top: 26px; font-size: 12px; color: var(--dim); }

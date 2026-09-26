@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diagnose my cat — scriptkitty.sh</title>
+  <meta name="description" content="A soldering check-up for Retia boards, straight from the browser: rest levels on every pin, solder bridges, the LoRa radio's ID, I2C buses, and whether the firmware boots." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="scriptkitty.sh" />
+  <meta property="og:url" content="https://scriptkitty.sh/vet.html" />
+  <meta property="og:title" content="Diagnose my cat — scriptkitty.sh" />
+  <meta property="og:description" content="A soldering check-up for Retia boards, straight from the browser." />
+  <meta property="og:image" content="https://scriptkitty.sh/assets/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <link rel="icon" href="favicon.ico" sizes="32x32" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="vet-page">
+  <header class="site-header compact">
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <img class="brand-mark" src="assets/scriptkitty-logo.svg" alt="" width="36" height="30" />
+          <span class="brand-name">scriptkitty<span class="tld">.sh</span></span>
+        </div>
+        <nav class="nav">
+          <a href="index.html">Flash</a>
+          <a href="serial.html">Serial</a>
+          <a href="vet.html" class="active">Vet</a>
+          <a href="https://retia.io" target="_blank" rel="noopener">Shop ↗</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap vet-main">
+    <div id="unsupported" class="banner banner-warn" hidden>
+      <strong>This browser can't reach serial devices.</strong>
+      The vet needs the Web Serial API — use a desktop browser that supports it (<b>Chrome</b>, <b>Edge</b>, or <b>Firefox</b> with Web Serial enabled).
+    </div>
+
+    <section class="detect-hero" id="vetHero" aria-label="Diagnose your board">
+      <pre class="hero-cat" id="heroCat" aria-hidden="true"></pre>
+      <div class="hero-body">
+        <div class="hero-title" id="heroTitle">Diagnose my cat</div>
+        <p class="hero-sub" id="heroSub">A soldering check-up, no firmware needed. I'll connect over USB, look at every pin the way a multimeter would, ask the radio to identify itself, scan the I2C header, then reboot the board and see whether its firmware comes up.</p>
+        <div class="vet-controls">
+          <label class="ctl">Patient
+            <select id="protocol"><option value="auto">Auto (identify the board)</option></select>
+          </label>
+          <label class="ctl ctl-check" title="After the exam, reboot the board into its firmware and read the console for a few seconds"><input type="checkbox" id="bootCheck" checked /> Boot check</label>
+          <label class="ctl ctl-check" title="Blink the board's debug LED during the exam so you can see it's alive"><input type="checkbox" id="blink" checked /> Blink LED</label>
+          <button class="btn hero-detect" id="diagnose" type="button">🩺 Diagnose</button>
+        </div>
+        <div class="hero-bar" id="heroBar" hidden><div class="hero-bar-fill" id="heroBarFill"></div></div>
+      </div>
+    </section>
+
+    <div id="status" class="banner banner-detect" hidden></div>
+
+    <section id="report" class="vet-report" hidden>
+      <div class="vet-summary" id="summary"></div>
+      <div id="checks"></div>
+      <div class="vet-actions">
+        <button class="btn secondary" id="copy" type="button">Copy report</button>
+        <button class="btn secondary" id="again" type="button">Diagnose again</button>
+      </div>
+    </section>
+
+    <p class="help-text vet-foot">What the vet can see: rest levels with only the chip's own pull resistors, whether neighbouring module pins are shorted, whether the LoRa radio answers over SPI, I2C pull-ups and devices, the flash and PSRAM fitted, and how the board boots. What it can't: LEDs lighting, microphones, anything that needs firmware timing. Nothing is written to flash.</p>
+  </main>
+  <script type="module" src="vet.js"></script>
+</body>
+</html>

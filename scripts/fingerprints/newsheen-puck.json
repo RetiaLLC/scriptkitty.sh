@@ -1,0 +1,57 @@
+{
+ "board": "Newsheen / Pusheen puck (esp32_base_puck_v2), operator's unit #3, running a local 'pusheen-puck' env build (HWCDC console)",
+ "measured": "2026-09-26 on the operator's Mac via scripts/test_vetprobe.mjs (probe_bridge, flasher stub)",
+ "chip": "ESP32-S3 (QFN56) (revision v0.2), ESP32-S3-WROOM-1-N16R2: external 16 MB flash (JEDEC vendor 0x46), eFuse PSRAM 2 MB",
+ "mac_oui": "a4:cb:8f",
+ "rest_levels": {
+  "HIGH": [
+   17,
+   35,
+   36,
+   9,
+   10,
+   39,
+   40
+  ],
+  "LOW": [
+   47,
+   21,
+   38
+  ],
+  "float": [
+   16,
+   4,
+   11,
+   12,
+   13,
+   14,
+   37,
+   15,
+   1,
+   2,
+   48,
+   5,
+   6,
+   7,
+   8,
+   18,
+   41,
+   42
+  ]
+ },
+ "vet": {
+  "verdict": "needs-rework",
+  "fail": [
+   "gpio4: IR receiver OUT floats (U4 unpopulated / unpowered / VCC-middle part)"
+  ],
+  "radio": "SX1261 V2D 2D02, STDBY_RC, BUSY released (Wio-SX1262 alive)",
+  "bridges": "none among 23 adjacent pairs",
+  "i2c": "35/36 pulled up, no devices",
+  "boot": "one clean boot (boot:0x29 SPI_FAST_FLASH_BOOT), no resets in 6 s, chatty firmware console",
+  "ms": 2588
+ },
+ "notes": [
+  "GPIO16 floats: this unit has the U5 DIR fix (or a fixed revision) \u2014 BUG #1 absent here",
+  "detect-wise the Newsheen is already unique among S3 boards by its 16 MB flash; rest levels recorded for the vet protocol"
+ ]
+}

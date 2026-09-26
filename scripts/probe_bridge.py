@@ -2,7 +2,8 @@
 """Hardware bridge for scripts/test_boardprobe.mjs — lets Node drive web/boardprobe.js
 against a real board, since Node has no Web Serial. Line-oriented over stdin/stdout.
 
-  probe_bridge.py serial PORT        raw duplex at 115200, DTR high / RTS low
+  probe_bridge.py serial PORT [--dtr-low]   raw duplex at 115200, DTR high (TinyUSB apps
+        need it to emit) or --dtr-low (HWCDC / ROM console: DTR high re-traps the chip)
         -> "READY", then "D <base64>" per read;   <- "W <base64>" to write, "Q" to quit
   probe_bridge.py esptool PORT [--stub] [--no-reset] [--before MODE]
         ROM loader (or flasher stub) register access. --no-reset leaves the board in the
@@ -25,11 +26,11 @@ def out(s):
     sys.stdout.flush()
 
 
-def serial_mode(port):
+def serial_mode(port, dtr=True):
     import serial
     p = serial.Serial()
     p.port, p.baudrate, p.timeout = port, 115200, 0.01
-    p.dtr, p.rts = True, False
+    p.dtr, p.rts = dtr, False          # --dtr-low: safe for an HWCDC/ROM console (DTR high re-traps it)
     p.open()
     alive = True
 
@@ -95,7 +96,7 @@ def esptool_mode(port, stub, reset=True, before="default_reset"):
 if __name__ == "__main__":
     mode, port = sys.argv[1], sys.argv[2]
     if mode == "serial":
-        serial_mode(port)
+        serial_mode(port, dtr="--dtr-low" not in sys.argv)
     else:
         args = sys.argv[3:]
         before = args[args.index("--before") + 1] if "--before" in args else "default_reset"
