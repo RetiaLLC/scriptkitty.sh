@@ -418,7 +418,7 @@ export function parseFirmwareBanner(text) {
   const ip = (clean.match(/\bIP (\d{1,3}(?:\.\d{1,3}){3})/) || [])[1] || null;
   const apip = (clean.match(/AP(?:IP| at| ip)?[:= ]+(\d{1,3}(?:\.\d{1,3}){3})/i) || [])[1] || null;
   const wiring = (clean.match(/wiring\s*:\s*([A-Za-z0-9_+\/() -]{1,40})/i) || [])[1]?.trim() || null;
-  const nameLine = clean.split(/\r?\n/).map((l) => l.trim()).find((l) => /^(Newsheen Radio|WLED|Meshtastic|MeshCore|CircuitPython)\b/i.test(l)) || null;
+  const nameLine = clean.split(/\r?\n/).map((l) => l.trim()).find((l) => /^(Newsheen Radio|WLED|Meshtastic|MeshCore|CircuitPython)\b|I2S mic test/i.test(l)) || null;
   return { name: nameLine, ip, apip, wiring };
 }
 
@@ -433,6 +433,29 @@ export function audioVerdict(protocol, statusJson, { ip = null } = {}) {
   if (statusJson == null) return check("audio", "Audio — via the firmware", "info", `firmware${where} didn't answer /api/status`, "Open the puck's web UI and use Sing, or check it's on the same network.");
   if (st.state >= 1) return check("audio", "Audio — via the firmware", "pass", `${stateName}: ${[st.station, st.title].filter(Boolean).join(" — ")}${st.vol != null ? ` (vol ${st.vol})` : ""}${where}`);
   return check("audio", "Audio — via the firmware", "info", `firmware idle${where}`, `Trigger ${fa?.singPath || "/api/sing"} — a chiptune through the amp. If you hear it, the amplifier, its wiring and the speaker are good.`);
+}
+// Mic verdict from a console capture of the "I2S mic test" firmware while the user makes
+// noise. Every sample reading exactly ±1 means the data line idles high with nothing driving
+// it (0xFFFFFF = -1): no mic, no power, or DOUT not on the SD pin. Constant garbage means a
+// clock/format problem; a level that moves means a microphone hearing the room.
+export function micVerdict(protocol, text, { madeNoise = true } = {}) {
+  const fm = protocol.firmwareMic;
+  const rows = [...(text || "").matchAll(/chan([AB])\s+peak=\s*(-?\d+)\s+rms=\s*(-?\d+)/g)].map((m) => ({ ch: m[1], peak: Math.abs(+m[2]), rms: Math.abs(+m[3]) }));
+  if (!rows.length) return check("mic", "Microphone — via the firmware", "info", "no mic-test lines seen on the console", "Only the I2S mic test firmware reports samples; for WLEDkitty-audio use its web UI's Audio Source reading.");
+  const byCh = {};
+  for (const r of rows) (byCh[r.ch] ||= []).push(r);
+  const summary = Object.entries(byCh).map(([ch, v]) => `chan${ch} rms ${Math.min(...v.map((x) => x.rms))}…${Math.max(...v.map((x) => x.rms))} (${v.length})`).join(", ");
+  const live = Object.values(byCh).some((v) => {
+    const body = v.slice(2);                                   // skip the start-up burst
+    const distinct = new Set(body.map((x) => x.rms)).size;
+    return body.length >= 4 && distinct >= 3 && body.some((x) => x.rms > 4);
+  });
+  const stuck = Object.values(byCh).every((v) => v.slice(2).every((x) => x.peak <= 1 && x.rms <= 1));
+  const pins = fm?.pins ? ` (WS GPIO${fm.pins.ws}, SCK GPIO${fm.pins.sck}, SD GPIO${fm.pins.sd})` : "";
+  if (live) return check("mic", "Microphone — via the firmware", "pass", `hears the room: ${summary}`);
+  if (stuck) return check("mic", "Microphone — via the firmware", madeNoise ? "fail" : "warn", `every sample reads ±1: the data line idles high with nothing driving it — ${summary}`,
+    `No microphone data${pins}. The mic is missing, unpowered (VIN/GND on J3), or its DOUT isn't wired to the SD pin; check SEL too. A live mic never returns a flat ±1 even in silence.`);
+  return check("mic", "Microphone — via the firmware", "warn", `constant or garbage samples: ${summary}`, `Data arrives but doesn't follow sound — suspect BCLK/WS wiring${pins} or the I2S format (SPH0645 needs left-justified, 24-bit in 32).`);
 }
 export function audioLinks(protocol, ip) {
   const fa = protocol.firmwareAudio;

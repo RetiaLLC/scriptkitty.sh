@@ -185,6 +185,14 @@ async function diagnose({ touched = false } = {}) {
             hint: "The I²S amplifier can't be measured from here. \"Make it sing\" plays a chiptune through it (it interrupts a stream); if you hear it, the amp, its wiring and the speaker are good.", links });
           report.counts.info = (report.counts.info || 0) + 1;
         }
+        const fm = protocol.firmwareMic;
+        if (fm && fittedFromUi()[fm.part] !== false && b.name && fm.match.test(b.name)) {
+          mascot("working", "Make some noise", "Talk, clap or play music near the board for 8 seconds.");
+          status("Listening to the microphone through the firmware… make some noise near the board");
+          const text = await readConsole(port, 8000);
+          const m = vet.micVerdict(protocol, text);
+          report.checks.push(m); report.counts[m.status] = (report.counts[m.status] || 0) + 1;
+        }
         report.verdict = report.counts.fail ? "needs-rework" : report.counts.warn ? "check" : "healthy";
       }
     } else { try { await transport.disconnect(); } catch {} }
@@ -203,6 +211,25 @@ async function diagnose({ touched = false } = {}) {
   }
 }
 function finish(phase, title = "Diagnose my cat", sub) { running = false; $("diagnose").disabled = !HAS_SERIAL; progress(null); mascot(phase, title, sub); }
+
+// Read the console for a while with DTR/RTS low (never DTR high on an HWCDC board).
+async function readConsole(port, ms) {
+  let text = "";
+  try {
+    await port.open({ baudRate: 115200 });
+    try { await port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch {}
+    const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      const chunk = await Promise.race([reader.read(), sleep(deadline - Date.now()).then(() => ({ done: true }))]);
+      if (chunk.done) break;
+      text += chunk.value;
+    }
+    try { await reader.cancel(); } catch {}
+  } catch (e) { console.warn("[vet] console read failed", e); }
+  try { await port.close(); } catch {}
+  return text;
+}
 
 // After the watchdog reset: an HWCDC/ROM board keeps its port — open it with DTR and RTS low
 // (DTR high would drop it back into download mode) and read; a TinyUSB app takes over USB and
@@ -247,7 +274,7 @@ async function waitFresh(before, ms) {
 
 // --- rendering -----------------------------------------------------------------
 const ICON = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
-const GROUP = (c) => c.id === "boot" || c.id === "audio" ? "Boot" : c.id === "declared" ? "Identity" : c.id === "ir" ? "Pins" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
+const GROUP = (c) => c.id === "boot" || c.id === "audio" || c.id === "mic" ? "Boot" : c.id === "declared" ? "Identity" : c.id === "ir" ? "Pins" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
 function render(r) {
   $("report").hidden = false;
   $("summary").className = `vet-summary verdict-${r.verdict}`;

@@ -1,0 +1,52 @@
+{
+ "board": "Newsheen / Pusheen puck (esp32_base_puck_v2), operator's unit #7 (a4:cb:8f:9e:d0:00), running an 'I2S mic test (stereo)' diagnostic firmware (pins WS=37 SCK=38 SD=39), HWCDC console \u2014 the mic unit",
+ "measured": "2026-09-26 on the operator's Mac via scripts/test_vetprobe.mjs + console captures",
+ "chip": "ESP32-S3 (QFN56) rev v0.2, WROOM-1-N16R2 (16 MB external flash vendor 0x46, eFuse PSRAM 2 MB)",
+ "rest_levels": {
+  "HIGH": [
+   17,
+   35,
+   36,
+   9,
+   10,
+   39,
+   40
+  ],
+  "LOW": [
+   38
+  ],
+  "float": [
+   16,
+   4,
+   47,
+   21,
+   11,
+   12,
+   13,
+   14,
+   37,
+   15,
+   1,
+   2,
+   48,
+   5,
+   6,
+   7,
+   8,
+   18,
+   41,
+   42
+  ]
+ },
+ "vet": {
+  "radio": "not fitted (BUSY/DIO1/MISO float; BUSY trace all 1s = pulled by our own probe, no module)",
+  "ir": "GPIO4 float (no receiver / not tested with remote)",
+  "mic": "console stream during 25 s of operator noise: chanA/chanB peak=1 rms=1 for 57 consecutive samples (only the post-boot start-up burst 32767/2048 differs) -> every sample is 0xFFFFFF (-1): SD line idles high, nothing driving it -> NO MIC DATA (mic missing / unpowered / DOUT not on GPIO39 / SEL). A live SPH0645 never reads a flat \u00b11.",
+  "bridges": "none among 23 pairs",
+  "boot": "one clean boot; console '=== I2S mic test (stereo) \u2026'",
+  "ms": 2601
+ },
+ "notes": [
+  "opening the CDC with DTR/RTS low on macOS DID reset this unit (ROM banner at the top of the capture) whereas the radio unit 71:00 was not reset by the same open \u2014 firmware/driver-state dependent; harmless (a reboot), but means a console capture may start with a fresh boot"
+ ]
+}

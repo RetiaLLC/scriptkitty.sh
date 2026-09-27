@@ -7,7 +7,8 @@
 //        its console for 6 s) [--not-fitted radio,ir] (declare optional parts this unit doesn't
 //        carry) [--ir-listen SECONDS] (after the exam, sample the IR receiver while a remote is
 //        held at the board) [--audio] (after the boot watch, ask the firmware over the LAN what
-//        it's playing) [--sing] (also trigger its test tune — interrupts a stream) [--no-reset]
+//        it's playing) [--sing] (also trigger its test tune — interrupts a stream) [--mic SECONDS]
+//        (with the I2S mic test firmware: read its sample stream while you make noise) [--no-reset]
 //        [--ssh pi@host] [--json out.json]
 //   node scripts/test_vetprobe.mjs --audio-only 192.168.1.221 [--sing]   LAN only, USB untouched
 import { spawn } from "node:child_process";
@@ -157,6 +158,18 @@ await test("firmware banner + audio verdict: Newsheen Radio's console and /api/s
   assert.equal(vet.audioVerdict(P, { state: 0 }).status, "info"); assert.equal(vet.audioVerdict(P, null).status, "info");
   assert.deepEqual(vet.audioLinks(P, "10.0.0.5").map((l) => l.href), ["http://10.0.0.5/api/status", "http://10.0.0.5/api/sing"]);
 });
+await test("micVerdict: flat ±1 -> no data (fail); moving rms -> pass; garbage -> warn; no lines -> info", () => {
+  const line = (a, b) => `chanA peak=${a[0]} rms=${a[1]} | chanB peak=${b[0]} rms=${b[1]}\n`;
+  const flat = line([32767, 2048], [1, 1]) + line([1, 1], [1, 1]).repeat(8);
+  assert.equal(vet.micVerdict(P, flat).status, "fail"); assert.match(vet.micVerdict(P, flat).hint, /DOUT isn't wired to the SD pin/);
+  assert.equal(vet.micVerdict(P, flat, { madeNoise: false }).status, "warn");
+  const live = line([32767, 2048], [1, 1]) + [30, 55, 120, 480, 90, 33, 600].map((r) => line([r * 3, r], [1, 1])).join("");
+  assert.equal(vet.micVerdict(P, live).status, "pass");
+  const garbage = line([32767, 2048], [1, 1]) + line([32767, 9000], [32767, 9000]).repeat(6);
+  assert.equal(vet.micVerdict(P, garbage).status, "warn");
+  assert.equal(vet.micVerdict(P, "Ada\n").status, "info");
+  assert.equal(vet.parseFirmwareBanner("=== I2S mic test (stereo) — pins WS=37 SCK=38 SD=39 ===\n").name.startsWith("=== I2S mic test"), true);
+});
 await test("radio module missing: BUSY/DIO1 float, MISO never driven -> radio fail + warns", async () => {
   const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
   const r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false });
@@ -295,6 +308,14 @@ if (opt("--rom")) {
       console.log("        console:", JSON.stringify(text.slice(0, 400)));
       if (b.banner?.name) console.log(`        firmware banner: ${b.banner.name}${b.banner.ip ? " at " + b.banner.ip : ""}${b.banner.wiring ? ", wiring " + b.banner.wiring : ""}`);
       if (argv.includes("--audio") && proto.firmwareAudio && b.banner?.ip) await new Promise((r) => setTimeout(r, 4000)).then(() => audioOverLan(proto, b.banner.ip, report));
+      if (opt("--mic") && proto.firmwareMic && b.banner?.name && proto.firmwareMic.match.test(b.banner.name)) {
+        const secs = Number(opt("--mic"));
+        console.log(`        make some noise near the board for ${secs} s…`);
+        const t2 = await readConsole(dev, secs * 1000);
+        const m = vet.micVerdict(proto, t2);
+        report.checks.push(m);
+        console.log(`        ${icon[m.status]} ${m.title}: ${m.detail}${m.hint ? `\n          ↳ ${m.hint}` : ""}`);
+      }
     });
   } else await io.close();
   if (report) {   // the report printed before the interactive/boot steps; restate the verdict with them included

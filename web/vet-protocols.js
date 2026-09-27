@@ -81,7 +81,11 @@ export const PROTOCOLS = {
     ir: { gpio: 4, part: "ir", name: "IR receiver (U4)" },
     // parts a unit may legitimately ship without — the user declares them; declared-absent
     // parts are checked for being genuinely absent (their pins float) and reported as info
-    optionalParts: { radio: "LoRa module (Wio-SX1262, U6)", ir: "IR receiver (U4)", amp: "I2S amplifier (MAX98357A on J3)" },
+    optionalParts: { radio: "LoRa module (Wio-SX1262, U6)", ir: "IR receiver (U4)", amp: "I2S amplifier (MAX98357A on J3)", mic: "I2S microphone (SPH0645 on J3)" },
+    // An I2S mic (WS 37 / SCK 38 / SD 39) is as invisible as the amp and won't clock out data
+    // below ~1 MHz BCLK, so it is judged from a firmware that runs it: the "I2S mic test"
+    // diagnostic streams `chanA peak=… rms=…` lines on the console.
+    firmwareMic: { part: "mic", match: /I2S mic test/i, pins: { ws: 37, sck: 38, sd: 39 } },
     // The amp's I2S inputs are invisible to a pull test; the firmware that drives it isn't.
     // Newsheen Radio prints its IP at boot and exposes status / a test tune over HTTP.
     firmwareAudio: { part: "amp", match: /Newsheen Radio/i, statusPath: "/api/status", singPath: "/api/sing",
