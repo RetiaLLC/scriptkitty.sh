@@ -116,12 +116,18 @@ export function judgePin(spec, level) {
   }
 }
 
-export async function pinChecks(io, protocol) {
+export async function pinChecks(io, protocol, fitted = {}) {
   const specs = protocol.pins.filter((p) => !UNSAFE.has(p.gpio));
   const fp = await pullFollow(io, specs.map((p) => p.gpio));
   const out = specs.map((spec) => {
-    const j = judgePin(spec, fp[spec.gpio]);
-    return { ...check(`gpio${spec.gpio}`, `GPIO${spec.gpio} — ${spec.name}`, j.status, j.detail, j.hint), gpio: spec.gpio, level: fp[spec.gpio] };
+    const level = fp[spec.gpio];
+    let j;
+    if (spec.part && fitted[spec.part] === false) {
+      // declared not fitted: the pin should be left alone by anything
+      j = level === "float" ? { status: "info", detail: `floats — ${protocol.optionalParts?.[spec.part] || spec.part} declared not fitted` }
+        : { status: "warn", detail: `held ${level} although ${protocol.optionalParts?.[spec.part] || spec.part} is declared not fitted`, hint: "Something drives this pin — is the part fitted after all, or is there a bridge?" };
+    } else j = judgePin(spec, level);
+    return { ...check(`gpio${spec.gpio}`, `GPIO${spec.gpio} — ${spec.name}`, j.status, j.detail, j.hint), gpio: spec.gpio, level };
   });
   return { checks: out, fingerprint: fp };
 }
@@ -363,13 +369,17 @@ export function analyzeBootLog(text, { vanishedAfterMs = null, windowMs = 6000 }
 }
 
 // ---------------------------------------------------------------- the exam
-export async function runExam(io, protocol, { chip = {}, images = null, onStep = () => {}, doBridges = true, doRadio = true, doAntenna = true, doI2c = true, doBeacon = true } = {}) {
+export async function runExam(io, protocol, { chip = {}, images = null, fitted = {}, onStep = () => {}, doBridges = true, doRadio = true, doAntenna = true, doI2c = true, doBeacon = true } = {}) {
   const t0 = Date.now();
   const checks = [];
+  const declaredAbsent = Object.entries(protocol.optionalParts || {}).filter(([k]) => fitted[k] === false).map(([, name]) => name);
+  if (declaredAbsent.length) checks.push(check("declared", "Declared not fitted", "info", declaredAbsent.join(", ")));
   onStep("identity"); checks.push(...await identityChecks(io, protocol, chip));
-  onStep("pins");     const pins = await pinChecks(io, protocol); checks.push(...pins.checks);
+  onStep("pins");     const pins = await pinChecks(io, protocol, fitted); checks.push(...pins.checks);
   if (doBridges) { onStep("bridges"); checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); }
-  if (doRadio) {
+  if (doRadio && protocol.radio && fitted.radio === false) {
+    checks.push(check("radio", `LoRa radio — ${protocol.radio.part || "module"}`, "info", "declared not fitted — radio and antenna checks skipped"));
+  } else if (doRadio) {
     onStep("radio"); const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio);
     if (doAntenna && radio.some((c) => c.id === "radio" && c.status === "pass")) { onStep("antenna"); const a = await antennaCheck(io, protocol); if (a) checks.push(a); }
   }
@@ -379,5 +389,5 @@ export async function runExam(io, protocol, { chip = {}, images = null, onStep =
   const counts = { pass: 0, warn: 0, fail: 0, info: 0, skip: 0 };
   for (const c of checks) counts[c.status] = (counts[c.status] || 0) + 1;
   const verdict = counts.fail ? "needs-rework" : counts.warn ? "check" : "healthy";
-  return { board: protocol.name, line: protocol.line, chip, checks, counts, verdict, fingerprint: pins.fingerprint, ms: Date.now() - t0 };
+  return { board: protocol.name, line: protocol.line, chip, fitted, checks, counts, verdict, fingerprint: pins.fingerprint, ms: Date.now() - t0 };
 }

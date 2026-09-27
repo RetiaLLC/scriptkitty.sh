@@ -570,6 +570,7 @@ esp-web-install-button[install-unsupported] { display: block; }
 .vet-main { max-width: 760px; padding-bottom: 40px; }
 .vet-controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 10px; }
 .vet-controls .ctl select { margin-left: 6px; }
+.vet-parts { display: contents; }
 .detect-hero[data-phase="healthy"] .hero-cat { color: var(--accent); }
 .detect-hero[data-phase="rework"] .hero-cat { color: #ff7b7b; }
 .detect-hero[data-phase="check"] .hero-cat { color: var(--amber, #f6c453); }

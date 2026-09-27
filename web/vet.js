@@ -25,6 +25,16 @@ function status(html, kind = "busy") { const el = $("status"); el.hidden = false
 function progress(frac) { $("heroBar").hidden = frac == null; if (frac != null) $("heroBarFill").style.width = `${Math.round(frac * 100)}%`; }
 
 for (const [key, p] of Object.entries(PROTOCOLS)) { const o = document.createElement("option"); o.value = key; o.textContent = p.name; $("protocol").append(o); }
+// "This unit has…" — the union of optional parts over all protocols; a part left unchecked is
+// checked for being genuinely absent and reported as info, not as a fault.
+const PARTS = {};
+for (const p of Object.values(PROTOCOLS)) for (const [k, name] of Object.entries(p.optionalParts || {})) PARTS[k] = PARTS[k] || name;
+for (const [k, name] of Object.entries(PARTS)) {
+  const l = document.createElement("label"); l.className = "ctl ctl-check"; l.title = "Untick if this unit is a build without this part";
+  l.innerHTML = `<input type="checkbox" data-part="${escapeHtml(k)}" checked /> has ${escapeHtml(name)}`;
+  $("parts").append(l);
+}
+const fittedFromUi = () => Object.fromEntries([...document.querySelectorAll("#parts input[data-part]")].map((i) => [i.dataset.part, i.checked]));
 
 // --- ports: same rules as the Flash page — a single remembered board is reused, the ROM
 // after a TinyUSB touch is a new device the browser must be shown once.
@@ -134,7 +144,7 @@ async function diagnose({ touched = false } = {}) {
     const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", antenna: "Listening for off-air RF through the antenna (receive only)", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
     status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the exam…`);
     const report = await vet.runExam(io, protocol, {
-      chip, doBeacon: $("blink").checked,
+      chip, fitted: fittedFromUi(), doBeacon: $("blink").checked,
       onStep: (s) => { progress(steps.indexOf(s) / steps.length); status(`${escapeHtml(protocol.name)} — ${labels[s] || s}…`); },
     });
     progress(1);
@@ -212,7 +222,7 @@ async function waitFresh(before, ms) {
 
 // --- rendering -----------------------------------------------------------------
 const ICON = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
-const GROUP = (c) => c.id === "boot" ? "Boot" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
+const GROUP = (c) => c.id === "boot" ? "Boot" : c.id === "declared" ? "Identity" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
 function render(r) {
   $("report").hidden = false;
   $("summary").className = `vet-summary verdict-${r.verdict}`;
@@ -231,7 +241,8 @@ function render(r) {
   }
 }
 function reportText(r) {
-  const lines = [`${r.board} — ${r.verdict} (${r.counts.pass} pass, ${r.counts.warn} warn, ${r.counts.fail} fail)`, `${r.chip.chipName || ""} ${r.chip.mac || ""}`.trim(), ""];
+  const absent = Object.entries(r.fitted || {}).filter(([, v]) => v === false).map(([k]) => k);
+  const lines = [`${r.board} — ${r.verdict} (${r.counts.pass} pass, ${r.counts.warn} warn, ${r.counts.fail} fail)`, `${r.chip.chipName || ""} ${r.chip.mac || ""}`.trim(), ...(absent.length ? [`declared not fitted: ${absent.join(", ")}`] : []), ""];
   for (const c of r.checks) lines.push(`${ICON[c.status]} ${c.title}: ${c.detail}${c.hint ? `\n    -> ${c.hint}` : ""}`);
   return lines.join("\n");
 }

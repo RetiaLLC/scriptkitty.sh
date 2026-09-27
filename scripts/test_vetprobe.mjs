@@ -4,7 +4,8 @@
 //   node scripts/test_vetprobe.mjs                              synthetic boards only
 //   node scripts/test_vetprobe.mjs --rom /dev/cu.X --stub       real board in download mode / HWCDC app
 //        [--protocol newsheen] [--boot-watch] (watchdog-reset into the firmware afterwards and read
-//        its console for 6 s) [--no-reset] [--ssh pi@host] [--json out.json]
+//        its console for 6 s) [--not-fitted radio,ir] (declare optional parts this unit doesn't
+//        carry) [--no-reset] [--ssh pi@host] [--json out.json]
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -123,6 +124,15 @@ await test("antenna: a strong band lifts RSSI -> pass; flat floor -> warn; skipp
   r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false });
   assert.equal(by(r, "antenna"), undefined, "no antenna check without a live radio");
 });
+await test("declared not fitted: a no-radio, no-IR build comes out healthy; a driven 'absent' pin still warns", async () => {
+  const parts = { ...HEALTHY }; delete parts[47]; delete parts[21]; delete parts[4];
+  let r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false, fitted: { radio: false, ir: false } });
+  assert.equal(r.verdict, "healthy", JSON.stringify(r.checks.filter((c) => c.status !== "pass" && c.status !== "info")));
+  assert.equal(by(r, "radio").status, "info"); assert.equal(by(r, "gpio4").status, "info"); assert.equal(by(r, "antenna"), undefined);
+  assert.match(by(r, "declared").detail, /Wio-SX1262.*IR receiver/);
+  r = await vet.runExam(FakeBoard({ parts: HEALTHY }), P, { chip: chipInfo, doBeacon: false, fitted: { ir: false } });
+  assert.equal(by(r, "gpio4").status, "warn", "IR declared absent but its output is pulled up");
+});
 await test("radio module missing: BUSY/DIO1 float, MISO never driven -> radio fail + warns", async () => {
   const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
   const r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false });
@@ -216,7 +226,8 @@ if (opt("--rom")) {
   console.log("        ", JSON.stringify(io.hello));
   let report;
   await test("exam runs to completion", async () => {
-    report = await vet.runExam(io, proto, { chip: { chipName: io.hello.chip, mac: io.hello.mac, flashId: io.hello.flash_id }, onStep: (s) => process.stdout.write(`        ${s}… `) });
+    const fitted = Object.fromEntries((opt("--not-fitted") || "").split(",").filter(Boolean).map((k) => [k.trim(), false]));
+    report = await vet.runExam(io, proto, { chip: { chipName: io.hello.chip, mac: io.hello.mac, flashId: io.hello.flash_id }, fitted, onStep: (s) => process.stdout.write(`        ${s}… `) });
     console.log();
     printReport(report);
   });

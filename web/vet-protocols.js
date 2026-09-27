@@ -27,7 +27,7 @@ export const PROTOCOLS = {
       { gpio: 16, expect: "float", name: "NeoPixel data (→ U5 level shifter)",
         onLOW:  { status: "fail", hint: "Known BUG #1: U5's DIR pin is strapped to GND by R21, so the shifter drives this pin instead of listening — the 8 LEDs will never light. Fix per unit: solder-bridge U5 pin 5 (DIR) to pin 6 (VCCB), back side, SOT-23-6." },
         onHIGH: { status: "warn", hint: "Held high — check for a bridge to 3V3 near U5/R21." } },
-      { gpio: 4, expect: "HIGH", name: "IR receiver OUT (U4)",
+      { gpio: 4, expect: "HIGH", name: "IR receiver OUT (U4)", part: "ir",
         onFLOAT: { status: "fail", hint: "The receiver isn't pulling its output up: unpopulated, unpowered, or the wrong pinout (BUG #2: a VCC-middle receiver never gets power on this GND-middle footprint). Check U4 and the +5V rail (D1, U3)." },
         onLOW:   { status: "fail", hint: "Output stuck low — receiver fitted backwards or shorted at U4." },
         passNote: "receiver powered and idle — this also proves the +5V rail is up" },
@@ -46,10 +46,10 @@ export const PROTOCOLS = {
       { gpio: 10, expect: "HIGH", name: "LoRa NSS (10K R22)",
         onFLOAT: { status: "fail", hint: "R22 missing/open — the radio is selected at random." },
         onLOW:   { status: "fail", hint: "NSS held low — short at R22/U6 pin 6." } },
-      { gpio: 47, expect: "LOW", name: "LoRa BUSY (U6 output)",
+      { gpio: 47, expect: "LOW", name: "LoRa BUSY (U6 output)", part: "radio",
         onFLOAT: { status: "warn", hint: "Nothing drives BUSY — Wio-SX1262 not soldered, or its 3V3/GND pins open." },
         onHIGH:  { status: "warn", hint: "BUSY stuck high — module held in reset or unpowered; see the radio check." } },
-      { gpio: 21, expect: "held", name: "LoRa DIO1 (U6 IRQ output)",
+      { gpio: 21, expect: "held", name: "LoRa DIO1 (U6 IRQ output)", part: "radio",
         onFLOAT: { status: "warn", hint: "DIO1 floats — U6 pin 12 open?" } },
       { gpio: 11, expect: "float", name: "LoRa MOSI" }, { gpio: 12, expect: "float", name: "LoRa MISO (idle, NSS high)" },
       { gpio: 13, expect: "float", name: "LoRa SCK" },  { gpio: 14, expect: "float", name: "LoRa RF switch" },
@@ -72,6 +72,9 @@ export const PROTOCOLS = {
     radio: { type: "sx126x", nss: 10, mosi: 11, miso: 12, sck: 13, busy: 47, nrst: 9, dio1: 21, rfsw: 14, tcxoV: 1.8, dio2Switch: true, part: "Wio-SX1262 (U6)", antPad: "ANT1 (wire antenna pad)" },
     i2c: [{ sda: 35, scl: 36, name: "sensor header J3", expectDevices: [] }],
     beacon: { gpio: 48, name: "debug LED D14" },
+    // parts a unit may legitimately ship without — the user declares them; declared-absent
+    // parts are checked for being genuinely absent (their pins float) and reported as info
+    optionalParts: { radio: "LoRa module (Wio-SX1262, U6)", ir: "IR receiver (U4)" },
     known: [
       "BUG #1 (all units so far): U5 DIR strapped low → LEDs dark. Signature: GPIO16 reads LOW.",
       "BUG #2: U4 footprint is GND-middle (TSOP38238/VS1838B); a VCC-middle breakout receiver is never powered. Signature: GPIO4 floats.",
