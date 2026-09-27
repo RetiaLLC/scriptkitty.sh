@@ -1,0 +1,56 @@
+{
+ "board": "Newsheen / Pusheen puck (esp32_base_puck_v2), operator's unit #8 (a4:cb:8f:b1:70:a4) \u2014 the 'NeoPixels never light' patient",
+ "measured": "2026-09-26 on the operator's Mac via scripts/test_vetprobe.mjs",
+ "chip": "ESP32-S3 (QFN56) rev v0.2, WROOM-1-N16R2 (16 MB external flash vendor 0x46, eFuse PSRAM 2 MB)",
+ "rest_levels": {
+  "HIGH": [
+   17,
+   35,
+   36,
+   9,
+   10,
+   39,
+   40
+  ],
+  "LOW": [
+   16,
+   38
+  ],
+  "float": [
+   4,
+   47,
+   21,
+   11,
+   12,
+   13,
+   14,
+   37,
+   15,
+   1,
+   2,
+   48,
+   5,
+   6,
+   7,
+   8,
+   18,
+   41,
+   42
+  ]
+ },
+ "vet": {
+  "verdict": "needs-rework, 3 fails",
+  "fail_1": "GPIO16 held LOW against the pull-up = BUG #1: U5 (SN74LVC1T45) DIR strapped to GND by R21 -> shifter drives A instead of listening -> LEDs never light. Fix: bridge U5 pin 5 (DIR) to pin 6 (VCCB), back side",
+  "fail_2": "flash is BLANK: no app image at 0x10000; ROM loops 'invalid header: 0xffffffff' -> nothing runs, so nothing can drive the LEDs either",
+  "fail_3": "radio not fitted (BUSY/DIO1/MISO float) \u2014 likely a no-radio build (declare it)",
+  "ir": "GPIO4 float (no receiver)",
+  "bridges": "none among 23 pairs",
+  "i2c": "healthy",
+  "ms": 2584
+ },
+ "notes": [
+  "first unit of the eight with the unfixed DIR strap \u2014 the vet's very first check was written for exactly this and it fired",
+  "GPIO16 LOW is specifically U5 driving: an unpowered LVC1T45 (no VCCB) would go high-Z and the pin would float; LOW means U5 has 5 V and DIR is low",
+  "MAC block a4:cb:8f:b1:70 matches the skill's bench-verified pucks (70:ec, 71:a4)"
+ ]
+}
