@@ -362,5 +362,16 @@ function reportText(r) {
 }
 // exposed for the simulator / console
 window.vetRender = render; window.vetRunOn = async (io, chip, key = "newsheen") => { lastKey = key; return vet.runExam(io, PROTOCOLS[key], { chip, images: await IMAGES, doBeacon: false }); };
+// #demo=<name> renders a canned report (demo-<name>.json next to the page) so the report
+// layout can be reviewed without a board — clearly labelled, never a live exam.
+if (/^#demo=[a-z0-9-]+$/.test(location.hash)) {
+  const name = location.hash.slice(6);
+  fetch(`demo-${name}.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).then((rep) => {
+    if (!rep) return status(`No demo report called “${escapeHtml(name)}”.`, "err");
+    lastKey = rep.protocolKey || "newsheen"; lastReport = rep; render(rep);
+    status(`<b>Demo report</b> “${escapeHtml(name)}” — canned data for layout review, not a live exam.`, "ok");
+    mascot(rep.verdict === "healthy" ? "healthy" : rep.verdict === "check" ? "check" : "rework", `Demo: ${rep.verdict}`, "Nothing was measured — this is a saved report.");
+  });
+}
 window.vetIrDemo = (p, secs = 5) => status(irLiveHtml(p, secs, escapeHtml), "busy");
 mascot("idle");
