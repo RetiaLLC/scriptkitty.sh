@@ -63,6 +63,7 @@
    "ir": "GPIO4 float + 0 edges in 45 s with a remote held -> no receiver (unchanged)",
    "boot": "one clean boot, console 'Ada' (WLED-style build) -> no TX risk from firmware while the antenna is off",
    "ms": 5588
-  }
+  },
+  "operator_confirmed": "radio added, no antenna, no mic, no amp, no IR receiver \u2014 exam matched on every point"
  }
 }
