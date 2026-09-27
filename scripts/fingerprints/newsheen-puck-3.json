@@ -44,7 +44,7 @@
   "bridges": "none among 23 pairs",
   "i2c": "healthy, nothing fitted",
   "boot": "one clean boot (boot:0x9), console 'Ada'",
-  "ir": "GPIO4 floats AND 0 edges in 297,592 samples over 60 s -> if a remote was held: receiver absent or unpowered (BUG #2); if not: inconclusive, re-run",
+  "ir": "GPIO4 floats AND 0 edges in 297,592 samples over 60 s with a remote held -> no receiver; OPERATOR CONFIRMED: no IR receiver fitted, radio + antenna fitted (all three match the exam)",
   "ms": 5618
  },
  "notes": [
