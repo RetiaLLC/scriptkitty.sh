@@ -10,8 +10,8 @@ sub('// vet.js — "Diagnose my cat": the browser side of vetprobe.js. Connects 
     '// vet.js — "Diagnose my cat" on catlamp.site: the browser side of vetprobe.js. Same code as\n// scriptkitty.sh/vet.html (esptool-js, TinyUSB touch fallback, S3 watchdog reset), with the\n// site\'s own firmware table so the installed image is named. Never writes flash or eFuses.\n// CSP: everything here is same-origin — no inline scripts, no third-party fetches.\n// GENERATED from ~/scriptkitty-flash/web/vet.js (scratchpad derive_catlamp_vet.py) — edit there.')
 sub('const loadEsptool = () => esptoolMod || (esptoolMod = import("./vendor/esptool-js/bundle.js"));',
     'const loadEsptool = () => esptoolMod || (esptoolMod = import("./vendor/esptool-bundle.js"));\n// app ELF sha256 -> { id, name, version, line, model } for every image this site ships\n// (built from firmware/*.bin by scripts in the repo); lets the report say "WLEDkitty 17.0.0"\n// instead of a hash. Missing table = still works, just anonymous.\nconst IMAGES = fetch("./images.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);')
-sub('try { line = (await probe.probeS3FourMeg(io)).line; } catch {} }',
-    'try { line = (await probe.probeS3FourMeg(io, { images: await IMAGES })).line; } catch {} }')
+sub('const r = await probe.probeS3FourMeg(io); line = r.line;',
+    'const r = await probe.probeS3FourMeg(io, { images: await IMAGES }); line = r.line;')
 sub('const report = await vet.runExam(io, protocol, {\n      chip, fitted: fittedFromUi(), doBeacon: $("blink").checked,',
     'const report = await vet.runExam(io, protocol, {\n      chip, images: await IMAGES, fitted: fittedFromUi(), doBeacon: $("blink").checked,')
 sub('function finish(phase, title = "Diagnose my cat", sub) { running = false; $("diagnose").disabled = !HAS_SERIAL; progress(null); mascot(phase, title, sub); }',
