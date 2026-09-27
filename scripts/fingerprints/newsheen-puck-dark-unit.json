@@ -58,5 +58,12 @@
   "GPIO16": "LOW -> float (U5 no longer drives the pin: DIR fix confirmed electrically)",
   "other_pins": "no changes",
   "remaining": "flash still blank ('invalid header' loop) \u2014 needs a firmware before the LEDs can light; declared no radio/IR/mic/amp -> otherwise HEALTHY (26 pass)"
+ },
+ "third_exam_2026-09-26": {
+  "state": "now flashed (WLED-style build, 'Ada'), clean boot; GPIO16 still floats (DIR fix holds); a Wio-SX1262 has been fitted since (BUSY/DIO1 now driven low)",
+  "fail_1": "solder bridge GPIO11 <-> GPIO12 (MOSI <-> MISO): GPIO12 follows GPIO11 both high and low in the active neighbour test",
+  "fail_2": "radio answers garbage: MISO is driven but the ID read is not an SX126x string, status 0xaa, BUSY trace 11111110 \u2014 consistent with MISO shorted to MOSI (our own command echoed back)",
+  "ir": "GPIO4 float (no receiver)",
+  "verdict": "needs-rework: wick between the MOSI/MISO castellations (module pins 19/20), then re-run \u2014 the radio ID should appear"
  }
 }
