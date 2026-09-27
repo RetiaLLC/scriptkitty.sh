@@ -65,5 +65,10 @@
    "ms": 5588
   },
   "operator_confirmed": "radio added, no antenna, no mic, no amp, no IR receiver \u2014 exam matched on every point"
+ },
+ "revisit_2_2026-09-26": {
+  "change": "antenna now fitted (inferred from the exam; pins unchanged)",
+  "antenna": "739 MHz -87 dBm, 881 -94, floor -104 -> PASS, 17 dB lift (previous exam on this unit: flat -103\u2026-106, 5 dB spread)",
+  "verdict": "HEALTHY (31 pass) with ir/mic/amp declared not fitted; radio 'SX1261 V2D 2D02'; clean boot"
  }
 }
