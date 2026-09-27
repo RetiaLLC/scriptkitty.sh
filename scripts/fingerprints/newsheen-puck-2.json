@@ -53,5 +53,16 @@
  "notes": [
   "differs from unit #3 only in the radio lines: 47/21 float here vs driven low there \u2014 a clean 'module absent' signature",
   "GPIO16 floats on this unit too (DIR fix present)"
- ]
+ ],
+ "revisit_2026-09-26": {
+  "change": "operator reworked the unit: Wio-SX1262 now fitted",
+  "rest_levels_diff": "GPIO21 float->LOW, GPIO47 float->LOW (DIO1/BUSY now driven by the module); everything else identical",
+  "vet": {
+   "radio": "answers 'SX1261 V2D 2D02', STDBY_RC, BUSY released -> PASS (was 'not fitted')",
+   "antenna": "flat -103\u2026-108 dBm, 5 dB spread -> WARN no antenna (matches the no-wire calibration from unit #3)",
+   "ir": "GPIO4 float + 0 edges in 45 s with a remote held -> no receiver (unchanged)",
+   "boot": "one clean boot, console 'Ada' (WLED-style build) -> no TX risk from firmware while the antenna is off",
+   "ms": 5588
+  }
+ }
 }
