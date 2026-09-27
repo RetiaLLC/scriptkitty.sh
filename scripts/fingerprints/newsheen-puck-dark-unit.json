@@ -52,5 +52,11 @@
   "first unit of the eight with the unfixed DIR strap \u2014 the vet's very first check was written for exactly this and it fired",
   "GPIO16 LOW is specifically U5 driving: an unpowered LVC1T45 (no VCCB) would go high-Z and the pin would float; LOW means U5 has 5 V and DIR is low",
   "MAC block a4:cb:8f:b1:70 matches the skill's bench-verified pucks (70:ec, 71:a4)"
- ]
+ ],
+ "after_rework_2026-09-26": {
+  "operator": "bodged U5 (DIR pin 5 -> pin 6), reseated USB",
+  "GPIO16": "LOW -> float (U5 no longer drives the pin: DIR fix confirmed electrically)",
+  "other_pins": "no changes",
+  "remaining": "flash still blank ('invalid header' loop) \u2014 needs a firmware before the LEDs can light; declared no radio/IR/mic/amp -> otherwise HEALTHY (26 pass)"
+ }
 }
