@@ -10,11 +10,15 @@ the pads a failing check implicates. Coordinates stay in KiCad millimetres (y do
 """
 import json, math, re, sys
 
-LABELS = {   # friendly names by (key, ref) or by value pattern
+LABELS = {   # friendly names: per-board ref names (REF_LABELS[key]) first, then by value pattern
     "value": [(r"ESP32-S3-WROOM", "ESP32-S3"), (r"WIO-SX1262", "LoRa radio"), (r"TSOP", "IR receiver"), (r"SN74LVC1T45", "level shifter"),
               (r"AMS1117", "3.3 V reg"), (r"USB_C", "USB-C"), (r"WS2812", ""), (r"^LED$", "LED"), (r"SW_Push|SW_SPST", ""), (r"RFM95", "LoRa radio"),
               (r"ESP32-S3-ZERO", "ESP32-S3-Zero"), (r"HS96L03|HS91L02|SSD1306", "OLED"), (r"SolderJumper", "JP")],
-    "ref": {"ANT1": "ANT", "J3": "J3 header", "SW3": "button", "SW1": "reset", "SW2": "boot", "R21": "R21", "D14": "LED", "JP1": "JP1"},
+    "ref": {"ANT1": "ANT"},
+}
+REF_LABELS = {
+    "newsheen": {"J3": "J3 header", "SW3": "button", "SW1": "reset", "SW2": "boot", "R21": "R21", "D14": "LED", "JP1": "JP1"},
+    "nibble-zero": {"SW1": "A", "SW2": "B", "SW3": "up", "SW4": "down", "SW5": "left", "SW6": "right", "RN1": "RN1", "R4": "LED R4", "D7": "WS2812", "J1": "Qwiic", "J2": "J2", "J3": "J3", "P1": "OLED"},
 }
 
 def tokenize(s): return re.findall(r'\(|\)|"(?:[^"\\]|\\.)*"|[^\s()"]+', s)
@@ -46,54 +50,65 @@ def arc_svg(s, m, e):
     return r, 1 if span > math.pi else 0, sweep
 
 def outline_path(pcb):
-    segs = []
+    segs, circles = [], []
     for g in pcb:
         if not (isinstance(g, list) and g and g[0] in ("gr_line", "gr_arc", "gr_circle", "gr_rect")): continue
         ly = find(g, "layer")
         if not ly or ly[0][1] != "Edge.Cuts": continue
         if g[0] == "gr_circle":
-            c, e = pt(g, "center"), pt(g, "end"); r = math.hypot(e[0]-c[0], e[1]-c[1])
-            return f"M {c[0]-r:.3f} {c[1]:.3f} a {r:.3f} {r:.3f} 0 1 0 {2*r:.3f} 0 a {r:.3f} {r:.3f} 0 1 0 {-2*r:.3f} 0 Z", (c[0]-r, c[1]-r, c[0]+r, c[1]+r)
+            c, e = pt(g, "center"), pt(g, "end"); circles.append((c, math.hypot(e[0]-c[0], e[1]-c[1]))); continue
         if g[0] == "gr_rect":
-            s, e = pt(g, "start"), pt(g, "end"); return f"M {s[0]} {s[1]} H {e[0]} V {e[1]} H {s[0]} Z", (min(s[0],e[0]), min(s[1],e[1]), max(s[0],e[0]), max(s[1],e[1]))
-        s, e = pt(g, "start"), pt(g, "end"); m = pt(g, "mid") if g[0] == "gr_arc" else None
-        segs.append({"s": s, "e": e, "m": m})
-    if not segs: return "", (0, 0, 10, 10)
-    # chain segments end-to-start
+            a, b = pt(g, "start"), pt(g, "end")
+            segs += [{"s": a, "e": (b[0], a[1]), "m": None}, {"s": (b[0], a[1]), "e": b, "m": None}, {"s": b, "e": (a[0], b[1]), "m": None}, {"s": (a[0], b[1]), "e": a, "m": None}]
+            continue
+        segs.append({"s": pt(g, "start"), "e": pt(g, "end"), "m": pt(g, "mid") if g[0] == "gr_arc" else None})
     def close(a, b): return math.hypot(a[0]-b[0], a[1]-b[1]) < 0.02
-    chain = [segs.pop(0)]
-    while segs:
-        cur = chain[-1]["e"]
-        for i, sg in enumerate(segs):
-            if close(sg["s"], cur): chain.append(segs.pop(i)); break
-            if close(sg["e"], cur):
-                sg = segs.pop(i); sg = {"s": sg["e"], "e": sg["s"], "m": sg["m"]}; chain.append(sg); break
-        else: break
-    xs, ys = [], []
-    d = f"M {chain[0]['s'][0]:.3f} {chain[0]['s'][1]:.3f}"
-    for sg in chain:
-        xs += [sg["s"][0], sg["e"][0]]; ys += [sg["s"][1], sg["e"][1]]
-        if sg["m"]:
-            xs.append(sg["m"][0]); ys.append(sg["m"][1])
-            r, large, sweep = arc_svg(sg["s"], sg["m"], sg["e"])
-            d += f" A {r:.3f} {r:.3f} 0 {large} {sweep} {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
-        else: d += f" L {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
-    d += " Z"
-    # an arc's bulge can exceed its endpoints — pad the bbox by the largest radius fraction seen
-    return d, (min(xs) - 0.5, min(ys) - 0.5, max(xs) + 0.5, max(ys) + 0.5)
+    loops = []
+    while segs:                                   # chain segments end-to-start into closed loops
+        chain = [segs.pop(0)]
+        while segs:
+            cur = chain[-1]["e"]; hit = None
+            for i, sg in enumerate(segs):
+                if close(sg["s"], cur): hit = segs.pop(i); break
+                if close(sg["e"], cur): sg = segs.pop(i); hit = {"s": sg["e"], "e": sg["s"], "m": sg["m"]}; break
+            if not hit: break
+            chain.append(hit)
+        loops.append(chain)
+    def loop_bbox(chain):
+        xs, ys = [], []
+        for sg in chain:
+            xs += [sg["s"][0], sg["e"][0]]; ys += [sg["s"][1], sg["e"][1]]
+            if sg["m"]: xs.append(sg["m"][0]); ys.append(sg["m"][1])
+        return (min(xs), min(ys), max(xs), max(ys))
+    if loops:
+        chain = max(loops, key=lambda c: (lambda b: (b[2]-b[0]) * (b[3]-b[1]))(loop_bbox(c)))
+        d = f"M {chain[0]['s'][0]:.3f} {chain[0]['s'][1]:.3f}"
+        for sg in chain:
+            if sg["m"]:
+                r, large, sweep = arc_svg(sg["s"], sg["m"], sg["e"])
+                d += f" A {r:.3f} {r:.3f} 0 {large} {sweep} {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
+            else: d += f" L {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
+        d += " Z"
+        x0, y0, x1, y1 = loop_bbox(chain)
+        return d, (x0 - 0.5, y0 - 0.5, x1 + 0.5, y1 + 0.5)
+    if circles:
+        (cx, cy), r = max(circles, key=lambda c: c[1])
+        return f"M {cx-r:.3f} {cy:.3f} a {r:.3f} {r:.3f} 0 1 0 {2*r:.3f} 0 a {r:.3f} {r:.3f} 0 1 0 {-2*r:.3f} 0 Z", (cx-r-0.5, cy-r-0.5, cx+r+0.5, cy+r+0.5)
+    return "", (0, 0, 10, 10)
 
 def gpio_of(net):
     if not net: return None
     m = re.search(r"GPIO_?0*(\d+)", net, re.I) or re.search(r"\bIO_?0*(\d+)\b", net) or re.search(r"\bGP0*(\d+)\b", net)
     return int(m.group(1)) if m else None
 
-def label_for(ref, value):
+def label_for(ref, value, key=None):
+    if key in REF_LABELS and ref in REF_LABELS[key]: return REF_LABELS[key][ref]
     if ref in LABELS["ref"]: return LABELS["ref"][ref]
     for pat, lab in LABELS["value"]:
         if re.search(pat, value or "", re.I): return lab
     return None
 
-def board(path):
+def board(path, key=None):
     pcb = parse(tokenize(open(path).read()))[0]
     outline, bbox = outline_path(pcb)
     parts, pads = [], []
@@ -120,7 +135,7 @@ def board(path):
         if w is None and plist:   # test points etc.: size from the pad
             sz = find(plist[0], "size"); w = h = round(max(num(sz[0][1]), num(sz[0][2])), 2) if sz else 1.2
         shape = "circle" if (w and h and abs(w - h) < 0.05 and len(plist) <= 1) else "rect"
-        parts.append({"ref": ref, "value": val, "layer": layer, "x": round(x, 3), "y": round(y, 3), "rot": rot, "w": w, "h": h, "shape": shape, "label": label_for(ref, val)})
+        parts.append({"ref": ref, "value": val, "layer": layer, "x": round(x, 3), "y": round(y, 3), "rot": rot, "w": w, "h": h, "shape": shape, "label": label_for(ref, val, key)})
         r = math.radians(rot)
         for p in plist:
             pat = find(p, "at")
@@ -139,7 +154,7 @@ def main():
     layouts = {}
     for a in args:
         key, path = a.split("=", 1)
-        b = board(path); b["key"] = key; layouts[key] = b
+        b = board(path, key); b["key"] = key; layouts[key] = b
         print(f"{key}: {len(b['parts'])} parts, {len(b['pads'])} pads, {sum(1 for p in b['pads'] if p['gpio'] is not None)} with a GPIO, bbox {b['bbox']}")
     with open(out, "w") as f:
         f.write("// GENERATED by scripts/board_layout.py from the KiCad PCBs — do not edit by hand.\n")
