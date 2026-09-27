@@ -52,6 +52,23 @@ renderParts(null);
 // after a TinyUSB touch is a new device the browser must be shown once.
 let esptoolMod = null;
 const loadEsptool = () => esptoolMod || (esptoolMod = import("./vendor/esptool-js/bundle.js"));
+// Every image the catalog ships, keyed by the ELF hash esptool stamps into the app header
+// (index.json `app_elf_sha256`, per target and per channel release) — the same table the
+// Flash page's Detect uses, so "Installed firmware" names our build and version exactly.
+async function loadImages() {
+  try {
+    const res = await fetch("manifests/index.json", { cache: "no-cache" });
+    if (!res.ok) return null;
+    const t = {};
+    for (const x of (await res.json()).targets || []) {
+      const base = { id: x.id, name: x.name, line: x.product_line, model: x.model || null };
+      if (x.app_elf_sha256) t[x.app_elf_sha256] = { ...base, version: x.version };
+      for (const r of (x.channel && x.channel.releases) || []) if (r.app_elf_sha256) t[r.app_elf_sha256] = { ...base, version: r.version, tag: r.tag };
+    }
+    return t;
+  } catch { return null; }
+}
+const IMAGES = loadImages();
 let grantedPort = null;
 async function acquirePort({ pick = false } = {}) {
   if (grantedPort && !pick) return grantedPort;
@@ -154,7 +171,7 @@ async function diagnose({ touched = false } = {}) {
       let line = null, model = null;
       if (mcu === "esp32-s3" && mb === 16) line = "newsheen";
       else if (mcu === "esp32-s3" && mb === 8) line = "defcon-badge";
-      else if (mcu === "esp32-s3" && mb === 4) { status("Identifying which ESP32-S3 board this is…"); try { const r = await probe.probeS3FourMeg(io); line = r.line; model = r.model || r.models?.[0] || null; } catch {} }
+      else if (mcu === "esp32-s3" && mb === 4) { status("Identifying which ESP32-S3 board this is…"); try { const r = await probe.probeS3FourMeg(io, { images: await IMAGES }); line = r.line; model = r.model || r.models?.[0] || null; } catch {} }
       key = (model && Object.keys(PROTOCOLS).find((k) => PROTOCOLS[k].model === model)) || Object.keys(PROTOCOLS).find((k) => PROTOCOLS[k].line === line) || null;
       why = model ? `identified as ${model}` : line ? `identified as ${line}` : `${chipName}${mb ? ", " + mb + " MB" : ""}`;
       if (key) { const declared = fittedFromUi(); renderParts(key); for (const i of document.querySelectorAll("#parts input[data-part]")) if (i.dataset.part in declared) i.checked = declared[i.dataset.part]; }
@@ -169,7 +186,7 @@ async function diagnose({ touched = false } = {}) {
     const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", antenna: "Listening for off-air RF through the antenna (receive only)", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
     status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the exam…`);
     const report = await vet.runExam(io, protocol, {
-      chip, fitted: fittedFromUi(), doBeacon: $("blink").checked,
+      chip, images: await IMAGES, fitted: fittedFromUi(), doBeacon: $("blink").checked,
       onStep: (s) => { progress(steps.indexOf(s) / steps.length); status(`${escapeHtml(protocol.name)} — ${labels[s] || s}…`); },
     });
     progress(1);
@@ -332,5 +349,5 @@ function reportText(r) {
   return lines.join("\n");
 }
 // exposed for the simulator / console
-window.vetRender = render; window.vetRunOn = (io, chip, key = "newsheen") => vet.runExam(io, PROTOCOLS[key], { chip, doBeacon: false });
+window.vetRender = render; window.vetRunOn = async (io, chip, key = "newsheen") => vet.runExam(io, PROTOCOLS[key], { chip, images: await IMAGES, doBeacon: false });
 mascot("idle");
