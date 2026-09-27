@@ -1,0 +1,261 @@
+{
+ "unit": "workbench5 Nibble Screen Connect (ESP32-S3-Zero + Wio-SX1262 + 0.91\" OLED) \u2014 vet exam 2026-09-27 (first bench run of protocol nibble-screen-connect, over ssh/Tailscale)",
+ "chip": {
+  "chipName": "ESP32-S3 (QFN56) (revision v0.2)",
+  "mac": "24:ec:4a:2f:c0:40",
+  "flashId": 1458208
+ },
+ "verdict": "healthy",
+ "counts": {
+  "pass": 32,
+  "warn": 0,
+  "fail": 0,
+  "info": 7,
+  "skip": 0
+ },
+ "timings": {
+  "identity": 57,
+  "pins": 4505,
+  "bridges": 2623,
+  "radio": 10649,
+  "antenna": 54883,
+  "i2c": 9348,
+  "firmware": 209,
+  "beacon": 1145
+ },
+ "ms": 83419,
+ "fingerprint": {
+  "1": "HIGH",
+  "2": "HIGH",
+  "4": "LOW",
+  "5": "LOW",
+  "6": "HIGH",
+  "7": "HIGH",
+  "8": "HIGH",
+  "9": "float",
+  "10": "HIGH",
+  "11": "float",
+  "12": "float",
+  "13": "float",
+  "14": "float",
+  "15": "float",
+  "16": "float",
+  "17": "float",
+  "18": "float",
+  "21": "HIGH",
+  "33": "float",
+  "34": "float",
+  "35": "float",
+  "36": "float",
+  "37": "float",
+  "38": "LOW",
+  "39": "HIGH",
+  "40": "HIGH",
+  "41": "float",
+  "42": "float",
+  "47": "float",
+  "48": "float"
+ },
+ "checks": [
+  {
+   "id": "chip",
+   "status": "pass",
+   "detail": "ESP32-S3 (QFN56) (revision v0.2) \u00b7 MAC 24:ec:4a:2f:c0:40"
+  },
+  {
+   "id": "flash",
+   "status": "pass",
+   "detail": "4 MB (XMC)"
+  },
+  {
+   "id": "psram",
+   "status": "pass",
+   "detail": "2 MB, in-package flash code 2"
+  },
+  {
+   "id": "gpio1",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio2",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio6",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio10",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio5",
+   "status": "pass",
+   "detail": "driven low"
+  },
+  {
+   "id": "gpio4",
+   "status": "pass",
+   "detail": "driven LOW"
+  },
+  {
+   "id": "gpio11",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio12",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio13",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio7",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio8",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio9",
+   "status": "info",
+   "detail": "float"
+  },
+  {
+   "id": "gpio21",
+   "status": "info",
+   "detail": "HIGH"
+  },
+  {
+   "id": "gpio14",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio15",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio16",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio17",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio18",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio41",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio42",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio33",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio34",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio35",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio36",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio37",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio47",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio48",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio38",
+   "status": "info",
+   "detail": "LOW (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "gpio39",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "gpio40",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "bridges",
+   "status": "pass",
+   "detail": "none among 8 neighbouring pairs"
+  },
+  {
+   "id": "radio",
+   "status": "pass",
+   "detail": "answers: \"SX1261 V2D 2D02\", STDBY_RC, BUSY released"
+  },
+  {
+   "id": "antenna",
+   "status": "pass",
+   "detail": "hears ambient RF: 739 MHz at -87 dBm, floor -100 dBm"
+  },
+  {
+   "id": "i2c-8",
+   "status": "pass",
+   "detail": "devices at 0x3c"
+  },
+  {
+   "id": "firmware",
+   "status": "info",
+   "detail": "ELF be5c7052c8bc\u2026"
+  },
+  {
+   "id": "beacon",
+   "status": "info",
+   "detail": "3\u00d7 \u2014 if it stayed dark, check the LED and its resistor"
+  }
+ ],
+ "antenna": {
+  "raw": "739:-87 751:-87 869:-94 881:-94 894:-96 915:-98 933:-99 945:-96 957:-95",
+  "floor": -99.875,
+  "lift": 12.875
+ }
+}

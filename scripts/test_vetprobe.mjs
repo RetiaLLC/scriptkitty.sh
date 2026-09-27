@@ -31,7 +31,7 @@ async function test(name, fn) { try { await fn(); console.log(`  ok    ${name}`)
 // ------------------------------------------------------------------ a register-level board
 // parts: { [gpio]: "pullup" | "low" | "high" }   bridges: [[a,b],…]   radio: "sx126x" | null
 const GPIO = 0x60004000, OUT = [GPIO + 0x04, GPIO + 0x10], EN = [GPIO + 0x20, GPIO + 0x2c];
-function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PROTOCOLS.newsheen.radio, psramCap = 2, flashCap = 0, env = "newsheen-puck", rssi = () => -118 } = {}) {
+function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PROTOCOLS.newsheen.radio, psramCap = 2, flashCap = 0, env = "newsheen-puck", rssi = () => -118, i2cDevice = null } = {}) {
   const regs = new Map(); let ops = 0;
   const out = [0, 0], en = [0, 0];
   const mux = (p) => regs.get(0x60009004 + 4 * p) ?? 0;
@@ -42,10 +42,30 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
   const R = radioPins; const spi = { nss: 1, sck: 0, byteIdx: 0, bits: 0, rx: 0, cmd: null, miso: 0, resp: 0, args: [], mhz: 915 };
   const REG320 = [..."SX1261 V2D 2D02\0"].map((c) => c.charCodeAt(0));
   const STATUS = (2 << 4) | (1 << 1);
-  const respByte = (k) => (spi.cmd === 0x1d && k >= 4 ? (REG320[k - 4] ?? 0) : spi.cmd === 0x15 && k === 2 ? Math.round(-2 * rssi(spi.mhz)) & 0xff : spi.cmd === 0x17 && k >= 2 ? 0 : STATUS);   // GetDeviceErrors: none
+  // SX127x: byte 0 = address | 0x80 for a write; a read returns the register in byte 1
+  const regs127 = new Map([[0x01, 0x09]]);
+  const reg127 = (a) => (a === 0x42 ? 0x12 : a === 0x1b ? Math.max(0, Math.round(rssi(spi.mhz) + 157)) & 0xff : (regs127.get(a) ?? 0));
+  const respByte = (k) => radio === "sx127x"
+    ? (k === 1 && !(spi.cmd & 0x80) ? reg127(spi.cmd & 0x7f) : 0)
+    : (spi.cmd === 0x1d && k >= 4 ? (REG320[k - 4] ?? 0) : spi.cmd === 0x15 && k === 2 ? Math.round(-2 * rssi(spi.mhz)) & 0xff : spi.cmd === 0x17 && k >= 2 ? 0 : STATUS);   // GetDeviceError
+  // one I2C slave (e.g. an SSD1306 at 0x3C): START, 8 address bits, ACK by pulling SDA low
+  const i2c = { scl: 1, sda: 1, active: false, bits: 0, byte: 0, ack: false, ackClock: false };
+  function i2cTick() {
+    if (!i2cDevice) return;
+    const { sda, scl, addr } = i2cDevice;
+    const sdaL = isOut(sda) ? outLvl(sda) : 1, sclL = isOut(scl) ? outLvl(scl) : 1;       // open-drain: released = pulled up
+    if (i2c.scl === 1 && sclL === 1 && i2c.sda === 1 && sdaL === 0) { i2c.active = true; i2c.bits = 0; i2c.byte = 0; i2c.ack = false; i2c.ackClock = false; }   // START
+    else if (i2c.scl === 1 && sclL === 1 && i2c.sda === 0 && sdaL === 1) { i2c.active = false; i2c.ack = false; }                                          // STOP
+    else if (i2c.active && i2c.scl === 0 && sclL === 1) {                                                                                                     // SCL rising
+      if (i2c.bits < 8) { i2c.byte = ((i2c.byte << 1) | sdaL) & 0xff; i2c.bits++; if (i2c.bits === 8) i2c.ack = (i2c.byte >> 1) === addr; }
+      else i2c.ackClock = true;
+    } else if (i2c.active && i2c.scl === 1 && sclL === 0 && i2c.ackClock) { i2c.ack = false; i2c.ackClock = false; i2c.bits = 0; i2c.byte = 0; }        // end of the ACK clock
+    i2c.scl = sclL; i2c.sda = sdaL;
+  }
   const loadBit = () => { spi.miso = (spi.resp >> (7 - spi.bits)) & 1; };
   let ticks = 0;
   function level(p) {
+    if (i2cDevice && p === i2cDevice.sda && i2c.ack && !isOut(p)) return 0;      // the slave holds SDA low for its ACK
     if (parts[p] === "pulses") return (Math.floor(ticks / 3) % 2) ? 1 : 0;      // a remote being held: toggles every 3 reads
     if (isOut(p)) return outLvl(p);
     for (const q of peers(p)) { if (isOut(q)) return outLvl(q); if (parts[q] === "pullup" || parts[q] === "high") return 1; if (parts[q] === "low") return 0; }
@@ -62,6 +82,10 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
       if (spi.bits === 8) {
         if (spi.byteIdx === 0) { spi.cmd = spi.rx; spi.args = []; } else spi.args.push(spi.rx);
         if (spi.cmd === 0x86 && spi.args.length === 4) spi.mhz = Math.round((((spi.args[0] << 24) | (spi.args[1] << 16) | (spi.args[2] << 8) | spi.args[3]) >>> 0) * 32e6 / 33554432 / 1e6);
+        if (radio === "sx127x" && (spi.cmd & 0x80) && spi.args.length === 1) {
+          regs127.set(spi.cmd & 0x7f, spi.args[0]);
+          if ([6, 7, 8].includes(spi.cmd & 0x7f)) spi.mhz = Math.round((((regs127.get(6) ?? 0) << 16) | ((regs127.get(7) ?? 0) << 8) | (regs127.get(8) ?? 0)) * 32e6 / 524288 / 1e6);
+        }
         spi.byteIdx++; spi.bits = 0; spi.rx = 0; spi.resp = respByte(spi.byteIdx);
       }
     }
@@ -88,7 +112,7 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
       const tbl = { [GPIO + 0x08]: ["out", 0, 1], [GPIO + 0x0c]: ["out", 0, 0], [GPIO + 0x14]: ["out", 1, 1], [GPIO + 0x18]: ["out", 1, 0],
                     [GPIO + 0x24]: ["en", 0, 1], [GPIO + 0x28]: ["en", 0, 0], [GPIO + 0x30]: ["en", 1, 1], [GPIO + 0x34]: ["en", 1, 0] };
       const t = tbl[a];
-      if (t) { const arr = t[0] === "out" ? out : en; arr[t[1]] = t[2] ? (arr[t[1]] | v) >>> 0 : (arr[t[1]] & ~v) >>> 0; spiTick(); return; }
+      if (t) { const arr = t[0] === "out" ? out : en; arr[t[1]] = t[2] ? (arr[t[1]] | v) >>> 0 : (arr[t[1]] & ~v) >>> 0; spiTick(); i2cTick(); return; }
       regs.set(a, v);
     },
     async readFlash(addr, n) {
@@ -213,6 +237,45 @@ await test("every pad the exam touched is restored", async () => {
   const dirty = [...b.regs.entries()].filter(([a, v]) => a >= 0x60009004 && a < 0x60009004 + 4 * 49 && v !== 0xa00);
   assert.deepEqual(dirty, [], "IO_MUX left modified: " + JSON.stringify(dirty.map(([a]) => (a - 0x60009004) / 4)));
   assert.equal((await b.readReg(GPIO + 0x20)) >>> 0, 0xa00, "no output-enables left set (reg untouched)");
+});
+const FP = (name) => JSON.parse(fs.readFileSync(new URL(`./fingerprints/${name}.json`, import.meta.url), "utf8")).pull_follow;
+const partsFrom = (fp) => { const o = {}; for (const g of fp.HIGH || []) o[g] = "pullup"; for (const g of fp.LOW || []) o[g] = "low"; return o; };
+const zeroChip = { chipName: "ESP32-S3 (QFN56) (revision v0.2)", mac: "3c:0f:02:00:00:00", flashId: 0x164020 };   // 4 MB in-package
+const NIBBLES = [["nibble-og-s3", "nibble-og-s3", "sx127x"], ["nibble-connect", "nibble-connect", "sx126x"], ["nibble-zero", "nibble-zero-workbench5", "sx126x"], ["nibble-screen-connect", "nibble-screen-connect", "sx126x"], ["bluetooth-nugget", "bluetooth-nugget", null]];
+await test("every Nibble protocol (and the Nugget) scores healthy on its measured workbench5 fingerprint", async () => {
+  for (const [key, fpName, radioType] of NIBBLES) {
+    const proto = PROTOCOLS[key], parts = partsFrom(FP(fpName));
+    const dev = (proto.i2c || []).find((b) => b.expectDevices?.length);
+    const b = FakeBoard({ parts, radio: radioType, radioPins: proto.radio, i2cDevice: dev ? { sda: dev.sda, scl: dev.scl, addr: 0x3c } : null, rssi: (mhz) => (mhz === 915 ? -80 : -115), flashCap: 2 });
+    const fitted = Object.fromEntries((proto.defaultAbsent || []).map((k) => [k, false]));
+    const r = await vet.runExam(b, proto, { chip: zeroChip, fitted, doBeacon: false });
+    const bad = r.checks.filter((c) => c.status === "fail" || c.status === "warn" || c.status === "skip").map((c) => `${c.id}: ${c.detail}`);
+    assert.deepEqual(bad, [], `${key}: ${bad.join(" | ")}`);
+    assert.equal(r.verdict, "healthy", key);
+    if (radioType) { assert.equal(by(r, "radio").status, "pass", key + " radio"); assert.equal(by(r, "antenna").status, "pass", key + " antenna"); }
+    if (dev) assert.match(by(r, `i2c-${dev.sda}`).detail, /0x3c/, key + " display");
+  }
+});
+await test("Nibble Zero radio on Connect-style SCK/MISO -> identified via the swapped pair, warn names the swap, antenna still runs", async () => {
+  const proto = PROTOCOLS["nibble-zero"], parts = partsFrom(FP("nibble-zero-workbench5"));
+  const b = FakeBoard({ parts, radioPins: { ...proto.radio, sck: 13, miso: 12 }, i2cDevice: { sda: 8, scl: 7, addr: 0x3c }, rssi: (mhz) => (mhz === 869 ? -85 : -115) });
+  const r = await vet.runExam(b, proto, { chip: zeroChip, doBeacon: false });
+  assert.equal(by(r, "radio").status, "warn"); assert.match(by(r, "radio").detail, /swapped \(SCK GPIO13, MISO GPIO12\)/); assert.match(by(r, "radio").hint, /Zero/);
+  assert.equal(by(r, "antenna").status, "pass");
+});
+await test("Nibble Zero with no display answering -> I2C fail naming the OLED; declared not fitted -> pass as info-ish detail", async () => {
+  const proto = PROTOCOLS["nibble-zero"], parts = partsFrom(FP("nibble-zero-workbench5"));
+  let r = await vet.runExam(FakeBoard({ parts, radioPins: proto.radio }), proto, { chip: zeroChip, doBeacon: false });
+  assert.equal(by(r, "i2c-8").status, "fail"); assert.match(by(r, "i2c-8").hint, /OLED/);
+  r = await vet.runExam(FakeBoard({ parts, radioPins: proto.radio }), proto, { chip: zeroChip, fitted: { display: false }, doBeacon: false });
+  assert.equal(by(r, "i2c-8").status, "pass"); assert.match(by(r, "i2c-8").detail, /declared not fitted/);
+});
+await test("Nibble OG: a dead RFM95 (MISO silent) fails with the module-not-answering hint; no-pull-up I2C is info, not skip", async () => {
+  const proto = PROTOCOLS["nibble-og-s3"], parts = partsFrom(FP("nibble-og-s3"));
+  const r = await vet.runExam(FakeBoard({ parts, radio: null, radioPins: proto.radio }), proto, { chip: zeroChip, doBeacon: false });
+  assert.equal(by(r, "radio").status, "fail"); assert.match(by(r, "radio").hint, /RESET \(GPIO4\)/);
+  assert.equal(by(r, "i2c-11").status, "info"); assert.match(by(r, "i2c-11").detail, /no pull-ups/);
+  assert.equal(r.checks.find((c) => c.id === "antenna"), undefined, "no sweep without an ID");
 });
 await test("analyzeBootLog: clean boot / reboot loop / blank flash / brownout / TinyUSB takeover", () => {
   const banner = (rst, boot) => `ESP-ROM:esp32s3-20210327\nBuild:Mar 27 2021\nrst:${rst}\nboot:${boot}\nSaved PC:0x40041a76\n`;

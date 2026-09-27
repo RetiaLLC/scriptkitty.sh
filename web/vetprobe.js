@@ -221,11 +221,29 @@ async function spiSession(io, r) {
 }
 
 export async function radioChecks(io, protocol, fingerprint = {}) {
-  const r = protocol.radio;
-  if (!r) return [];
+  const r0 = protocol.radio;
+  if (!r0) return [];
+  const first = await probeRadio(io, r0, fingerprint);
+  if (first.alive || !r0.alt) return first.checks;
+  // no ID on the protocol's pins — try the sibling variant's SCK/MISO assignment before
+  // calling the module dead (Zero swaps them relative to Connect / Screen Connect)
+  const alt = { ...r0, ...r0.alt, alt: null };
+  const second = await probeRadio(io, alt, fingerprint);
+  if (!second.alive) return first.checks;
+  const c = second.checks.find((x) => x.id === "radio");
+  c.status = "warn";
+  c.detail += ` — but only with SCK/MISO swapped (SCK GPIO${alt.sck}, MISO GPIO${alt.miso})`;
+  c.hint = `The radio answers on the other Nibble variant's SPI pins. Either the wrong protocol is selected (Zero ↔ Connect / Screen Connect) or this PCB revision routes SCK/MISO the other way. The antenna check below used the swapped pins.`;
+  return second.checks;
+}
+
+async function probeRadio(io, r, fingerprint) {
   // every module-driven line floating = nothing fitted / unpowered, not a bad joint
-  const moduleSilent = [r.busy, r.dio1].filter((p) => p != null).every((p) => fingerprint[p] === "float");
+  const drivenLines = [["BUSY", r.busy], ["DIO1", r.dio1], ["DIO0", r.dio0]].filter(([, p]) => p != null);
+  const moduleSilent = drivenLines.length > 0 && drivenLines.every(([, p]) => fingerprint[p] === "float");
+  const drivenTxt = [...drivenLines, ["MISO", r.miso]].map(([n, p]) => `${n} GPIO${p}`).join(", ");
   const out = [];
+  let alive = false;
   const { pads, xfer } = await spiSession(io, r);
   try {
     // reset pulse through NRST (external pull-up releases it), then wait for BUSY to drop
@@ -233,37 +251,42 @@ export async function radioChecks(io, protocol, fingerprint = {}) {
     let busyTrace = [];
     if (r.busy != null) {
       for (let i = 0; i < 20; i++) { const b = await pads.read(r.busy); busyTrace.push(b ? 1 : 0); if (!b && i >= 2) break; }
-    }
+    } else await pads.sleep(10);                                  // SX127x: ~10 ms from reset to SPI-ready
     // is anything driving MISO while selected? (a missing module leaves it floating)
     await pads.set(r.nss, 0);
     await pads.input(r.miso, FUN_PD); const d = await pads.read(r.miso);
     await pads.input(r.miso, FUN_PU); const u = await pads.read(r.miso);
     await pads.input(r.miso, 0); await pads.set(r.nss, 1);
     const misoDriven = d === u;
+    const notFitted = `Every line the module would drive (${drivenTxt}) floats: ${r.part || "the radio module"} is not fitted, or has no 3V3/GND. If this unit is meant to have LoRa, populate/solder it; if it's a no-radio build, untick the radio and re-run.`;
 
     if (r.type === "sx126x") {
       const st = await xfer([0xc0, 0x00], 1);
-      const status = st[1], mode = (status >> 4) & 7, cmd = (status >> 1) & 7;
+      const status = st[1], mode = (status >> 4) & 7;
       const id = await xfer([0x1d, 0x03, 0x20, 0x00, ...new Array(16).fill(0)], 4).then((b) => b.slice(4));
       const idStr = String.fromCharCode(...id).replace(/\0.*$/, "");
-      const alive = /^SX126/.test(idStr);
+      alive = /^SX126/.test(idStr);
       const modeName = { 2: "STDBY_RC", 3: "STDBY_XOSC", 4: "FS", 5: "RX", 6: "TX" }[mode] || `mode ${mode}`;
       out.push(check("radio", `LoRa radio — ${r.part || "SX126x"}`, alive ? "pass" : "fail",
         alive ? `answers: "${idStr}", ${modeName}, BUSY ${busyTrace.at(-1) === 0 ? "released" : "still high"}`
               : `no ID (${misoDriven ? "MISO is driven but the reply is garbage" : "MISO never driven"}; status 0x${(status ?? 0).toString(16)}; BUSY trace ${busyTrace.join("") || "n/a"})`,
         alive ? undefined
               : misoDriven ? `Something answers on MISO but not as an SX126x — check SCK/MOSI for bridges (GPIO${r.sck}/GPIO${r.mosi}) and NSS (GPIO${r.nss}).`
-              : moduleSilent ? `Every line the module would drive (BUSY GPIO${r.busy}, DIO1 GPIO${r.dio1}, MISO GPIO${r.miso}) floats: ${r.part || "the radio module"} is not fitted, or has no 3V3/GND. If this unit is meant to have LoRa, populate/solder it; if it's a no-radio build, ignore the radio section.`
+              : moduleSilent ? notFitted
               : `The module is powered but not answering: check its SPI joints (MISO GPIO${r.miso}, NSS GPIO${r.nss}, SCK GPIO${r.sck}, MOSI GPIO${r.mosi}) and that BUSY (GPIO${r.busy}) drops after reset.`));
     } else if (r.type === "sx127x") {
-      const v = (await xfer([0x42, 0x00], 1))[1];
-      const alive = v === 0x12;
+      const v = (await xfer([0x42, 0x00], 1))[1];                  // RegVersion
+      alive = v === 0x12;
       out.push(check("radio", `LoRa radio — ${r.part || "SX127x"}`, alive ? "pass" : "fail",
-        alive ? `RegVersion 0x12 (SX1276/RFM95)` : `RegVersion 0x${v.toString(16)} (${misoDriven ? "MISO driven" : "MISO never driven"})`,
-        alive ? undefined : `Check the module is soldered and powered (MISO GPIO${r.miso}, NSS GPIO${r.nss}, SCK GPIO${r.sck}).`));
+        alive ? `RegVersion 0x12 (SX1276 / RFM95)` : `RegVersion 0x${v.toString(16)} (${misoDriven ? "MISO driven but not an SX127x" : "MISO never driven"})`,
+        alive ? undefined
+              : misoDriven ? `Something answers on MISO but not as an SX127x — check SCK/MOSI (GPIO${r.sck}/GPIO${r.mosi}) and NSS (GPIO${r.nss}) for bridges.`
+              : moduleSilent ? notFitted
+              : `The module is powered but not answering: check its SPI joints (MISO GPIO${r.miso}, NSS GPIO${r.nss}, SCK GPIO${r.sck}, MOSI GPIO${r.mosi}) and RESET (GPIO${r.nrst}).`));
     }
   } finally { await pads.restore(); }
-  return out;
+  for (const c of out) if (c.id === "radio") { c.alive = alive; c.radio = r; }
+  return { checks: out, alive };
 }
 
 // ---------------------------------------------------------------- antenna (RX-only)
@@ -276,9 +299,7 @@ export async function radioChecks(io, protocol, fingerprint = {}) {
 const ANTENNA_BANDS_MHZ = [739, 751, 869, 881, 894, 915, 933, 945, 957];
 const RX_BW_500K = 0x06;
 
-export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_BANDS_MHZ } = {}) {
-  const r = protocol.radio;
-  if (!r || r.type !== "sx126x") return null;
+async function sweepSx126x(io, r, samples, bands) {
   const { pads, xfer } = await spiSession(io, r);
   const busyLow = async () => { for (let i = 0; i < 40; i++) { if (r.busy == null || !(await pads.read(r.busy))) return true; } return false; };
   const cmd = async (bytes) => { await busyLow(); return xfer(bytes, Infinity); };          // reply not needed
@@ -309,6 +330,46 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
     }
     await busyLow(); const e = await xfer([0x17, 0x00, 0x00, 0x00], 2); errors = (e[2] << 8) | e[3];   // GetDeviceErrors
   } finally { try { await xfer([0x80, 0x00], Infinity); } catch {} await pads.restore(); }
+  return { sweep, errors, note: null };
+}
+
+// SX1276 / RFM95: LoRa mode, max LNA gain, BW 500 kHz, continuous RX per band, RegRssiValue
+// (dBm = -157 + value on the HF port). Register writes are opcode | 0x80. Never TX.
+async function sweepSx127x(io, r, samples, bands) {
+  const { pads, xfer } = await spiSession(io, r);
+  const wr = (a, v) => xfer([a | 0x80, v & 0xff], Infinity);
+  const rd = async (a) => (await xfer([a & 0x7f, 0x00], 1))[1];
+  const sweep = [];
+  let note = "SX1276 RegRssiValue sweep — thresholds borrowed from the SX1262 calibration";
+  try {
+    await wr(0x01, 0x00); await pads.sleep(2);                    // FSK sleep: LongRangeMode only changes in sleep
+    await wr(0x01, 0x80); await pads.sleep(2);                    // LoRa sleep
+    await wr(0x01, 0x81); await pads.sleep(2);                    // LoRa standby
+    const op = await rd(0x01);
+    if (op !== 0x81) return { sweep: [], errors: 0, note: `RegOpMode reads 0x${op.toString(16)} after writing 0x81 — SPI writes aren't reaching the radio (MOSI GPIO${r.mosi}?)` };
+    await wr(0x0c, 0x23);                                         // LNA G1 + HF boost
+    await wr(0x1d, 0x92);                                         // BW 500 kHz, CR 4/5, explicit header
+    await wr(0x1e, 0x74);                                         // SF7, CRC on
+    await wr(0x26, 0x04);                                         // AGC auto
+    for (const mhz of bands) {
+      const f = Math.round((mhz * 1e6) * 524288 / 32e6) >>> 0;   // f * 2^19 / 32 MHz
+      await wr(0x06, (f >>> 16) & 0xff); await wr(0x07, (f >>> 8) & 0xff); await wr(0x08, f & 0xff);
+      await wr(0x01, 0x85);                                       // RXCONTINUOUS
+      await pads.sleep(6);
+      const vals = [];
+      for (let i = 0; i < samples; i++) vals.push(-157 + (await rd(0x1b)));
+      sweep.push({ mhz, max: Math.max(...vals), mean: vals.reduce((a, b) => a + b, 0) / vals.length });
+      await wr(0x01, 0x81);
+    }
+  } finally { try { await wr(0x01, 0x80); } catch {} await pads.restore(); }
+  return { sweep, errors: 0, note };
+}
+
+export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_BANDS_MHZ, radio = null } = {}) {
+  const r = radio || protocol.radio;
+  if (!r || (r.type !== "sx126x" && r.type !== "sx127x")) return null;
+  const { sweep, errors, note } = r.type === "sx126x" ? await sweepSx126x(io, r, samples, bands) : await sweepSx127x(io, r, samples, bands);
+  if (!sweep.length) return check("antenna", "Antenna installed (RX-only listen)", "info", `sweep not possible: ${note}`);
   const floor = Math.min(...sweep.map((b) => b.mean));
   const peakBand = sweep.reduce((a, b) => (b.max > a.max ? b : a), sweep[0]);
   const lift = peakBand.max - floor;
@@ -325,6 +386,7 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
       (cal ? ` — a unit with its antenna reads about ${cal.withMax} dBm on the loudest band here, ${cal.withLift}+ dB above this floor` : "") +
       `. A truly RF-quiet spot looks the same, so if you're sure the antenna is on, move near a window or a phone and re-run. Never transmit until this passes.`;
   }
+  if (note) detail += ` (${note})`;
   return { ...check("antenna", "Antenna installed (RX-only listen)", status, detail, hint), sweep, floor, lift, errors, raw: fmt };
 }
 
@@ -359,19 +421,28 @@ export async function i2cScan(io, sda, scl, addrs) {
   return found;
 }
 
-export async function i2cChecks(io, protocol, fingerprint = {}) {
+export async function i2cChecks(io, protocol, fingerprint = {}, fitted = {}) {
   const out = [];
   for (const bus of protocol.i2c || []) {
     const up = fingerprint[bus.sda] === "HIGH" && fingerprint[bus.scl] === "HIGH";
-    if (!up) { out.push(check(`i2c-${bus.sda}`, `I2C scan — ${bus.name}`, "skip", "bus not pulled up (see the SDA/SCL pin checks)")); continue; }
+    const partName = bus.part ? (protocol.optionalParts?.[bus.part] || bus.part) : null;
+    const declaredAbsent = bus.part != null && fitted[bus.part] === false;
+    if (!up) {
+      out.push(bus.optionalPullups
+        ? check(`i2c-${bus.sda}`, `I2C scan — ${bus.name}`, "info", "no pull-ups on this bus — none are fitted on this board (an accessory brings its own), nothing to scan")
+        : check(`i2c-${bus.sda}`, `I2C scan — ${bus.name}`, "skip", "bus not pulled up (see the SDA/SCL pin checks)"));
+      continue;
+    }
     const found = await i2cScan(io, bus.sda, bus.scl, Array.from({ length: 0x78 - 0x08 }, (_, i) => 0x08 + i));
     const hex = found.map((a) => "0x" + a.toString(16).padStart(2, "0"));
-    const expected = bus.expectDevices || [];
+    const expected = declaredAbsent ? [] : (bus.expectDevices || []);
     const missing = expected.filter((a) => !found.includes(a));
     const status = missing.length ? "fail" : "pass";
-    out.push(check(`i2c-${bus.sda}`, `I2C scan — ${bus.name}`, status,
-      found.length ? `devices at ${hex.join(", ")}` : (expected.length ? "no devices answered" : "bus healthy, nothing fitted (expected)"),
-      missing.length ? `Expected ${missing.map((a) => "0x" + a.toString(16)).join(", ")} to answer.` : undefined));
+    const detail = found.length ? `devices at ${hex.join(", ")}${declaredAbsent ? ` — although ${partName} was declared not fitted` : ""}`
+      : expected.length ? "no devices answered"
+      : declaredAbsent ? `bus healthy, nothing answered (${partName} declared not fitted)` : "bus healthy, nothing fitted (expected)";
+    out.push(check(`i2c-${bus.sda}`, `I2C scan — ${bus.name}`, status, detail,
+      missing.length ? (bus.missingHint || `Expected ${missing.map((a) => "0x" + a.toString(16)).join(", ")} to answer${partName ? ` (${partName})` : ""} — check its solder/FPC, VCC and GND, and that SDA/SCL aren't swapped. If this unit has no ${partName || "device"}, untick it and re-run.`) : undefined));
   }
   return out;
 }
@@ -533,9 +604,10 @@ export async function runExam(io, protocol, { chip = {}, images = null, fitted =
     checks.push(check("radio", `LoRa radio — ${protocol.radio.part || "module"}`, "info", "declared not fitted — radio and antenna checks skipped"));
   } else if (doRadio) {
     step("radio"); const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio);
-    if (doAntenna && radio.some((c) => c.id === "radio" && c.status === "pass")) { step("antenna"); const a = await antennaCheck(io, protocol); if (a) checks.push(a); }
+    const rc = radio.find((c) => c.id === "radio");
+    if (doAntenna && rc?.alive) { step("antenna"); const a = await antennaCheck(io, protocol, { radio: rc.radio }); if (a) checks.push(a); }
   }
-  if (doI2c)     { step("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint)); }
+  if (doI2c)     { step("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint, fitted)); }
   step("firmware"); const fw = await firmwareCheck(io, images); if (fw) checks.push(fw);
   if (doBeacon)  { step("beacon");  const b = await beacon(io, protocol); if (b) checks.push(b); }
   const counts = { pass: 0, warn: 0, fail: 0, info: 0, skip: 0 };

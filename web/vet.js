@@ -25,16 +25,28 @@ function status(html, kind = "busy") { const el = $("status"); el.hidden = false
 function progress(frac) { $("heroBar").hidden = frac == null; if (frac != null) $("heroBarFill").style.width = `${Math.round(frac * 100)}%`; }
 
 for (const [key, p] of Object.entries(PROTOCOLS)) { const o = document.createElement("option"); o.value = key; o.textContent = p.name; $("protocol").append(o); }
-// "This unit has…" — the union of optional parts over all protocols; a part left unchecked is
-// checked for being genuinely absent and reported as info, not as a fault.
-const PARTS = {};
-for (const p of Object.values(PROTOCOLS)) for (const [k, name] of Object.entries(p.optionalParts || {})) PARTS[k] = PARTS[k] || name;
-for (const [k, name] of Object.entries(PARTS)) {
-  const l = document.createElement("label"); l.className = "ctl ctl-check"; l.title = "Untick if this unit is a build without this part";
-  l.innerHTML = `<input type="checkbox" data-part="${escapeHtml(k)}" checked /> has ${escapeHtml(name)}`;
-  $("parts").append(l);
+// "This unit has…" — the selected protocol's optional parts (Auto: the union over all
+// protocols); a part left unchecked is checked for being genuinely absent and reported as
+// info, not as a fault. Parts a board usually ships without start unticked.
+function renderParts(key) {
+  const protos = key && PROTOCOLS[key] ? [PROTOCOLS[key]] : Object.values(PROTOCOLS);
+  const prev = fittedFromUi();
+  const parts = {}, absent = new Set();
+  for (const p of protos) {
+    for (const [k, name] of Object.entries(p.optionalParts || {})) parts[k] = parts[k] || name;
+    for (const k of p.defaultAbsent || []) absent.add(k);
+  }
+  $("parts").replaceChildren();
+  for (const [k, name] of Object.entries(parts)) {
+    const l = document.createElement("label"); l.className = "ctl ctl-check"; l.title = "Untick if this unit is a build without this part";
+    const on = k in prev ? prev[k] : !(absent.size && absent.has(k) && protos.length === 1);
+    l.innerHTML = `<input type="checkbox" data-part="${escapeHtml(k)}" ${on ? "checked" : ""} /> has ${escapeHtml(name)}`;
+    $("parts").append(l);
+  }
 }
+$("protocol").addEventListener("change", () => renderParts($("protocol").value === "auto" ? null : $("protocol").value));
 const fittedFromUi = () => Object.fromEntries([...document.querySelectorAll("#parts input[data-part]")].map((i) => [i.dataset.part, i.checked]));
+renderParts(null);
 
 // --- ports: same rules as the Flash page — a single remembered board is reused, the ROM
 // after a TinyUSB touch is a new device the browser must be shown once.
@@ -139,12 +151,13 @@ async function diagnose({ touched = false } = {}) {
     if (key === "auto") {
       const mcu = /ESP32-S3/i.test(chipName) ? "esp32-s3" : /ESP32-S2/i.test(chipName) ? "esp32-s2" : /ESP8266/i.test(chipName) ? "esp8266" : null;
       const mb = chip.flashId != null ? vet.flashSizeMb(chip.flashId) : null;
-      let line = null;
+      let line = null, model = null;
       if (mcu === "esp32-s3" && mb === 16) line = "newsheen";
       else if (mcu === "esp32-s3" && mb === 8) line = "defcon-badge";
-      else if (mcu === "esp32-s3" && mb === 4) { status("Identifying which ESP32-S3 board this is…"); try { line = (await probe.probeS3FourMeg(io)).line; } catch {} }
-      key = Object.keys(PROTOCOLS).find((k) => PROTOCOLS[k].line === line) || null;
-      why = line ? `identified as ${line}` : `${chipName}${mb ? ", " + mb + " MB" : ""}`;
+      else if (mcu === "esp32-s3" && mb === 4) { status("Identifying which ESP32-S3 board this is…"); try { const r = await probe.probeS3FourMeg(io); line = r.line; model = r.model || r.models?.[0] || null; } catch {} }
+      key = (model && Object.keys(PROTOCOLS).find((k) => PROTOCOLS[k].model === model)) || Object.keys(PROTOCOLS).find((k) => PROTOCOLS[k].line === line) || null;
+      why = model ? `identified as ${model}` : line ? `identified as ${line}` : `${chipName}${mb ? ", " + mb + " MB" : ""}`;
+      if (key) { const declared = fittedFromUi(); renderParts(key); for (const i of document.querySelectorAll("#parts input[data-part]")) if (i.dataset.part in declared) i.checked = declared[i.dataset.part]; }
       if (!key) {
         try { await transport.disconnect(); } catch {}
         status(`No vet protocol for this board yet (${escapeHtml(why)}). Pick one explicitly if you know what it is.`, "err");

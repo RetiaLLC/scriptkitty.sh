@@ -1,0 +1,250 @@
+{
+ "unit": "workbench5 Bluetooth Nugget (LOLIN S3 Mini) \u2014 vet exam 2026-09-27 (first bench run of protocol bluetooth-nugget, over ssh/Tailscale)",
+ "chip": {
+  "chipName": "ESP32-S3 (QFN56) (revision v0.1)",
+  "mac": "f0:f5:bd:6d:3e:c8",
+  "flashId": 1458208
+ },
+ "verdict": "healthy",
+ "counts": {
+  "pass": 23,
+  "warn": 0,
+  "fail": 0,
+  "info": 15,
+  "skip": 0
+ },
+ "timings": {
+  "identity": 247,
+  "pins": 4343,
+  "bridges": 0,
+  "i2c": 8465,
+  "firmware": 194,
+  "beacon": 1035
+ },
+ "ms": 14285,
+ "fingerprint": {
+  "1": "float",
+  "2": "float",
+  "4": "float",
+  "5": "float",
+  "6": "float",
+  "7": "float",
+  "8": "float",
+  "9": "float",
+  "10": "float",
+  "11": "float",
+  "12": "float",
+  "13": "float",
+  "14": "float",
+  "15": "float",
+  "16": "float",
+  "17": "float",
+  "18": "float",
+  "21": "float",
+  "33": "float",
+  "34": "float",
+  "35": "HIGH",
+  "36": "HIGH",
+  "37": "float",
+  "38": "LOW",
+  "39": "HIGH",
+  "40": "HIGH",
+  "41": "float",
+  "42": "float",
+  "47": "LOW",
+  "48": "float"
+ },
+ "checks": [
+  {
+   "id": "declared",
+   "status": "info",
+   "detail": "LoRa add-on (RFM95)"
+  },
+  {
+   "id": "chip",
+   "status": "pass",
+   "detail": "ESP32-S3 (QFN56) (revision v0.1) \u00b7 MAC f0:f5:bd:6d:3e:c8"
+  },
+  {
+   "id": "flash",
+   "status": "pass",
+   "detail": "4 MB (XMC)"
+  },
+  {
+   "id": "psram",
+   "status": "pass",
+   "detail": "2 MB, in-package flash code 2"
+  },
+  {
+   "id": "gpio35",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio36",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio11",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio12",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio13",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio18",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio10",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio15",
+   "status": "info",
+   "detail": "float"
+  },
+  {
+   "id": "gpio4",
+   "status": "info",
+   "detail": "floats \u2014 LoRa add-on (RFM95) declared not fitted"
+  },
+  {
+   "id": "gpio9",
+   "status": "info",
+   "detail": "floats \u2014 LoRa add-on (RFM95) declared not fitted"
+  },
+  {
+   "id": "gpio16",
+   "status": "info",
+   "detail": "floats \u2014 LoRa add-on (RFM95) declared not fitted"
+  },
+  {
+   "id": "gpio6",
+   "status": "info",
+   "detail": "floats \u2014 LoRa add-on (RFM95) declared not fitted"
+  },
+  {
+   "id": "gpio7",
+   "status": "info",
+   "detail": "floats \u2014 LoRa add-on (RFM95) declared not fitted"
+  },
+  {
+   "id": "gpio8",
+   "status": "info",
+   "detail": "floats \u2014 LoRa add-on (RFM95) declared not fitted"
+  },
+  {
+   "id": "gpio47",
+   "status": "info",
+   "detail": "LOW"
+  },
+  {
+   "id": "gpio1",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio2",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio5",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio14",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio17",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio21",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio33",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio34",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio37",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio41",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio42",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio48",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio38",
+   "status": "info",
+   "detail": "LOW (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "gpio39",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "gpio40",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "radio",
+   "status": "info",
+   "detail": "declared not fitted \u2014 radio and antenna checks skipped"
+  },
+  {
+   "id": "i2c-35",
+   "status": "pass",
+   "detail": "devices at 0x3c"
+  },
+  {
+   "id": "firmware",
+   "status": "info",
+   "detail": "ELF e87d97a4967b\u2026"
+  },
+  {
+   "id": "beacon",
+   "status": "info",
+   "detail": "3\u00d7 \u2014 if it stayed dark, check the LED and its resistor"
+  }
+ ],
+ "antenna": null
+}

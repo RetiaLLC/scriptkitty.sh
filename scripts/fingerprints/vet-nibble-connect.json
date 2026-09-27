@@ -1,0 +1,261 @@
+{
+ "unit": "workbench5 Nibble Connect (ESP32-S3-Zero + Wio-SX1262) \u2014 vet exam 2026-09-27 (first bench run of protocol nibble-connect, over ssh/Tailscale)",
+ "chip": {
+  "chipName": "ESP32-S3 (QFN56) (revision v0.2)",
+  "mac": "b8:f8:62:d9:54:70",
+  "flashId": 1458208
+ },
+ "verdict": "healthy",
+ "counts": {
+  "pass": 31,
+  "warn": 0,
+  "fail": 0,
+  "info": 8,
+  "skip": 0
+ },
+ "timings": {
+  "identity": 144,
+  "pins": 4550,
+  "bridges": 2736,
+  "radio": 13342,
+  "antenna": 56278,
+  "i2c": 2,
+  "firmware": 218,
+  "beacon": 1126
+ },
+ "ms": 78396,
+ "fingerprint": {
+  "1": "float",
+  "2": "float",
+  "4": "LOW",
+  "5": "LOW",
+  "6": "HIGH",
+  "7": "float",
+  "8": "float",
+  "9": "float",
+  "10": "HIGH",
+  "11": "float",
+  "12": "float",
+  "13": "float",
+  "14": "float",
+  "15": "float",
+  "16": "float",
+  "17": "float",
+  "18": "float",
+  "21": "HIGH",
+  "33": "float",
+  "34": "float",
+  "35": "float",
+  "36": "float",
+  "37": "float",
+  "38": "LOW",
+  "39": "HIGH",
+  "40": "HIGH",
+  "41": "float",
+  "42": "float",
+  "47": "float",
+  "48": "float"
+ },
+ "checks": [
+  {
+   "id": "chip",
+   "status": "pass",
+   "detail": "ESP32-S3 (QFN56) (revision v0.2) \u00b7 MAC b8:f8:62:d9:54:70"
+  },
+  {
+   "id": "flash",
+   "status": "pass",
+   "detail": "4 MB (XMC)"
+  },
+  {
+   "id": "psram",
+   "status": "pass",
+   "detail": "2 MB, in-package flash code 2"
+  },
+  {
+   "id": "gpio6",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio10",
+   "status": "pass",
+   "detail": "pulled up"
+  },
+  {
+   "id": "gpio5",
+   "status": "pass",
+   "detail": "driven low"
+  },
+  {
+   "id": "gpio4",
+   "status": "pass",
+   "detail": "driven LOW"
+  },
+  {
+   "id": "gpio11",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio12",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio13",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio7",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio8",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio9",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio1",
+   "status": "info",
+   "detail": "float"
+  },
+  {
+   "id": "gpio2",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio21",
+   "status": "info",
+   "detail": "HIGH"
+  },
+  {
+   "id": "gpio14",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio15",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio16",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio17",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio18",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio41",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio42",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio33",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio34",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio35",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio36",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio37",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio47",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio48",
+   "status": "pass",
+   "detail": "floats"
+  },
+  {
+   "id": "gpio38",
+   "status": "info",
+   "detail": "LOW (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "gpio39",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "gpio40",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+  },
+  {
+   "id": "bridges",
+   "status": "pass",
+   "detail": "none among 8 neighbouring pairs"
+  },
+  {
+   "id": "radio",
+   "status": "pass",
+   "detail": "answers: \"SX1261 V2D 2D02\", STDBY_RC, BUSY released"
+  },
+  {
+   "id": "antenna",
+   "status": "pass",
+   "detail": "hears ambient RF: 739 MHz at -76 dBm, floor -92 dBm"
+  },
+  {
+   "id": "i2c-8",
+   "status": "info",
+   "detail": "no pull-ups on this bus \u2014 none are fitted on this board (an accessory brings its own), nothing to scan"
+  },
+  {
+   "id": "firmware",
+   "status": "info",
+   "detail": "PlatformIO env \"nibble-esp32_sx1262\""
+  },
+  {
+   "id": "beacon",
+   "status": "info",
+   "detail": "3\u00d7 \u2014 if it stayed dark, check the LED and its resistor"
+  }
+ ],
+ "antenna": {
+  "raw": "739:-76 751:-81 869:-88 881:-87 894:-91 915:-90 933:-88 945:-89 957:-90",
+  "floor": -91.75,
+  "lift": 15.75
+ }
+}
