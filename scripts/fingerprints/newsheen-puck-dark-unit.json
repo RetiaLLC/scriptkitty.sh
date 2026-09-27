@@ -65,5 +65,284 @@
   "fail_2": "radio answers garbage: MISO is driven but the ID read is not an SX126x string, status 0xaa, BUSY trace 11111110 \u2014 consistent with MISO shorted to MOSI (our own command echoed back)",
   "ir": "GPIO4 float (no receiver)",
   "verdict": "needs-rework: wick between the MOSI/MISO castellations (module pins 19/20), then re-run \u2014 the radio ID should appear"
+ },
+ "history": [
+  {
+   "date": "2026-09-26",
+   "note": "after wicking the MOSI/MISO bridge (Wio-SX1262 castellations GPIO11/12): bridge gone, radio answers SX1261 V2D 2D02, WLED boots clean; antenna sweep flat -108..-104 dBm (no antenna)",
+   "verdict": "check",
+   "counts": {
+    "pass": 30,
+    "warn": 1,
+    "fail": 0,
+    "info": 8,
+    "skip": 0
+   },
+   "fingerprint": {
+    "1": "float",
+    "2": "float",
+    "4": "float",
+    "5": "float",
+    "6": "float",
+    "7": "float",
+    "8": "float",
+    "9": "HIGH",
+    "10": "HIGH",
+    "11": "float",
+    "12": "float",
+    "13": "float",
+    "14": "float",
+    "15": "float",
+    "16": "float",
+    "17": "HIGH",
+    "18": "float",
+    "21": "LOW",
+    "35": "HIGH",
+    "36": "HIGH",
+    "37": "float",
+    "38": "LOW",
+    "39": "HIGH",
+    "40": "HIGH",
+    "41": "float",
+    "42": "float",
+    "47": "LOW",
+    "48": "float"
+   },
+   "checks": [
+    {
+     "id": "declared",
+     "status": "info",
+     "detail": "IR receiver (U4), I2S amplifier (MAX98357A on J3), I2S microphone (SPH0645 on J3)"
+    },
+    {
+     "id": "chip",
+     "status": "pass",
+     "detail": "ESP32-S3 (QFN56) (revision v0.2) \u00b7 MAC a4:cb:8f:b1:70:a4"
+    },
+    {
+     "id": "flash",
+     "status": "pass",
+     "detail": "16 MB (0x46)"
+    },
+    {
+     "id": "psram",
+     "status": "pass",
+     "detail": "2 MB, external flash"
+    },
+    {
+     "id": "gpio16",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio4",
+     "status": "info",
+     "detail": "floats \u2014 IR receiver (U4) declared not fitted"
+    },
+    {
+     "id": "gpio17",
+     "status": "pass",
+     "detail": "pulled up"
+    },
+    {
+     "id": "gpio35",
+     "status": "pass",
+     "detail": "pulled up"
+    },
+    {
+     "id": "gpio36",
+     "status": "pass",
+     "detail": "pulled up"
+    },
+    {
+     "id": "gpio9",
+     "status": "pass",
+     "detail": "pulled up"
+    },
+    {
+     "id": "gpio10",
+     "status": "pass",
+     "detail": "pulled up"
+    },
+    {
+     "id": "gpio47",
+     "status": "pass",
+     "detail": "driven low"
+    },
+    {
+     "id": "gpio21",
+     "status": "pass",
+     "detail": "driven LOW"
+    },
+    {
+     "id": "gpio11",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio12",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio13",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio14",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio37",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio38",
+     "status": "info",
+     "detail": "LOW (ROM-mode JTAG level, not a board signal)"
+    },
+    {
+     "id": "gpio39",
+     "status": "info",
+     "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+    },
+    {
+     "id": "gpio40",
+     "status": "info",
+     "detail": "HIGH (ROM-mode JTAG level, not a board signal)"
+    },
+    {
+     "id": "gpio15",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio1",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio2",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio48",
+     "status": "info",
+     "detail": "float"
+    },
+    {
+     "id": "gpio5",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio6",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio7",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio8",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio18",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio41",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "gpio42",
+     "status": "pass",
+     "detail": "floats"
+    },
+    {
+     "id": "bridges",
+     "status": "pass",
+     "detail": "none among 23 neighbouring pairs"
+    },
+    {
+     "id": "radio",
+     "status": "pass",
+     "detail": "answers: \"SX1261 V2D 2D02\", STDBY_RC, BUSY released"
+    },
+    {
+     "id": "antenna",
+     "status": "warn",
+     "detail": "flat noise floor -108\u2026-104 dBm across 9 bands (4 dB spread)"
+    },
+    {
+     "id": "i2c-35",
+     "status": "pass",
+     "detail": "bus healthy, nothing fitted (expected)"
+    },
+    {
+     "id": "firmware",
+     "status": "info",
+     "detail": "ELF a8b036772fb9\u2026"
+    },
+    {
+     "id": "beacon",
+     "status": "info",
+     "detail": "3\u00d7 \u2014 if it stayed dark, check the LED and its resistor"
+    },
+    {
+     "id": "boot",
+     "status": "pass",
+     "detail": "one clean boot (USB_UART_CHIP_RESET), no further resets in 6 s \u2014 console: Ada"
+    }
+   ]
+  }
+ ],
+ "fingerprint": {
+  "1": "float",
+  "2": "float",
+  "4": "float",
+  "5": "float",
+  "6": "float",
+  "7": "float",
+  "8": "float",
+  "9": "HIGH",
+  "10": "HIGH",
+  "11": "float",
+  "12": "float",
+  "13": "float",
+  "14": "float",
+  "15": "float",
+  "16": "float",
+  "17": "HIGH",
+  "18": "float",
+  "21": "LOW",
+  "35": "HIGH",
+  "36": "HIGH",
+  "37": "float",
+  "38": "LOW",
+  "39": "HIGH",
+  "40": "HIGH",
+  "41": "float",
+  "42": "float",
+  "47": "LOW",
+  "48": "float"
+ },
+ "verdict": "check",
+ "counts": {
+  "pass": 30,
+  "warn": 1,
+  "fail": 0,
+  "info": 8,
+  "skip": 0
  }
 }
