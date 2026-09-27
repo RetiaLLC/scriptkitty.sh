@@ -270,6 +270,12 @@ if (opt("--rom")) {
       console.log("        console:", JSON.stringify(text.slice(0, 400)));
     });
   } else await io.close();
+  if (report) {   // the report printed before the interactive/boot steps; restate the verdict with them included
+    const counts = { pass: 0, warn: 0, fail: 0, info: 0, skip: 0 };
+    for (const c of report.checks) counts[c.status] = (counts[c.status] || 0) + 1;
+    report.counts = counts; report.verdict = counts.fail ? "needs-rework" : counts.warn ? "check" : "healthy";
+    console.log(`\n${report.board} — final: ${report.verdict.toUpperCase()} (${counts.pass} pass, ${counts.warn} warn, ${counts.fail} fail)`);
+  }
   if (opt("--json") && report) fs.writeFileSync(opt("--json"), JSON.stringify(report, null, 1));
 }
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");

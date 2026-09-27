@@ -1,0 +1,54 @@
+{
+ "board": "Newsheen / Pusheen puck (esp32_base_puck_v2), operator's unit #5 (a4:cb:8f:9e:59:54), WLED-style build (prints 'Ada'), HWCDC console",
+ "measured": "2026-09-26 on the operator's Mac via scripts/test_vetprobe.mjs (60 s IR listen, boot watch)",
+ "chip": "ESP32-S3 (QFN56) rev v0.2, WROOM-1-N16R2 (16 MB external flash vendor 0x46, eFuse PSRAM 2 MB)",
+ "rest_levels": {
+  "HIGH": [
+   17,
+   35,
+   36,
+   9,
+   10,
+   39,
+   40
+  ],
+  "LOW": [
+   47,
+   21,
+   38
+  ],
+  "float": [
+   16,
+   4,
+   11,
+   12,
+   13,
+   14,
+   37,
+   15,
+   1,
+   2,
+   48,
+   5,
+   6,
+   7,
+   8,
+   18,
+   41,
+   42
+  ]
+ },
+ "vet": {
+  "radio": "SX1261 V2D 2D02, STDBY_RC, BUSY released",
+  "antenna": "881 MHz -86 dBm (US LTE band 5 downlink), 739 -88, floor -102 -> PASS, 16 dB lift",
+  "bridges": "none among 23 pairs",
+  "i2c": "healthy, nothing fitted",
+  "boot": "one clean boot (boot:0x9), console 'Ada'",
+  "ir": "GPIO4 floats AND 0 edges in 297,592 samples over 60 s -> if a remote was held: receiver absent or unpowered (BUG #2); if not: inconclusive, re-run",
+  "ms": 5618
+ },
+ "notes": [
+  "fourth Newsheen unit; MAC block a4:cb:8f:9e differs from the b1:7x units",
+  "GPIO16 floats: DIR fix present"
+ ]
+}
