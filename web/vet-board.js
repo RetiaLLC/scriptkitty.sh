@@ -59,6 +59,15 @@ export function renderBoard(el, layout, highlights, { onPick = () => {}, title =
     if (h) g.addEventListener("click", () => onPick(h.checkId));
     svg.append(g);
   }
+  // every castellation of a multi-pin part as a faint dot, so modules read as modules and a
+  // painted pad has neighbours to be compared with
+  const padCount = {}; for (const pd of layout.pads) padCount[pd.ref] = (padCount[pd.ref] || 0) + 1;
+  for (const pd of layout.pads) {
+    if (padCount[pd.ref] < 8 || (pd.gpio != null && byGpio.has(pd.gpio))) continue;
+    const d = mk("circle", { cx: pd.x, cy: pd.y, r: Math.max(0.28, Math.min(pd.w || 1, pd.h || 1) * 0.3), class: `pad pad-dot layer-${layout.parts.find((q) => q.ref === pd.ref)?.layer || "F"}` });
+    d.append(mk("title", {}, `${pd.ref} pad ${pd.pad}${pd.gpio != null ? ` — GPIO${pd.gpio}` : pd.net ? ` — ${pd.net.split("/").pop()}` : ""}`));
+    svg.append(d);
+  }
   // pads on a highlighted net — every place that net is soldered
   for (const pd of layout.pads) {
     const h = pd.gpio != null ? byGpio.get(pd.gpio) : null;

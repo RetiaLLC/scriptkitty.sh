@@ -625,3 +625,6 @@ esp-web-install-button[install-unsupported] { display: block; }
 .ir-code { display: inline-flex; flex-direction: column; gap: 1px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--mono); font-size: 12px; background: rgba(123,241,173,.08); }
 .ir-code em { font-style: normal; color: var(--accent); margin-left: 6px; } .ir-code small { color: var(--muted); font-size: 10.5px; }
 .ir-none { font-size: 12px; color: var(--dim); }
+
+.pad-dot { fill: rgba(120,130,125,.35); stroke: none; pointer-events: all; }
+.pad-dot.layer-B { fill: rgba(120,130,125,.18); }
