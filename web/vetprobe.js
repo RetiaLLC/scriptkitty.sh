@@ -296,8 +296,11 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
     status = errors & 0x60 ? "warn" : "pass"; detail = `hears ambient RF: ${peakBand.mhz} MHz at ${Math.round(peakBand.max)} dBm, floor ${Math.round(floor)} dBm${errTxt}`;
     if (errors & 0x60) hint = "The radio heard the antenna but flagged its oscillator/PLL — check the module's TCXO supply and crystal; re-run once.";
   } else {
-    status = "warn"; detail = `flat noise floor ${Math.round(floor)}…${Math.round(peakBand.max)} dBm across ${sweep.length} bands${errTxt}`;
-    hint = `No off-air signal reached the receiver. Either the antenna is missing / not soldered to ${r.antPad || "the ANT pad"}, or this spot is RF-quiet — move near a window or a phone and re-run. Never transmit until this passes.`;
+    const cal = r.antennaCalibration;
+    status = "warn"; detail = `flat noise floor ${Math.round(floor)}…${Math.round(peakBand.max)} dBm across ${sweep.length} bands (${Math.round(lift)} dB spread)${errTxt}`;
+    hint = `No off-air signal reached the receiver: the antenna is most likely missing / not soldered to ${r.antPad || "the ANT pad"}` +
+      (cal ? ` — a unit with its antenna reads about ${cal.withMax} dBm on the loudest band here, ${cal.withLift}+ dB above this floor` : "") +
+      `. A truly RF-quiet spot looks the same, so if you're sure the antenna is on, move near a window or a phone and re-run. Never transmit until this passes.`;
   }
   return { ...check("antenna", "Antenna installed (RX-only listen)", status, detail, hint), sweep, floor, lift, errors, raw: fmt };
 }
