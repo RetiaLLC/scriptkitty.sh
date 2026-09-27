@@ -5,7 +5,8 @@
 //   node scripts/test_vetprobe.mjs --rom /dev/cu.X --stub       real board in download mode / HWCDC app
 //        [--protocol newsheen] [--boot-watch] (watchdog-reset into the firmware afterwards and read
 //        its console for 6 s) [--not-fitted radio,ir] (declare optional parts this unit doesn't
-//        carry) [--no-reset] [--ssh pi@host] [--json out.json]
+//        carry) [--ir-listen SECONDS] (after the exam, sample the IR receiver while a remote is
+//        held at the board) [--no-reset] [--ssh pi@host] [--json out.json]
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -39,7 +40,9 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
   const STATUS = (2 << 4) | (1 << 1);
   const respByte = (k) => (spi.cmd === 0x1d && k >= 4 ? (REG320[k - 4] ?? 0) : spi.cmd === 0x15 && k === 2 ? Math.round(-2 * rssi(spi.mhz)) & 0xff : spi.cmd === 0x17 && k >= 2 ? 0 : STATUS);   // GetDeviceErrors: none
   const loadBit = () => { spi.miso = (spi.resp >> (7 - spi.bits)) & 1; };
+  let ticks = 0;
   function level(p) {
+    if (parts[p] === "pulses") return (Math.floor(ticks / 3) % 2) ? 1 : 0;      // a remote being held: toggles every 3 reads
     if (isOut(p)) return outLvl(p);
     for (const q of peers(p)) { if (isOut(q)) return outLvl(q); if (parts[q] === "pullup" || parts[q] === "high") return 1; if (parts[q] === "low") return 0; }
     if (radio && p === R.miso) return spi.nss === 0 ? spi.miso : ((mux(p) & (1 << 8)) ? 1 : 0);
@@ -65,6 +68,7 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
     get ops() { return ops; }, regs,
     async readReg(a) {
       ops++;
+      if (a === GPIO + 0x3c || a === GPIO + 0x40) { ticks++; }
       if (a === GPIO + 0x3c || a === GPIO + 0x40) { const b = a === GPIO + 0x3c ? 0 : 1; let w = 0; for (let i = 0; i < 32; i++) if (level(b * 32 + i)) w |= 1 << i; return w >>> 0; }
       if (a === 0x60007050) return (flashCap << 27) >>> 0;
       if (a === 0x60007054) return (psramCap << 3) >>> 0;
@@ -106,10 +110,10 @@ await test("BUG #1 (U5 DIR strapped): GPIO16 held low -> fail with the bodge hin
   const r = await vet.runExam(FakeBoard({ parts: { ...HEALTHY, 16: "low" } }), P, { chip: chipInfo, doBeacon: false });
   assert.equal(by(r, "gpio16").status, "fail"); assert.match(by(r, "gpio16").hint, /U5 pin 5 \(DIR\) to pin 6/); assert.equal(r.verdict, "needs-rework");
 });
-await test("BUG #2 (IR receiver unpowered / wrong pinout): GPIO4 floats -> fail", async () => {
+await test("IR output floating -> warn pointing at the remote test (BUG #2 is only confirmed by irListen)", async () => {
   const parts = { ...HEALTHY }; delete parts[4];
   const r = await vet.runExam(FakeBoard({ parts }), P, { chip: chipInfo, doBeacon: false });
-  assert.equal(by(r, "gpio4").status, "fail"); assert.match(by(r, "gpio4").hint, /VCC-middle/);
+  assert.equal(by(r, "gpio4").status, "warn"); assert.match(by(r, "gpio4").hint, /remote test/); assert.match(by(r, "gpio4").hint, /BUG #2/);
 });
 await test("antenna: a strong band lifts RSSI -> pass; flat floor -> warn; skipped when the radio failed", async () => {
   const withAnt = FakeBoard({ parts: HEALTHY, rssi: (mhz) => (mhz === 881 ? -84 : -117 + (mhz % 3)) });
@@ -132,6 +136,15 @@ await test("declared not fitted: a no-radio, no-IR build comes out healthy; a dr
   assert.match(by(r, "declared").detail, /Wio-SX1262.*IR receiver/);
   r = await vet.runExam(FakeBoard({ parts: HEALTHY }), P, { chip: chipInfo, doBeacon: false, fitted: { ir: false } });
   assert.equal(by(r, "gpio4").status, "warn", "IR declared absent but its output is pulled up");
+});
+await test("irListen: pulses -> pass; silent + floating -> BUG #2 fail; silent + pulled-up -> warn", async () => {
+  let r = await vet.irListen(FakeBoard({ parts: { ...HEALTHY, 4: "pulses" } }), P, { ms: 60, restLevel: "float" });
+  assert.equal(r.status, "pass"); assert.match(r.detail, /no\/weak internal pull-up/);
+  const parts = { ...HEALTHY }; delete parts[4];
+  r = await vet.irListen(FakeBoard({ parts }), P, { ms: 60, restLevel: "float" });
+  assert.equal(r.status, "fail"); assert.match(r.hint, /BUG #2/);
+  r = await vet.irListen(FakeBoard({ parts: HEALTHY }), P, { ms: 60, restLevel: "HIGH" });
+  assert.equal(r.status, "warn");
 });
 await test("radio module missing: BUSY/DIO1 float, MISO never driven -> radio fail + warns", async () => {
   const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
@@ -231,6 +244,18 @@ if (opt("--rom")) {
     console.log();
     printReport(report);
   });
+  if (opt("--ir-listen") && report) {
+    const secs = Number(opt("--ir-listen"));
+    await test(`IR listen: hold a remote at the board for ${secs} s`, async () => {
+      const rest = report.fingerprint[proto.ir?.gpio];
+      process.stdout.write(`        listening on GPIO${proto.ir?.gpio}… `);
+      const r = await vet.irListen(io, proto, { ms: secs * 1000, restLevel: rest, onProgress: (p) => process.stdout.write(`\r        ${Math.round(p.elapsed / 1000)}s: ${p.samples} samples, ${p.transitions} edges, ${p.lows} low   `) });
+      console.log(`\n        ${icon[r.status]} ${r.title}: ${r.detail}${r.hint ? `\n          ↳ ${r.hint}` : ""}`);
+      report.checks.push(r);
+      const passive = report.checks.find((c) => c.id === `gpio${proto.ir?.gpio}`);
+      if (passive && r.status === "pass" && passive.status !== "pass") { passive.status = "info"; passive.detail += " — but it decodes IR"; delete passive.hint; console.log("        (passive GPIO verdict superseded: the receiver works, its output just has no pull-up)"); }
+    });
+  }
   if (bootWatch && report) {
     await test("boot watch: watchdog-reset into the firmware and read its console", async () => {
       const t0 = Date.now();

@@ -324,6 +324,46 @@ export async function i2cChecks(io, protocol, fingerprint = {}) {
   return out;
 }
 
+// ---------------------------------------------------------------- IR receiver (interactive)
+// Rest level alone can't tell a receiver that's unpowered from one whose open-collector
+// output simply has no internal pull-up. Both are "float"; only one of them still decodes
+// light. Enable the chip's pull-up on OUT and sample as fast as the link allows while the
+// user holds a remote at the board: a live receiver pulls the line low in bursts (NEC: a
+// 9 ms leader, then 560 µs marks; repeats every 110 ms while held).
+export async function irListen(io, protocol, { ms = 6000, onProgress = () => {}, restLevel = null } = {}) {
+  const ir = protocol.ir;
+  if (!ir) return null;
+  const pads = new Pads(io);
+  let samples = 0, lows = 0, transitions = 0, last = null;
+  const t0 = Date.now();
+  try {
+    await pads.input(ir.gpio, FUN_PU);
+    while (Date.now() - t0 < ms) {
+      const v = await pads.read(ir.gpio);
+      samples++; if (!v) lows++;
+      if (last != null && v !== last) transitions++;
+      last = v;
+      if (samples % 200 === 0) onProgress({ samples, lows, transitions, elapsed: Date.now() - t0 });
+    }
+  } finally { await pads.restore(); }
+  const rate = samples / ((Date.now() - t0) / 1000);
+  const seen = transitions >= 6 && lows >= 3;
+  let status, detail, hint;
+  if (seen) {
+    status = "pass"; detail = `decodes IR: ${transitions} edges, ${lows} low samples of ${samples} (${Math.round(rate)} samples/s)`;
+    if (restLevel === "float") detail += " — its output idles floating (no/weak internal pull-up): firmware must enable INPUT_PULLUP on this pin or decoding will be unreliable";
+  } else if (lows === samples && samples > 0) {
+    status = "fail"; detail = "output stuck low the whole time"; hint = "Receiver fitted backwards, damaged, or OUT shorted to GND at U4.";
+  } else {
+    status = restLevel === "float" ? "fail" : "warn";
+    detail = `no IR seen in ${(ms / 1000).toFixed(0)} s (${samples} samples, ${transitions} edges)`;
+    hint = restLevel === "float"
+      ? "Its output neither idles high nor reacts to a remote: the receiver isn't powered. On this footprint that is BUG #2 — a VCC-middle part (Gikfun-style) lands its VCC on the GND pad. Fit a GND-middle TSOP38238 / VS1838B with the OUT leg in the square pad, or measure Vs (D3-side pad) for ~4.6 V."
+      : "The output idles high (powered) but no remote was seen — press and hold a button on a remote aimed at the board while this runs, then re-run.";
+  }
+  return { ...check("ir", `IR receiver — ${ir.name}`, status, detail, hint), samples, lows, transitions, rate };
+}
+
 // ---------------------------------------------------------------- beacon + firmware
 export async function beacon(io, protocol, { blinks = 3, ms = 120 } = {}) {
   const b = protocol.beacon;

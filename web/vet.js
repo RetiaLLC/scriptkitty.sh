@@ -149,6 +149,21 @@ async function diagnose({ touched = false } = {}) {
     });
     progress(1);
 
+    // interactive: the IR receiver only proves itself when it sees light. Rest level can't
+    // separate "unpowered" from "no internal pull-up", so ask for a remote.
+    if ($("irTest").checked && protocol.ir && (fittedFromUi()[protocol.ir.part] !== false)) {
+      const rest = report.fingerprint[protocol.ir.gpio];
+      mascot("working", "Point a remote at the cat", "Hold any button on an IR remote aimed at the board for the next 8 seconds.");
+      const t0 = Date.now();
+      const r = await vet.irListen(io, protocol, { ms: 8000, restLevel: rest, onProgress: (p) => status(`Listening on the IR receiver… ${Math.max(0, 8 - Math.round((Date.now() - t0) / 1000))} s left — ${p.transitions} edges so far`) });
+      report.checks.push(r);
+      report.counts[r.status] = (report.counts[r.status] || 0) + 1;
+      // the passive GPIO verdict is superseded by the live one
+      const passive = report.checks.find((c) => c.id === `gpio${protocol.ir.gpio}`);
+      if (passive && r.status === "pass" && passive.status !== "pass") { report.counts[passive.status]--; report.counts.info = (report.counts.info || 0) + 1; passive.status = "info"; passive.detail += " — but it decodes IR (see below)"; delete passive.hint; }
+      report.verdict = report.counts.fail ? "needs-rework" : report.counts.warn ? "check" : "healthy";
+    }
+
     // boot check: hand the board back to its firmware and watch the console
     if ($("bootCheck").checked && /esp32-s3/i.test(protocol.mcu)) {
       status("Rebooting the board into its firmware and watching it boot…");
@@ -222,7 +237,7 @@ async function waitFresh(before, ms) {
 
 // --- rendering -----------------------------------------------------------------
 const ICON = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
-const GROUP = (c) => c.id === "boot" ? "Boot" : c.id === "declared" ? "Identity" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
+const GROUP = (c) => c.id === "boot" ? "Boot" : c.id === "declared" ? "Identity" : c.id === "ir" ? "Pins" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
 function render(r) {
   $("report").hidden = false;
   $("summary").className = `vet-summary verdict-${r.verdict}`;

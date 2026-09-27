@@ -50,7 +50,8 @@
   "boot": "one clean boot (boot:0x29 SPI_FAST_FLASH_BOOT), no resets in 6 s, chatty firmware console",
   "ms": 2588,
   "antenna": "RX-only sweep (SF7/500 kHz, RF_SW GPIO14 high, DIO2 switch, TCXO 1.8 V): 739 MHz -87..-91 dBm, 957 MHz -91/-93, 869-894 -94..-98, floor -102 dBm (915 MHz) -> PASS; two runs consistent; XOSC_START_ERR seen before ClearDeviceErrors was added, clean after",
-  "antenna_without_wire": "same unit, wire antenna removed (operator's 'final variant', 2026-09-26): flat -103\u2026-107 dBm, 4 dB spread -> WARN 'no off-air signal' \u2014 the negative calibration; every other check identical to the with-antenna runs"
+  "antenna_without_wire": "same unit, wire antenna removed (operator's 'final variant', 2026-09-26): flat -103\u2026-107 dBm, 4 dB spread -> WARN 'no off-air signal' \u2014 the negative calibration; every other check identical to the with-antenna runs",
+  "ir_receiver_added": "operator fitted an IR receiver (2026-09-26): GPIO4 STILL floats at rest, but irListen with a remote held: 3460 edges / 9469 low of 370,710 samples at 4.9 kS/s -> receiver works; its output has no/weak internal pull-up (firmware must enable INPUT_PULLUP). So 'float' alone is NOT BUG #2 \u2014 demoted to warn + remote test."
  },
  "notes": [
   "GPIO16 floats: this unit has the U5 DIR fix (or a fixed revision) \u2014 BUG #1 absent here",
