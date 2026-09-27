@@ -119,10 +119,14 @@ await test("BUG #1 (U5 DIR strapped): GPIO16 held low -> fail with the bodge hin
   const r = await vet.runExam(FakeBoard({ parts: { ...HEALTHY, 16: "low" } }), P, { chip: chipInfo, doBeacon: false });
   assert.equal(by(r, "gpio16").status, "fail"); assert.match(by(r, "gpio16").hint, /U5 pin 5 \(DIR\) to pin 6/); assert.equal(r.verdict, "needs-rework");
 });
-await test("IR output floating -> warn pointing at the remote test (BUG #2 is only confirmed by irListen)", async () => {
+await test("IR output floating -> info (a fitted open-collector receiver rests like an empty footprint); low -> BUG #2 fail", async () => {
   const parts = { ...HEALTHY }; delete parts[4];
-  const r = await vet.runExam(FakeBoard({ parts }), P, { chip: chipInfo, doBeacon: false });
-  assert.equal(by(r, "gpio4").status, "warn"); assert.match(by(r, "gpio4").hint, /remote test/); assert.match(by(r, "gpio4").hint, /BUG #2/);
+  let r = await vet.runExam(FakeBoard({ parts }), P, { chip: chipInfo, doBeacon: false });
+  assert.equal(by(r, "gpio4").status, "info"); assert.match(by(r, "gpio4").detail, /idles open/); assert.match(by(r, "gpio4").hint, /remote test/);
+  assert.equal(r.verdict, "check", "float on GPIO4 alone must not drag the verdict below the antenna warn");
+  assert.ok(!r.checks.some((c) => c.status === "warn" && c.id === "gpio4"));
+  r = await vet.runExam(FakeBoard({ parts: { ...HEALTHY, 4: "low" } }), P, { chip: chipInfo, doBeacon: false });
+  assert.equal(by(r, "gpio4").status, "fail"); assert.match(by(r, "gpio4").hint, /BUG #2/);
 });
 await test("antenna: a strong band lifts RSSI -> pass; flat floor -> warn; skipped when the radio failed", async () => {
   const withAnt = FakeBoard({ parts: HEALTHY, rssi: (mhz) => (mhz === 881 ? -84 : -117 + (mhz % 3)) });
@@ -146,12 +150,12 @@ await test("declared not fitted: a no-radio, no-IR build comes out healthy; a dr
   r = await vet.runExam(FakeBoard({ parts: HEALTHY }), P, { chip: chipInfo, doBeacon: false, fitted: { ir: false } });
   assert.equal(by(r, "gpio4").status, "warn", "IR declared absent but its output is pulled up");
 });
-await test("irListen: pulses -> pass; silent + floating -> BUG #2 fail; silent + pulled-up -> warn", async () => {
+await test("irListen: pulses -> pass; silent + floating -> warn (re-run or BUG #2); silent + pulled-up -> warn", async () => {
   let r = await vet.irListen(FakeBoard({ parts: { ...HEALTHY, 4: "pulses" } }), P, { ms: 60, restLevel: "float" });
   assert.equal(r.status, "pass"); assert.match(r.detail, /no\/weak internal pull-up/);
   const parts = { ...HEALTHY }; delete parts[4];
   r = await vet.irListen(FakeBoard({ parts }), P, { ms: 60, restLevel: "float" });
-  assert.equal(r.status, "fail"); assert.match(r.hint, /BUG #2/);
+  assert.equal(r.status, "warn"); assert.match(r.hint, /re-run the remote test/); assert.match(r.hint, /BUG #2/);
   r = await vet.irListen(FakeBoard({ parts: HEALTHY }), P, { ms: 60, restLevel: "HIGH" });
   assert.equal(r.status, "warn");
 });

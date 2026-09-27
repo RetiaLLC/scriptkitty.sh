@@ -120,7 +120,7 @@ export function judgePin(spec, level) {
                     : { status: "warn", detail: `held ${level}`, hint: `Nothing should drive GPIO${spec.gpio}; look for a solder bridge to ${level === "HIGH" ? "3V3 / a pulled-up neighbour" : "GND / a neighbour"}.` };
     case "HIGH":
       if (level === "HIGH") return { status: "pass", detail: "pulled up" + okNote };
-      return custom ? { status: custom.status, detail: level === "float" ? "floats (no pull-up)" : "held LOW", hint: custom.hint }
+      return custom ? { status: custom.status, detail: custom.detail || (level === "float" ? "floats (no pull-up)" : "held LOW"), hint: custom.hint }
                     : { status: "fail", detail: level === "float" ? "floats (no pull-up)" : "held LOW" };
     case "LOW":
       if (level === "LOW") return { status: "pass", detail: "driven low" + okNote };
@@ -407,10 +407,12 @@ export async function irListen(io, protocol, { ms = 6000, onProgress = () => {},
   } else if (lows === samples && samples > 0) {
     status = "fail"; detail = "output stuck low the whole time"; hint = "Receiver fitted backwards, damaged, or OUT shorted to GND at U4.";
   } else {
-    status = restLevel === "float" ? "fail" : "warn";
-    detail = `no IR seen in ${(ms / 1000).toFixed(0)} s (${samples} samples, ${transitions} edges)`;
+    // silence proves nothing by itself: a fitted open-collector receiver rests exactly like
+    // an empty footprint, and the most common cause is simply no remote being held
+    status = "warn";
+    detail = `no IR seen in ${(ms / 1000).toFixed(0)} s (${samples} samples, ${transitions} edges) — not confirmed`;
     hint = restLevel === "float"
-      ? "Its output neither idles high nor reacts to a remote: the receiver isn't powered. On this footprint that is BUG #2 — a VCC-middle part (Gikfun-style) lands its VCC on the GND pad. Fit a GND-middle TSOP38238 / VS1838B with the OUT leg in the square pad, or measure Vs (D3-side pad) for ~4.6 V."
+      ? "If no remote was held at the board for the whole window, re-run the remote test. If one was: the receiver is missing, dead, or unpowered — on this footprint that is BUG #2 (a VCC-middle part lands its VCC on the GND pad); fit a GND-middle TSOP38238 / VS1838B with the OUT leg in the square pad, or measure Vs (D3-side pad) for ~4.6 V."
       : "The output idles high (powered) but no remote was seen — press and hold a button on a remote aimed at the board while this runs, then re-run.";
   }
   return { ...check("ir", `IR receiver — ${ir.name}`, status, detail, hint), samples, lows, transitions, rate };

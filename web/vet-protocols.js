@@ -28,11 +28,15 @@ export const PROTOCOLS = {
         onLOW:  { status: "fail", hint: "Known BUG #1: U5's DIR pin is strapped to GND by R21, so the shifter drives this pin instead of listening — the 8 LEDs will never light. Fix per unit: solder-bridge U5 pin 5 (DIR) to pin 6 (VCCB), back side, SOT-23-6." },
         onHIGH: { status: "warn", hint: "Held high — check for a bridge to 3V3 near U5/R21." } },
       { gpio: 4, expect: "HIGH", name: "IR receiver OUT (U4)", part: "ir",
-        // measured: a fitted, working receiver can idle floating too (no / weak internal
-        // pull-up) — only the remote test separates that from BUG #2, so float is a warning
-        onFLOAT: { status: "warn", hint: "Output isn't pulled up. Either no receiver is fitted, it's unpowered (BUG #2: a VCC-middle part never gets power on this GND-middle footprint), or it's a type without an internal pull-up — run the IR remote test to tell: a decode means it works (firmware must enable the pin's pull-up)." },
-        onLOW:   { status: "fail", hint: "Output stuck low — receiver fitted backwards or shorted at U4." },
-        passNote: "receiver powered and idle — this also proves the +5V rail is up" },
+        // measured on every unit with a receiver so far: the VS1838-type parts these boards
+        // ship with have an open-collector OUT with no internal pull-up, so at rest they
+        // float exactly like an empty footprint. Float is therefore no finding at all — only
+        // the remote test (irListen) proves a receiver. A receiver whose supply pad is at GND
+        // (BUG #2) clamps OUT low through its protection diode, which the rest level does show.
+        onFLOAT: { status: "info", detail: "idles open (no internal pull-up) — the open-collector receiver these boards use rests exactly like an empty footprint",
+                   hint: "Rest level can't tell a fitted receiver from a missing one; the IR remote test can — hold any remote at the board when the vet asks." },
+        onLOW:   { status: "fail", hint: "Output clamped low — BUG #2 (a VCC-middle receiver in this GND-middle footprint puts its supply on the GND pad and its protection diode pins OUT low), a receiver fitted backwards, or OUT shorted to GND at U4." },
+        passNote: "a receiver with an internal pull-up, powered — this also proves the +5V rail is up" },
       { gpio: 17, expect: "HIGH", name: "User button SW3 (10K R3)",
         onFLOAT: { status: "fail", hint: "10K pull-up R3 missing or open." },
         onLOW:   { status: "fail", hint: "Button stuck or SW3/C11 shorted to GND." } },
