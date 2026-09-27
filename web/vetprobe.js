@@ -701,8 +701,17 @@ export function audioLinks(protocol, ip) {
 }
 
 // ---------------------------------------------------------------- the exam
+// A part is "declared fitted" when the user ticked it, or left it ticked; parts a board
+// usually ships without (protocol.defaultAbsent) start unticked, so they need an explicit yes.
+export function declaredFitted(protocol, fitted, key) {
+  if (fitted[key] === true) return true;
+  if (fitted[key] === false) return false;
+  return !(protocol.defaultAbsent || []).includes(key);
+}
+
 export async function runExam(io, protocol, { chip = {}, images = null, fitted = {}, onStep = () => {}, doBridges = true, doRadio = true, doAntenna = true, doI2c = true, doBeacon = true } = {}) {
   const t0 = Date.now();
+  fitted = Object.fromEntries(Object.keys(protocol.optionalParts || {}).map((k) => [k, declaredFitted(protocol, fitted, k)]));
   DATE_REG = DATE_REGS[protocol.mcu] || DATE_REGS["esp32-s3"];
   const timings = {}; let cur = null, tCur = 0;
   const step = (name) => { if (cur) timings[cur] = Date.now() - tCur; cur = name; tCur = Date.now(); onStep(name); };
@@ -722,6 +731,14 @@ export async function runExam(io, protocol, { chip = {}, images = null, fitted =
   if (doI2c)     { step("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint, fitted)); }
   step("firmware"); const fw = await firmwareCheck(io, images); if (fw) checks.push(fw);
   if (doBeacon)  { step("beacon");  const b = await beacon(io, protocol); if (b) checks.push(b); }
+  // a declared part that nothing in this exam can see must not pass by silence: it stays a
+  // warning until a live test (tone, level, firmware, remote) replaces it by id
+  for (const [key, name] of Object.entries(protocol.optionalParts || {})) {
+    if (fitted[key] === false) continue;
+    const seen = checks.some((c) => c.id === key || (c.part === key && c.status !== "info") || (protocol.pins || []).some((p) => p.part === key && c.id === `gpio${p.gpio}` && c.status !== "info") || (key === "radio" && (c.id === "radio" || c.id === "antenna")) || (key === "ir" && c.id === "ir") || (key === "display" && /^i2c-/.test(c.id) && c.status !== "info"));
+    if (seen) continue;
+    checks.push({ id: key, title: `${name} — declared fitted`, status: "warn", detail: "not verified: nothing in this exam can see this part", hint: (protocol.liveTests?.[key]) || `Run the live test for it from the exam options, or untick "has ${name}" if this unit doesn't have one.`, part: key });
+  }
   const counts = { pass: 0, warn: 0, fail: 0, info: 0, skip: 0 };
   for (const c of checks) counts[c.status] = (counts[c.status] || 0) + 1;
   const verdict = counts.fail ? "needs-rework" : counts.warn ? "check" : "healthy";

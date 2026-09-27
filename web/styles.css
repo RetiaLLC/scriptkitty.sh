@@ -596,7 +596,6 @@ esp-web-install-button[install-unsupported] { display: block; }
 .board-svg { display: block; width: 100%; max-height: 420px; height: auto; margin: 0 auto; }
 .board-face { fill: #0f2a20; stroke: #2f6a52; stroke-width: .3; }
 .part rect, .part circle { fill: #21303a; stroke: #4a5a66; stroke-width: .18; }
-.part.layer-B rect, .part.layer-B circle { fill: rgba(33,48,58,.35); stroke: #566876; stroke-dasharray: .5 .35; }
 .part-label { font: 600 1.55px var(--mono); fill: #9fb0bd; pointer-events: none; }
 .part.hl rect, .part.hl circle, .pad.hl { stroke-width: .35; }
 .hl-fail rect, .hl-fail circle, .pad.hl-fail { fill: rgba(255,90,90,.55); stroke: #ff5a5a; filter: drop-shadow(0 0 .8px #ff5a5a); animation: vet-pulse 1.6s ease-in-out infinite; }
@@ -628,3 +627,10 @@ esp-web-install-button[install-unsupported] { display: block; }
 
 .pad-dot { fill: rgba(120,130,125,.35); stroke: none; pointer-events: all; }
 .pad-dot.layer-B { fill: rgba(120,130,125,.18); }
+
+/* two-view board model */
+.board-views { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.board-side { flex: 1 1 260px; margin: 0; min-width: 0; }
+.board-side .board-svg { max-height: 360px; }
+.board-side figcaption { margin-top: 6px; font: 600 11.5px var(--mono); color: var(--secondary); text-align: center; }
+.board-B .board-face { fill: #0d251d; }

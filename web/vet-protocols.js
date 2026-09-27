@@ -119,6 +119,13 @@ export const PROTOCOLS = {
     // parts a unit may legitimately ship without — the user declares them; declared-absent
     // parts are checked for being genuinely absent (their pins float) and reported as info
     optionalParts: { radio: "LoRa module (Wio-SX1262)", ir: "IR receiver", amp: "I2S amplifier (MAX98357A)", mic: "I2S microphone (SPH0645)" },
+    defaultAbsent: ["amp", "mic"],                                          // most pucks ship without either
+    // what proves the parts a pull test can't see
+    liveTests: { amp: "Tick \"Amp tone test\": the vet plays a 1 kHz tone through the amplifier and asks whether you heard it. With Newsheen Radio running, its own \"make it sing\" link appears after the boot check.",
+                 mic: "Tick \"Mic level test\": the vet clocks the microphone and shows its live level for a few seconds while you talk or clap.",
+                 ir: "Tick \"IR remote test\" and hold a remote at the board." },
+    // I2S header J3 — the amplifier (DIN) and the microphone (SD) share these three lines
+    i2s: { ws: 37, sck: 38, sd: 39 },
     // An I2S mic (WS 37 / SCK 38 / SD 39) is as invisible as the amp and won't clock out data
     // below ~1 MHz BCLK, so it is judged from a firmware that runs it: the "I2S mic test"
     // diagnostic streams `chanA peak=… rms=…` lines on the console.

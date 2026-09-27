@@ -37,54 +37,66 @@ export function renderBoard(el, layout, highlights, { onPick = () => {}, title =
   const NS = "http://www.w3.org/2000/svg";
   const mk = (tag, attrs = {}, text) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; return n; };
   const [x0, y0, x1, y1] = layout.bbox, pad = 1.5;
-  const svg = mk("svg", { viewBox: `${x0 - pad} ${y0 - pad} ${x1 - x0 + 2 * pad} ${y1 - y0 + 2 * pad}`, class: "board-svg", role: "img", "aria-label": `${title || "board"} model` });
-  svg.append(mk("path", { d: layout.outline, class: "board-face" }));
-
   const byRef = new Map(), byGpio = new Map();
   const bump = (map, k, h) => { const cur = map.get(k); if (!cur || RANK[h.status] > RANK[cur.status]) map.set(k, h); };
   for (const h of highlights) { for (const r of h.refs) bump(byRef, r, h); for (const g of h.gpios) bump(byGpio, g, h); }
-
-  // parts: back side first (dashed), highlighted ones last so they sit on top
-  const parts = [...layout.parts].sort((a, b) => (a.layer === "B" ? 0 : 1) - (b.layer === "B" ? 0 : 1) || (byRef.has(a.ref) ? 1 : 0) - (byRef.has(b.ref) ? 1 : 0));
-  for (const p of parts) {
-    const h = byRef.get(p.ref);
-    const w = p.w || 1.4, hh = p.h || 1.4;
-    const g = mk("g", { class: `part layer-${p.layer}${h ? ` hl hl-${h.status} clickable` : ""}`, "data-ref": p.ref });
-    g.append(p.shape === "circle"
-      ? mk("circle", { cx: p.x, cy: p.y, r: Math.max(w, hh) / 2 })
-      : mk("rect", { x: p.x - w / 2, y: p.y - hh / 2, width: w, height: hh, rx: 0.25, transform: `rotate(${-p.rot} ${p.x} ${p.y})` }));
-    const tip = `${p.ref}${p.label ? " — " + p.label : ""}${p.value && p.value !== p.label ? ` (${p.value})` : ""}${p.layer === "B" ? " · on the back" : ""}${h ? `\n${h.status.toUpperCase()}: ${h.title}` : ""}`;
-    g.append(mk("title", {}, tip));
-    if (p.label && (w * hh >= 12 || h)) g.append(mk("text", { x: p.x, y: p.y, class: "part-label", "text-anchor": "middle", "dominant-baseline": "middle" }, p.label));
-    if (h) g.addEventListener("click", () => onPick(h.checkId));
-    svg.append(g);
-  }
-  // every castellation of a multi-pin part as a faint dot, so modules read as modules and a
-  // painted pad has neighbours to be compared with
+  const layerOf = {}; for (const p of layout.parts) layerOf[p.ref] = p.layer;
   const padCount = {}; for (const pd of layout.pads) padCount[pd.ref] = (padCount[pd.ref] || 0) + 1;
-  for (const pd of layout.pads) {
-    if (padCount[pd.ref] < 8 || (pd.gpio != null && byGpio.has(pd.gpio))) continue;
-    const d = mk("circle", { cx: pd.x, cy: pd.y, r: Math.max(0.28, Math.min(pd.w || 1, pd.h || 1) * 0.3), class: `pad pad-dot layer-${layout.parts.find((q) => q.ref === pd.ref)?.layer || "F"}` });
-    d.append(mk("title", {}, `${pd.ref} pad ${pd.pad}${pd.gpio != null ? ` — GPIO${pd.gpio}` : pd.net ? ` — ${pd.net.split("/").pop()}` : ""}`));
-    svg.append(d);
-  }
-  // pads on a highlighted net — every place that net is soldered
-  for (const pd of layout.pads) {
-    const h = pd.gpio != null ? byGpio.get(pd.gpio) : null;
-    if (!h) continue;
-    const c = mk("circle", { cx: pd.x, cy: pd.y, r: Math.max(0.6, Math.max(pd.w || 1, pd.h || 1) * 0.55), class: `pad hl hl-${h.status} clickable` });
-    c.append(mk("title", {}, `${pd.ref} pad ${pd.pad} — GPIO${pd.gpio}\n${h.status.toUpperCase()}: ${h.title}`));
-    c.addEventListener("click", () => onPick(h.checkId));
-    svg.append(c);
-  }
-  el.replaceChildren(svg);
+
+  // One drawing per side. The bottom view is mirrored left-to-right, i.e. the board as you
+  // see it once you flip it over, so a part sits where your iron would find it.
+  const side = (layer) => {
+    const mirror = layer === "B";
+    const mx = (x) => (mirror ? x0 + x1 - x : x);
+    const svg = mk("svg", { viewBox: `${x0 - pad} ${y0 - pad} ${x1 - x0 + 2 * pad} ${y1 - y0 + 2 * pad}`, class: `board-svg board-${layer}`, role: "img", "aria-label": `${title || "board"} ${mirror ? "bottom" : "top"} view` });
+    const face = mk("path", { d: layout.outline, class: "board-face" });
+    if (mirror) face.setAttribute("transform", `translate(${x0 + x1} 0) scale(-1 1)`);
+    svg.append(face);
+    const parts = layout.parts.filter((p) => p.layer === layer).sort((a, b) => (byRef.has(a.ref) ? 1 : 0) - (byRef.has(b.ref) ? 1 : 0));
+    for (const p of parts) {
+      const h = byRef.get(p.ref);
+      const w = p.w || 1.4, hh = p.h || 1.4, cx = mx(p.x);
+      const g = mk("g", { class: `part${h ? ` hl hl-${h.status} clickable` : ""}`, "data-ref": p.ref });
+      g.append(p.shape === "circle"
+        ? mk("circle", { cx, cy: p.y, r: Math.max(w, hh) / 2 })
+        : mk("rect", { x: cx - w / 2, y: p.y - hh / 2, width: w, height: hh, rx: 0.25, transform: `rotate(${mirror ? p.rot : -p.rot} ${cx} ${p.y})` }));
+      g.append(mk("title", {}, `${p.ref}${p.label ? " — " + p.label : ""}${p.value && p.value !== p.label ? ` (${p.value})` : ""}${h ? `\n${h.status.toUpperCase()}: ${h.title}` : ""}`));
+      if (p.label && (w * hh >= 12 || h)) g.append(mk("text", { x: cx, y: p.y, class: "part-label", "text-anchor": "middle", "dominant-baseline": "middle" }, p.label));
+      if (h) g.addEventListener("click", () => onPick(h.checkId));
+      svg.append(g);
+    }
+    for (const pd of layout.pads) {
+      if (layerOf[pd.ref] !== layer) continue;
+      const h = pd.gpio != null ? byGpio.get(pd.gpio) : null;
+      if (h) {
+        const c = mk("circle", { cx: mx(pd.x), cy: pd.y, r: Math.max(0.6, Math.max(pd.w || 1, pd.h || 1) * 0.55), class: `pad hl hl-${h.status} clickable` });
+        c.append(mk("title", {}, `${pd.ref} pad ${pd.pad} — GPIO${pd.gpio}\n${h.status.toUpperCase()}: ${h.title}`));
+        c.addEventListener("click", () => onPick(h.checkId));
+        svg.append(c);
+      } else if (padCount[pd.ref] >= 8) {
+        const d = mk("circle", { cx: mx(pd.x), cy: pd.y, r: Math.max(0.28, Math.min(pd.w || 1, pd.h || 1) * 0.3), class: "pad pad-dot" });
+        d.append(mk("title", {}, `${pd.ref} pad ${pd.pad}${pd.gpio != null ? ` — GPIO${pd.gpio}` : pd.net ? ` — ${pd.net.split("/").pop()}` : ""}`));
+        svg.append(d);
+      }
+    }
+    const fig = document.createElement("figure"); fig.className = `board-side board-side-${layer}`;
+    const n = highlights.filter((h) => h.refs.some((r) => layerOf[r] === layer) || h.gpios.some((g) => layout.pads.some((pd) => pd.gpio === g && layerOf[pd.ref] === layer))).length;
+    fig.append(svg);
+    const cap = document.createElement("figcaption");
+    cap.textContent = (mirror ? "Bottom — as you see it flipped over" : "Top") + (n ? ` · ${n} finding${n === 1 ? "" : "s"} on this side` : "");
+    fig.append(cap);
+    return fig;
+  };
+  const views = document.createElement("div"); views.className = "board-views";
+  views.append(side("F"));
+  if (layout.parts.some((p) => p.layer === "B")) views.append(side("B"));
+  el.replaceChildren(views);
   const legend = document.createElement("div"); legend.className = "board-legend";
-  const items = [`<span><i class="sw sw-fail"></i>needs rework</span>`, `<span><i class="sw sw-warn"></i>check</span>`, `<span><i class="sw sw-back"></i>on the back of the board</span>`];
   const note = highlights.length ? "Click a painted part or pad to jump to its finding." : "Nothing to point at — every part the vet can see checked out.";
-  legend.innerHTML = items.join("") + `<span class="board-note">${note}</span>`;
+  legend.innerHTML = `<span><i class="sw sw-fail"></i>needs rework</span><span><i class="sw sw-warn"></i>check</span><span class="board-note">${note}</span>`;
   el.append(legend);
   el.hidden = false;
-  return svg;
+  return views;
 }
 
 // A small bar chart of the antenna sweep: max RSSI per band, the noise floor, the pass line.
