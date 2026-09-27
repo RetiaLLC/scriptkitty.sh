@@ -127,6 +127,10 @@ await test("radio module missing: BUSY/DIO1 float, MISO never driven -> radio fa
   const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
   const r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false });
   assert.equal(by(r, "radio").status, "fail"); assert.match(by(r, "radio").detail, /MISO never driven/); assert.equal(by(r, "gpio47").status, "warn");
+  assert.match(by(r, "radio").hint, /not fitted/, "all module lines float -> 'not fitted' wording");
+  // module powered (BUSY low) but SPI dead -> joint wording
+  const r2 = await vet.runExam(FakeBoard({ parts: HEALTHY, radio: null }), P, { chip: chipInfo, doBeacon: false });
+  assert.match(by(r2, "radio").hint, /SPI joints/);
 });
 await test("solder bridge GPIO37<->GPIO38 (J3 header pins) is found by the active test, not by rest levels", async () => {
   const r = await vet.runExam(FakeBoard({ parts: HEALTHY, bridges: [[37, 38]] }), P, { chip: chipInfo, doBeacon: false });

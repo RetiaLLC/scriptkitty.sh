@@ -191,9 +191,11 @@ async function spiSession(io, r) {
   return { pads, xfer };
 }
 
-export async function radioChecks(io, protocol) {
+export async function radioChecks(io, protocol, fingerprint = {}) {
   const r = protocol.radio;
   if (!r) return [];
+  // every module-driven line floating = nothing fitted / unpowered, not a bad joint
+  const moduleSilent = [r.busy, r.dio1].filter((p) => p != null).every((p) => fingerprint[p] === "float");
   const out = [];
   const { pads, xfer } = await spiSession(io, r);
   try {
@@ -222,7 +224,8 @@ export async function radioChecks(io, protocol) {
               : `no ID (${misoDriven ? "MISO is driven but the reply is garbage" : "MISO never driven"}; status 0x${(status ?? 0).toString(16)}; BUSY trace ${busyTrace.join("") || "n/a"})`,
         alive ? undefined
               : misoDriven ? `Something answers on MISO but not as an SX126x — check SCK/MOSI for bridges (GPIO${r.sck}/GPIO${r.mosi}) and NSS (GPIO${r.nss}).`
-              : `The module isn't talking: check ${r.part || "the radio"} is soldered (MISO GPIO${r.miso}, NSS GPIO${r.nss}, SCK GPIO${r.sck}), its 3V3 and GND pins, and that BUSY (GPIO${r.busy}) drops after reset.`));
+              : moduleSilent ? `Every line the module would drive (BUSY GPIO${r.busy}, DIO1 GPIO${r.dio1}, MISO GPIO${r.miso}) floats: ${r.part || "the radio module"} is not fitted, or has no 3V3/GND. If this unit is meant to have LoRa, populate/solder it; if it's a no-radio build, ignore the radio section.`
+              : `The module is powered but not answering: check its SPI joints (MISO GPIO${r.miso}, NSS GPIO${r.nss}, SCK GPIO${r.sck}, MOSI GPIO${r.mosi}) and that BUSY (GPIO${r.busy}) drops after reset.`));
     } else if (r.type === "sx127x") {
       const v = (await xfer([0x42, 0x00]))[1];
       const alive = v === 0x12;
@@ -367,7 +370,7 @@ export async function runExam(io, protocol, { chip = {}, images = null, onStep =
   onStep("pins");     const pins = await pinChecks(io, protocol); checks.push(...pins.checks);
   if (doBridges) { onStep("bridges"); checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); }
   if (doRadio) {
-    onStep("radio"); const radio = await radioChecks(io, protocol); checks.push(...radio);
+    onStep("radio"); const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio);
     if (doAntenna && radio.some((c) => c.id === "radio" && c.status === "pass")) { onStep("antenna"); const a = await antennaCheck(io, protocol); if (a) checks.push(a); }
   }
   if (doI2c)     { onStep("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint)); }
