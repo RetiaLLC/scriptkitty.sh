@@ -126,8 +126,8 @@ def board(path, key=None):
             for e in find(fp, k):
                 l2 = find(e, "layer")
                 if not l2 or not re.search(r"CrtYd", l2[0][1]): continue
-                for key in ("start", "end", "center", "mid"):
-                    for q in find(e, key): xs.append(num(q[1])); ys.append(num(q[2]))
+                for corner in ("start", "end", "center", "mid"):
+                    for q in find(e, corner): xs.append(num(q[1])); ys.append(num(q[2]))
                 for pts in find(e, "pts"):
                     for q in find(pts, "xy"): xs.append(num(q[1])); ys.append(num(q[2]))
         w = round(max(xs) - min(xs), 2) if xs else None; h = round(max(ys) - min(ys), 2) if ys else None
