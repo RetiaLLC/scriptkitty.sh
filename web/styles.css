@@ -590,3 +590,38 @@ esp-web-install-button[install-unsupported] { display: block; }
 .vet-links { margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; } .vet-link { font-size: 12.5px; }
 .vet-actions { display: flex; gap: 10px; margin-top: 14px; } .vet-actions .btn { width: auto; }
 .vet-foot { margin-top: 26px; font-size: 12px; color: var(--dim); }
+
+/* --- vet: board model, sweep chart, live IR --------------------------------------- */
+.vet-board { margin: 0 0 12px; padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--inset, rgba(255,255,255,.03)); }
+.board-svg { display: block; width: 100%; max-height: 420px; height: auto; margin: 0 auto; }
+.board-face { fill: #0f2a20; stroke: #2f6a52; stroke-width: .3; }
+.part rect, .part circle { fill: #21303a; stroke: #4a5a66; stroke-width: .18; }
+.part.layer-B rect, .part.layer-B circle { fill: rgba(33,48,58,.35); stroke: #566876; stroke-dasharray: .5 .35; }
+.part-label { font: 600 1.55px var(--mono); fill: #9fb0bd; pointer-events: none; }
+.part.hl rect, .part.hl circle, .pad.hl { stroke-width: .35; }
+.hl-fail rect, .hl-fail circle, .pad.hl-fail { fill: rgba(255,90,90,.55); stroke: #ff5a5a; filter: drop-shadow(0 0 .8px #ff5a5a); animation: vet-pulse 1.6s ease-in-out infinite; }
+.hl-warn rect, .hl-warn circle, .pad.hl-warn { fill: rgba(242,193,78,.5); stroke: var(--amber); }
+.hl .part-label { fill: #fff; }
+.clickable { cursor: pointer; }
+.pad.hl { pointer-events: all; }
+@keyframes vet-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.board-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 11.5px; color: var(--muted); align-items: center; }
+.board-legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.sw-fail { background: #ff5a5a; } .sw-warn { background: var(--amber); } .sw-back { border: 1px dashed #8a95a5; }
+.board-note { margin-left: auto; color: var(--secondary); }
+.vet-chart { display: block; width: 100%; max-width: 420px; margin: 8px 0 2px; }
+.vet-chart .grid { stroke: rgba(255,255,255,.08); stroke-width: 1; }
+.vet-chart .tick, .vet-chart .axis { font: 9px var(--mono); fill: var(--dim); }
+.vet-chart .bar { fill: #3b4b57; } .vet-chart .bar-hot { fill: var(--accent); }
+.vet-chart .thr { stroke: var(--amber); stroke-dasharray: 3 3; stroke-width: 1; } .vet-chart .thr-label { font: 9px var(--mono); fill: var(--amber); }
+.vet-chart .floor { stroke: #8a95a5; stroke-dasharray: 2 3; stroke-width: 1; } .vet-chart .floor-label { font: 9px var(--mono); fill: var(--muted); }
+.vet-flash { animation: vet-flash 1.6s ease-out 1; }
+@keyframes vet-flash { 0% { background: rgba(242,193,78,.35); } 100% { background: transparent; } }
+.ir-live { display: grid; gap: 6px; }
+.ir-head { font-size: 12.5px; color: var(--muted); } .ir-head b { color: var(--text); }
+.ir-wave { display: block; width: 100%; height: 36px; background: rgba(0,0,0,.25); border-radius: 6px; }
+.ir-wave polyline { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.ir-frames { display: flex; flex-wrap: wrap; gap: 6px; }
+.ir-code { display: inline-flex; flex-direction: column; gap: 1px; padding: 5px 9px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--mono); font-size: 12px; background: rgba(123,241,173,.08); }
+.ir-code em { font-style: normal; color: var(--accent); margin-left: 6px; } .ir-code small { color: var(--muted); font-size: 10.5px; }
+.ir-none { font-size: 12px; color: var(--dim); }

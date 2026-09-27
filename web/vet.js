@@ -4,6 +4,8 @@
 import { PROTOCOLS } from "./vet-protocols.js";
 import * as vet from "./vetprobe.js";
 import * as probe from "./boardprobe.js";
+import { LAYOUTS } from "./vet-layouts.js";
+import { renderBoard, boardHighlights, sweepChartSvg, irLiveHtml } from "./vet-board.js";
 
 const $ = (id) => document.getElementById(id);
 const HAS_SERIAL = "serial" in navigator;
@@ -100,7 +102,7 @@ let running = false;
 $("diagnose").addEventListener("click", () => diagnose());
 $("again").addEventListener("click", () => diagnose());
 $("copy").addEventListener("click", () => { if (lastReport) navigator.clipboard.writeText(reportText(lastReport)).then(() => { $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy report"), 1500); }); });
-let lastReport = null;
+let lastReport = null, lastKey = null;
 
 async function diagnose({ touched = false } = {}) {
   if (!HAS_SERIAL || running) return;
@@ -181,7 +183,7 @@ async function diagnose({ touched = false } = {}) {
         return finish("check", "No protocol");
       }
     }
-    const protocol = PROTOCOLS[key];
+    const protocol = PROTOCOLS[key]; lastKey = key;
     const steps = ["identity", "pins", "bridges", "radio", "antenna", "i2c", "firmware", "beacon"];
     const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", antenna: "Listening for off-air RF through the antenna (receive only)", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
     status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the exam…`);
@@ -197,7 +199,7 @@ async function diagnose({ touched = false } = {}) {
       const rest = report.fingerprint[protocol.ir.gpio];
       mascot("working", "Point a remote at the cat", "Hold any button on an IR remote aimed at the board for the next 8 seconds.");
       const t0 = Date.now();
-      const r = await vet.irListen(io, protocol, { ms: 8000, restLevel: rest, onProgress: (p) => status(`Listening on the IR receiver… ${Math.max(0, 8 - Math.round((Date.now() - t0) / 1000))} s left — ${p.transitions} edges so far`) });
+      const r = await vet.irListen(io, protocol, { ms: 8000, restLevel: rest, onProgress: (p) => status(irLiveHtml(p, Math.max(0, 8 - Math.round((Date.now() - t0) / 1000)), escapeHtml), "busy") });
       report.checks.push(r);
       report.counts[r.status] = (report.counts[r.status] || 0) + 1;
       // the passive GPIO verdict is superseded by the live one
@@ -317,8 +319,17 @@ async function waitFresh(before, ms) {
 // --- rendering -----------------------------------------------------------------
 const ICON = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
 const GROUP = (c) => c.id === "boot" || c.id === "audio" || c.id === "mic" ? "Boot" : c.id === "declared" ? "Identity" : c.id === "ir" ? "Pins" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
+function jumpTo(id) {
+  const el = document.getElementById(`check-${id}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("vet-flash"); void el.offsetWidth; el.classList.add("vet-flash");
+}
 function render(r) {
   $("report").hidden = false;
+  const proto = PROTOCOLS[lastKey] || {};
+  const layout = LAYOUTS[proto.layout || lastKey] || null;
+  if ($("board")) renderBoard($("board"), layout, boardHighlights(r, proto, layout), { onPick: jumpTo, title: proto.name || r.board });
   $("summary").className = `vet-summary verdict-${r.verdict}`;
   $("summary").innerHTML = `<div class="vet-verdict">${r.verdict === "healthy" ? "Healthy" : r.verdict === "check" ? "Check" : "Needs rework"}</div>` +
     `<div class="vet-counts">${r.counts.pass} pass · ${r.counts.warn} warn · ${r.counts.fail} fail · ${r.chip.chipName ? escapeHtml(r.chip.chipName) : ""}${r.chip.mac ? " · " + escapeHtml(r.chip.mac) : ""} · ${escapeHtml(timingText(r))}</div>`;
@@ -329,9 +340,10 @@ function render(r) {
   for (const c of sorted) {
     const g = GROUP(c);
     if (g !== group) { group = g; const h = document.createElement("div"); h.className = "tag-head"; h.innerHTML = `<span class="tag-name">${g}</span><span class="tag-rule"></span>`; wrap.append(h); }
-    const row = document.createElement("div"); row.className = `vet-row vet-${c.status}`;
+    const row = document.createElement("div"); row.className = `vet-row vet-${c.status}`; row.id = `check-${c.id}`;
     const links = (c.links || []).map((l) => `<a class="vet-link" href="${escapeHtml(l.href)}" target="_blank" rel="noopener">${escapeHtml(l.label)} ↗</a>`).join(" ");
-    row.innerHTML = `<span class="vet-icon">${ICON[c.status]}</span><div class="vet-body"><div class="vet-title">${escapeHtml(c.title)}</div><div class="vet-detail">${escapeHtml(c.detail)}</div>${c.hint ? `<div class="vet-hint">↳ ${escapeHtml(c.hint)}</div>` : ""}${links ? `<div class="vet-links">${links}</div>` : ""}</div>`;
+    const extra = c.id === "antenna" ? sweepChartSvg(c) : c.id === "ir" && c.frames?.length ? irLiveHtml({ recent: [], transitions: c.transitions, frames: c.frames, rmt: c.rmt }, 0, escapeHtml).replace(/<div class="ir-head">.*?<\/div>/, "").replace(/<svg class="ir-wave".*?<\/svg>/, "") : "";
+    row.innerHTML = `<span class="vet-icon">${ICON[c.status]}</span><div class="vet-body"><div class="vet-title">${escapeHtml(c.title)}</div><div class="vet-detail">${escapeHtml(c.detail)}</div>${c.hint ? `<div class="vet-hint">↳ ${escapeHtml(c.hint)}</div>` : ""}${extra}${links ? `<div class="vet-links">${links}</div>` : ""}</div>`;
     wrap.append(row);
   }
 }
@@ -349,5 +361,6 @@ function reportText(r) {
   return lines.join("\n");
 }
 // exposed for the simulator / console
-window.vetRender = render; window.vetRunOn = async (io, chip, key = "newsheen") => vet.runExam(io, PROTOCOLS[key], { chip, images: await IMAGES, doBeacon: false });
+window.vetRender = render; window.vetRunOn = async (io, chip, key = "newsheen") => { lastKey = key; return vet.runExam(io, PROTOCOLS[key], { chip, images: await IMAGES, doBeacon: false }); };
+window.vetIrDemo = (p, secs = 5) => status(irLiveHtml(p, secs, escapeHtml), "busy");
 mascot("idle");

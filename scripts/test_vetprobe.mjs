@@ -347,6 +347,13 @@ if (opt("--rom")) {
   const bootWatch = argv.includes("--boot-watch");
   console.log(`\nhardware: ${proto.name} on ${dev}`);
   const io = await romIo(dev, stub, bootWatch || argv.includes("--no-reset"));
+  if (argv.includes("--ir-selftest")) {
+    // RMT capture path with no remote: a NEC frame drawn on a spare pin by one batched write
+    const pin = Number(opt("--ir-selftest-pin") || 18);
+    const t = await vet.irSelfTest(io, { pin });
+    console.log(`  ir self-test on GPIO${pin}: rx_end=${t.rxEnd} err=${t.err} entries=${t.entries.length} decoded=${t.decoded ? t.decoded.hex + (t.decoded.valid ? "" : " (checksum?)") : "none"} -> ${t.ok ? "OK" : "FAIL"}`);
+    if (!t.ok) console.log("    first entries:", t.entries.slice(0, 8).map((e) => `${e.level}:${e.us}`).join(" "));
+  }
   console.log("        ", JSON.stringify(io.hello));
   let report;
   await test("exam runs to completion", async () => {

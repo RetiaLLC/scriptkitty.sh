@@ -450,30 +450,118 @@ export async function i2cChecks(io, protocol, fingerprint = {}, fitted = {}) {
 // ---------------------------------------------------------------- IR receiver (interactive)
 // Rest level alone can't tell a receiver that's unpowered from one whose open-collector
 // output simply has no internal pull-up. Both are "float"; only one of them still decodes
-// light. Enable the chip's pull-up on OUT and sample as fast as the link allows while the
-// user holds a remote at the board: a live receiver pulls the line low in bursts (NEC: a
-// 9 ms leader, then 560 µs marks; repeats every 110 ms while held).
+// light. So the user holds a remote at the board. A USB round-trip is slower than one IR
+// bit, so the ESP32-S3's RMT peripheral does the timing: RX channel 4 timestamps every edge
+// on the pin in hardware into its own RAM (1 µs ticks) and we read the finished frame back
+// through the loader and decode NEC. The GPIO is still polled for a live waveform and as the
+// fallback verdict when the capture path is unavailable.
+const RMT = 0x60016000, RMT_CH4_MEM = 0x60016800 + 192 * 4, RMT_WORDS = 48;
+const RMT_CH4CONF0 = RMT + 0x30, RMT_CH4CONF1 = RMT + 0x34, RMT_CH4STATUS = RMT + 0x60, RMT_INT_RAW = RMT + 0x70, RMT_INT_CLR = RMT + 0x7c, RMT_CH4_RX_CARRIER_RM = RMT + 0x90, RMT_SYS_CONF = RMT + 0xc0;
+const SYSTEM_PERIP_CLK_EN0 = 0x600c0018, SYSTEM_PERIP_RST_EN0 = 0x600c0020, SYSTEM_RMT_BIT = 1 << 9;
+const RMT_SIG_IN0_IDX = 81, gpioFuncInSel = (sig) => GPIO + 0x154 + 4 * sig;
+const RX_END = 1 << 16, RX_ERR = 1 << 20, IDLE_US = 12000;
+const CONF1_BASE = (1 << 3) | (1 << 4) | (200 << 5);          // RX owns the RAM, glitch filter 2.5 µs
+
+export function decodeNec(entries) {
+  const near = (v, t, tol = 0.3) => Math.abs(v - t) <= t * tol;
+  const e = entries.filter((x) => x.us > 0);
+  if (e.length >= 3 && e[0].level === 0 && near(e[0].us, 9000) && e[1].level === 1 && near(e[1].us, 2250) && e[2].level === 0 && near(e[2].us, 560, 0.5)) return { repeat: true };
+  if (e.length < 67 || e[0].level !== 0 || !near(e[0].us, 9000) || !near(e[1].us, 4500)) return null;
+  let code = 0;
+  for (let i = 0; i < 32; i++) {
+    const mark = e[2 + 2 * i], space = e[3 + 2 * i];
+    if (!mark || !space || !near(mark.us, 560, 0.5)) return null;
+    let bit;
+    if (near(space.us, 560, 0.5)) bit = 0; else if (near(space.us, 1690, 0.35)) bit = 1; else return null;
+    code = ((code << 1) | bit) >>> 0;
+  }
+  const rev8 = (b) => { let r = 0; for (let i = 0; i < 8; i++) r = (r << 1) | ((b >> i) & 1); return r; };
+  const b0 = code >>> 24, b1 = (code >>> 16) & 0xff, b2 = (code >>> 8) & 0xff, b3 = code & 0xff;
+  const plain = ((b0 ^ b1) & 0xff) === 0xff && ((b2 ^ b3) & 0xff) === 0xff;
+  const extended = !plain && ((b2 ^ b3) & 0xff) === 0xff;
+  return { code, hex: "0x" + code.toString(16).toUpperCase().padStart(8, "0"), address: extended ? rev8(b0) | (rev8(b1) << 8) : rev8(b0), command: rev8(b2), valid: plain || extended, extended };
+}
+// the NEC codes every cheap 21/24-key RGB remote shares (WLED's IR21/IR24 tables agree)
+const NEC_NAMES = { 0x00FF02FD: "ON", 0x00FF827D: "OFF", 0x00FF3AC5: "brighter", 0x00FFBA45: "darker", 0x00FF1AE5: "red", 0x00FF9A65: "green", 0x00FFA25D: "blue", 0x00FF22DD: "white" };
+export const necName = (code) => NEC_NAMES[code >>> 0] || null;
+
+async function rmtRxSetup(io, gpio) {
+  await io.writeReg(SYSTEM_PERIP_CLK_EN0, SYSTEM_RMT_BIT, SYSTEM_RMT_BIT);          // clock on
+  await io.writeReg(SYSTEM_PERIP_RST_EN0, 0, SYSTEM_RMT_BIT);                       // out of reset
+  // clock the RMT from the 40 MHz crystal (SCLK_SEL 3): in loader mode the APB clock is
+  // 40 MHz too, but the crystal is the one source that is the same no matter what ran before
+  await io.writeReg(RMT_SYS_CONF, (1 << 0) | (1 << 1) | (1 << 3) | (3 << 24) | (1 << 26) | (1 << 31));   // direct RAM, mem clk on, XTAL source
+  await io.writeReg(RMT_CH4CONF0, 40 | (IDLE_US << 8) | (1 << 24));                // 40 MHz / 40 = 1 µs ticks, 12 ms idle ends a frame, 1 RAM block
+  await io.writeReg(RMT_CH4_RX_CARRIER_RM, 0);
+  const sel = gpioFuncInSel(RMT_SIG_IN0_IDX);
+  const savedSel = (await io.readReg(sel)) >>> 0;
+  await io.writeReg(sel, (gpio & 0x3f) | (1 << 7));                                 // pad -> RMT_SIG_IN0 through the GPIO matrix
+  return { sel, savedSel };
+}
+async function rmtRxArm(io) {
+  await io.writeReg(RMT_CH4CONF1, CONF1_BASE | (1 << 1) | (1 << 2));                // reset write pointer + APB fifo
+  await io.writeReg(RMT_CH4CONF1, CONF1_BASE | (1 << 15));                          // apply
+  await io.writeReg(RMT_INT_CLR, RX_END | RX_ERR);
+  await io.writeReg(RMT_CH4CONF1, CONF1_BASE | (1 << 0) | (1 << 15));               // receive
+}
+async function rmtRxStop(io, cfg) {
+  try { await io.writeReg(RMT_CH4CONF1, CONF1_BASE | (1 << 15)); if (cfg) await io.writeReg(cfg.sel, cfg.savedSel); } catch {}
+}
+async function rmtRxRead(io) {
+  const st = (await io.readReg(RMT_CH4STATUS)) >>> 0;
+  const hint = Math.min(RMT_WORDS, Math.max(1, (st & 0x3ff) - 192)) || RMT_WORDS;
+  const entries = [];
+  for (let i = 0; i < hint; i++) {
+    const w = (await io.readReg(RMT_CH4_MEM + 4 * i)) >>> 0;
+    let done = false;
+    for (const half of [w & 0xffff, w >>> 16]) { const us = half & 0x7fff; if (!us) { done = true; break; } entries.push({ level: (half >> 15) & 1, us }); }
+    if (done) break;
+  }
+  return entries;
+}
+
 export async function irListen(io, protocol, { ms = 6000, onProgress = () => {}, restLevel = null } = {}) {
   const ir = protocol.ir;
   if (!ir) return null;
   const pads = new Pads(io);
-  let samples = 0, lows = 0, transitions = 0, last = null;
+  let samples = 0, lows = 0, transitions = 0, last = null, rmt = false, cfg = null;
+  const frames = [], recent = [];
   const t0 = Date.now();
   try {
-    await pads.input(ir.gpio, FUN_PU);
+    await pads.input(ir.gpio, FUN_PU); await pads.flush();
+    try { cfg = await rmtRxSetup(io, ir.gpio); await rmtRxArm(io); rmt = true; } catch (e) { rmt = false; }
     while (Date.now() - t0 < ms) {
       const v = await pads.read(ir.gpio);
       samples++; if (!v) lows++;
       if (last != null && v !== last) transitions++;
       last = v;
-      if (samples % 200 === 0) onProgress({ samples, lows, transitions, elapsed: Date.now() - t0 });
+      recent.push(v ? 1 : 0); if (recent.length > 240) recent.shift();
+      if (rmt) {
+        const raw = (await io.readReg(RMT_INT_RAW)) >>> 0;
+        if (raw & (RX_END | RX_ERR)) {
+          if (raw & RX_END) {
+            const entries = await rmtRxRead(io);
+            if (entries.length > 2) {
+              const d = decodeNec(entries);
+              frames.push({ t: Date.now() - t0, entries: entries.length, ...(d || { unknown: true }), name: d && d.code != null ? necName(d.code) : null });
+            }
+          }
+          await rmtRxArm(io);
+        }
+      }
+      if (samples % 3 === 0) onProgress({ samples, lows, transitions, elapsed: Date.now() - t0, recent: recent.slice(), frames: frames.slice(), rmt });
     }
-  } finally { await pads.restore(); }
+  } finally { if (rmt) await rmtRxStop(io, cfg); await pads.restore(); }
   const rate = samples / ((Date.now() - t0) / 1000);
+  const decoded = frames.filter((f) => f.code != null), repeats = frames.filter((f) => f.repeat).length, unknown = frames.filter((f) => f.unknown).length;
   const seen = transitions >= 6 && lows >= 3;
   let status, detail, hint;
-  if (seen) {
-    status = "pass"; detail = `decodes IR: ${transitions} edges, ${lows} low samples of ${samples} (${Math.round(rate)} samples/s)`;
+  if (decoded.length) {
+    const uniq = [...new Set(decoded.map((f) => f.hex))];
+    status = "pass"; detail = `decodes NEC: ${uniq.map((h) => { const f = decoded.find((x) => x.hex === h); return h + (f.name ? ` (${f.name})` : ""); }).join(", ")} — ${decoded.length} frame${decoded.length === 1 ? "" : "s"}${repeats ? `, ${repeats} repeats` : ""}${unknown ? `, ${unknown} unrecognised` : ""}`;
+    if (restLevel === "float") detail += "; the output idles floating (no internal pull-up), so firmware must enable INPUT_PULLUP on this pin";
+  } else if (seen) {
+    status = "pass"; detail = `sees IR: ${transitions} edges, ${lows} low samples of ${samples} (${Math.round(rate)} samples/s)${unknown ? `, ${unknown} frames that weren't NEC` : ""}`;
     if (restLevel === "float") detail += " — its output idles floating (no/weak internal pull-up): firmware must enable INPUT_PULLUP on this pin or decoding will be unreliable";
   } else if (lows === samples && samples > 0) {
     status = "fail"; detail = "output stuck low the whole time"; hint = "Receiver fitted backwards, damaged, or OUT shorted to GND at U4.";
@@ -486,10 +574,34 @@ export async function irListen(io, protocol, { ms = 6000, onProgress = () => {},
       ? "If no remote was held at the board for the whole window, re-run the remote test. If one was: the receiver is missing, dead, or unpowered — on this footprint that is BUG #2 (a VCC-middle part lands its VCC on the GND pad); fit a GND-middle TSOP38238 / VS1838B with the OUT leg in the square pad, or measure Vs (D3-side pad) for ~4.6 V."
       : "The output idles high (powered) but no remote was seen — press and hold a button on a remote aimed at the board while this runs, then re-run.";
   }
-  return { ...check("ir", `IR receiver — ${ir.name}`, status, detail, hint), samples, lows, transitions, rate };
+  return { ...check("ir", `IR receiver — ${ir.name}`, status, detail, hint), samples, lows, transitions, rate, frames, rmt };
 }
 
-// ---------------------------------------------------------------- beacon + firmware
+// Self-test of the capture path with no remote: route the RMT input from a spare pin, then
+// toggle that pin through ONE batched write command whose per-tuple delays draw a NEC frame
+// (the stub's ets_delay_us is µs-accurate). Expect the same code back.
+export async function irSelfTest(io, { pin = 18, code = 0x00ff30cf } = {}) {
+  const pads = new Pads(io);
+  let cfg = null;
+  try {
+    await pads.drive(pin, 1); await pads.flush();
+    cfg = await rmtRxSetup(io, pin); await rmtRxArm(io);
+    await sleep(20);
+    const lo = [], t = [];
+    const set = (level, delay) => t.push([(level ? OUT_W1TS : OUT_W1TC)[bank(pin)], bit(pin), 0xffffffff, delay]);
+    set(0, 0); set(1, 9000); set(0, 4500);
+    for (let i = 31; i >= 0; i--) { set(1, 560); set(0, (code >>> i) & 1 ? 1690 : 560); }
+    set(1, 560);
+    if (!io.writeRegs) throw new Error("io.writeRegs missing — the self-test needs batched writes");
+    await io.writeRegs(t);
+    await sleep(40);
+    const raw = (await io.readReg(RMT_INT_RAW)) >>> 0;
+    const entries = raw & RX_END ? await rmtRxRead(io) : [];
+    const d = decodeNec(entries);
+    return { rxEnd: !!(raw & RX_END), err: !!(raw & RX_ERR), entries, decoded: d, ok: !!d && d.code === (code >>> 0) };
+  } finally { await rmtRxStop(io, cfg); await pads.restore(); }
+}
+
 export async function beacon(io, protocol, { blinks = 3, ms = 120 } = {}) {
   const b = protocol.beacon;
   if (!b) return null;
