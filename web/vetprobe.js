@@ -408,7 +408,36 @@ export function analyzeBootLog(text, { vanishedAfterMs = null, windowMs = 6000 }
   else if (banners === 0) { status = "info"; detail = "no console output — firmware running silently or console on UART0"; }
   else { status = "info"; detail = `${banners} boot(s): ${boots.join(", ")}`; }
   if (fwLines.length && status !== "fail") detail += ` — console: ${fwLines.join(" ⏎ ").slice(0, 160)}`;
-  return { status, detail, hint, banners, resets, boots, invalid, panic, brownout, firmwareLines: fwLines };
+  return { status, detail, hint, banners, resets, boots, invalid, panic, brownout, firmwareLines: fwLines, banner: parseFirmwareBanner(text) };
+}
+
+// What the firmware tells us about itself on the console: a name line, the LAN IP it got,
+// its soft-AP address, a wiring variant. Enough to reach it over HTTP afterwards.
+export function parseFirmwareBanner(text) {
+  const clean = (text || "").replace(/\x1b\[[0-9;]*m/g, "");
+  const ip = (clean.match(/\bIP (\d{1,3}(?:\.\d{1,3}){3})/) || [])[1] || null;
+  const apip = (clean.match(/AP(?:IP| at| ip)?[:= ]+(\d{1,3}(?:\.\d{1,3}){3})/i) || [])[1] || null;
+  const wiring = (clean.match(/wiring\s*:\s*([A-Za-z0-9_+\/() -]{1,40})/i) || [])[1]?.trim() || null;
+  const nameLine = clean.split(/\r?\n/).map((l) => l.trim()).find((l) => /^(Newsheen Radio|WLED|Meshtastic|MeshCore|CircuitPython)\b/i.test(l)) || null;
+  return { name: nameLine, ip, apip, wiring };
+}
+
+// ---------------------------------------------------------------- audio via the firmware
+// Pure: turn the firmware's status JSON into a check. Fetching is the caller's job (Node can
+// hit the LAN directly; a browser page can only offer links — the puck sends no CORS headers).
+export function audioVerdict(protocol, statusJson, { ip = null } = {}) {
+  const fa = protocol.firmwareAudio;
+  const st = statusJson || {};
+  const stateName = fa?.states?.[st.state] || `state ${st.state}`;
+  const where = ip ? ` at ${ip}` : "";
+  if (statusJson == null) return check("audio", "Audio — via the firmware", "info", `firmware${where} didn't answer /api/status`, "Open the puck's web UI and use Sing, or check it's on the same network.");
+  if (st.state >= 1) return check("audio", "Audio — via the firmware", "pass", `${stateName}: ${[st.station, st.title].filter(Boolean).join(" — ")}${st.vol != null ? ` (vol ${st.vol})` : ""}${where}`);
+  return check("audio", "Audio — via the firmware", "info", `firmware idle${where}`, `Trigger ${fa?.singPath || "/api/sing"} — a chiptune through the amp. If you hear it, the amplifier, its wiring and the speaker are good.`);
+}
+export function audioLinks(protocol, ip) {
+  const fa = protocol.firmwareAudio;
+  if (!fa || !ip) return [];
+  return [{ label: "What's playing", href: `http://${ip}${fa.statusPath}` }, { label: "Make it sing", href: `http://${ip}${fa.singPath}` }];
 }
 
 // ---------------------------------------------------------------- the exam

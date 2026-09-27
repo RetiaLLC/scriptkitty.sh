@@ -1,0 +1,54 @@
+{
+ "board": "Newsheen / Pusheen puck (esp32_base_puck_v2), operator's unit #6 (a4:cb:8f:b1:71:00, 'puck 71:00'), Newsheen Radio (env newsheen-speaker, HWCDC), MAX98357A amp on J3, no LoRa, no IR",
+ "measured": "2026-09-26 on the operator's Mac via scripts/test_vetprobe.mjs + LAN /api/status",
+ "chip": "ESP32-S3 (QFN56) rev v0.2, WROOM-1-N16R2 (16 MB external flash vendor 0x46, eFuse PSRAM 2 MB)",
+ "rest_levels": {
+  "HIGH": [
+   17,
+   35,
+   36,
+   9,
+   10,
+   39,
+   40
+  ],
+  "LOW": [
+   38
+  ],
+  "float": [
+   16,
+   4,
+   47,
+   21,
+   11,
+   12,
+   13,
+   14,
+   37,
+   15,
+   1,
+   2,
+   48,
+   5,
+   6,
+   7,
+   8,
+   18,
+   41,
+   42
+  ]
+ },
+ "vet": {
+  "radio": "not fitted (BUSY/DIO1/MISO float) \u2014 operator: correct, no radio",
+  "ir": "GPIO4 float \u2014 no receiver",
+  "amp": "electrically invisible (I2S inputs float: 37 float, 38/39 ROM levels); PROVEN by firmware: /api/status state 4 streaming 'Exclusively Dolly Parton', vol 0.29, and the operator hearing it",
+  "bridges": "none among 23 pairs",
+  "boot": "one clean boot; console: joined Wi-Fi (192.168.1.221), 'Newsheen Radio', 'wiring : S\u2026'",
+  "ms": 2588
+ },
+ "notes": [
+  "this is the unit the newsheen-radio skill says needed physical replugs twice after esptool runs \u2014 the vet's watchdog reset brought it straight back (Wi-Fi joined within the 6 s boot watch)",
+  "console CLI ('status', 'help', 'sing' over the HWCDC with DTR low) returned nothing while streaming; the HTTP API answered \u2014 prefer /api/* for firmware-assisted checks",
+  "opening the CDC with DTR+RTS low on macOS does NOT reset the board (verified: 0 bytes, no banner)"
+ ]
+}

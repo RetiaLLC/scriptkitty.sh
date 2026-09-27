@@ -81,7 +81,11 @@ export const PROTOCOLS = {
     ir: { gpio: 4, part: "ir", name: "IR receiver (U4)" },
     // parts a unit may legitimately ship without — the user declares them; declared-absent
     // parts are checked for being genuinely absent (their pins float) and reported as info
-    optionalParts: { radio: "LoRa module (Wio-SX1262, U6)", ir: "IR receiver (U4)" },
+    optionalParts: { radio: "LoRa module (Wio-SX1262, U6)", ir: "IR receiver (U4)", amp: "I2S amplifier (MAX98357A on J3)" },
+    // The amp's I2S inputs are invisible to a pull test; the firmware that drives it isn't.
+    // Newsheen Radio prints its IP at boot and exposes status / a test tune over HTTP.
+    firmwareAudio: { part: "amp", match: /Newsheen Radio/i, statusPath: "/api/status", singPath: "/api/sing",
+      states: ["idle", "speaking", "singing", "playing a file", "streaming"] },
     known: [
       "BUG #1 (all units so far): U5 DIR strapped low → LEDs dark. Signature: GPIO16 reads LOW.",
       "BUG #2: U4 footprint is GND-middle (TSOP38238/VS1838B); a VCC-middle breakout receiver is never powered. Signature: GPIO4 floats.",

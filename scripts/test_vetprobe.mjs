@@ -6,7 +6,10 @@
 //        [--protocol newsheen] [--boot-watch] (watchdog-reset into the firmware afterwards and read
 //        its console for 6 s) [--not-fitted radio,ir] (declare optional parts this unit doesn't
 //        carry) [--ir-listen SECONDS] (after the exam, sample the IR receiver while a remote is
-//        held at the board) [--no-reset] [--ssh pi@host] [--json out.json]
+//        held at the board) [--audio] (after the boot watch, ask the firmware over the LAN what
+//        it's playing) [--sing] (also trigger its test tune — interrupts a stream) [--no-reset]
+//        [--ssh pi@host] [--json out.json]
+//   node scripts/test_vetprobe.mjs --audio-only 192.168.1.221 [--sing]   LAN only, USB untouched
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -146,6 +149,14 @@ await test("irListen: pulses -> pass; silent + floating -> BUG #2 fail; silent +
   r = await vet.irListen(FakeBoard({ parts: HEALTHY }), P, { ms: 60, restLevel: "HIGH" });
   assert.equal(r.status, "warn");
 });
+await test("firmware banner + audio verdict: Newsheen Radio's console and /api/status", () => {
+  const b = vet.parseFirmwareBanner("[wifi] joining X\r\n[wifi] connected, IP 192.168.1.221 (-86 dBm), AP moved to channel 11\r\nNewsheen Radio\r\n  wiring     : STRAIGHT (35/36/37 + SD/GAIN)\r\n");
+  assert.deepEqual([b.name, b.ip, b.wiring], ["Newsheen Radio", "192.168.1.221", "STRAIGHT (35/36/37 + SD/GAIN)"]);
+  const a = vet.audioVerdict(P, { state: 4, title: "Dolly Parton - Detroit City", station: "Exclusively Dolly Parton", vol: 0.29 }, { ip: b.ip });
+  assert.equal(a.status, "pass"); assert.match(a.detail, /streaming: Exclusively Dolly Parton — Dolly Parton - Detroit City/);
+  assert.equal(vet.audioVerdict(P, { state: 0 }).status, "info"); assert.equal(vet.audioVerdict(P, null).status, "info");
+  assert.deepEqual(vet.audioLinks(P, "10.0.0.5").map((l) => l.href), ["http://10.0.0.5/api/status", "http://10.0.0.5/api/sing"]);
+});
 await test("radio module missing: BUSY/DIO1 float, MISO never driven -> radio fail + warns", async () => {
   const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
   const r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false });
@@ -226,6 +237,20 @@ async function readConsole(dev, ms) {
   return text;
 }
 const icon = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
+async function getJson(url, ms = 6000) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal }); return await r.json(); } catch { return null; } finally { clearTimeout(t); }
+}
+async function audioOverLan(proto, ip, report) {
+  const fa = proto.firmwareAudio;
+  if (argv.includes("--sing")) { await getJson(`http://${ip}${fa.singPath}`, 4000); await new Promise((r) => setTimeout(r, 1500)); }
+  const st = await getJson(`http://${ip}${fa.statusPath}`);
+  const c = vet.audioVerdict(proto, st, { ip });
+  if (report) report.checks.push(c);
+  console.log(`        ${icon[c.status]} ${c.title}: ${c.detail}${c.hint ? ` ↳ ${c.hint}` : ""}`);
+  return c;
+}
+if (opt("--audio-only")) { await audioOverLan(PROTOCOLS[opt("--protocol") || "newsheen"], opt("--audio-only"), null); process.exit(0); }
 function printReport(r) {
   console.log(`\n${r.board} — ${r.verdict.toUpperCase()}  (${r.counts.pass} pass, ${r.counts.warn} warn, ${r.counts.fail} fail, ${r.ms} ms)`);
   for (const c of r.checks) console.log(`  ${icon[c.status]} ${c.title}: ${c.detail}${c.raw ? `\n      sweep (MHz:max dBm) ${c.raw}` : ""}${c.hint ? `\n      ↳ ${c.hint}` : ""}`);
@@ -268,6 +293,8 @@ if (opt("--rom")) {
       report.checks.push({ id: "boot", title: "Boots into its firmware", status: b.status, detail: b.detail, ...(b.hint ? { hint: b.hint } : {}) });
       console.log(`        ${icon[b.status]} boot: ${b.detail}${b.hint ? ` ↳ ${b.hint}` : ""}  [${text.length} bytes, ${Math.round((Date.now() - t0) / 100) / 10}s]`);
       console.log("        console:", JSON.stringify(text.slice(0, 400)));
+      if (b.banner?.name) console.log(`        firmware banner: ${b.banner.name}${b.banner.ip ? " at " + b.banner.ip : ""}${b.banner.wiring ? ", wiring " + b.banner.wiring : ""}`);
+      if (argv.includes("--audio") && proto.firmwareAudio && b.banner?.ip) await new Promise((r) => setTimeout(r, 4000)).then(() => audioOverLan(proto, b.banner.ip, report));
     });
   } else await io.close();
   if (report) {   // the report printed before the interactive/boot steps; restate the verdict with them included

@@ -173,8 +173,18 @@ async function diagnose({ touched = false } = {}) {
       try { await transport.disconnect(); } catch {}
       if (reset) {
         const boot = await bootWatch(port, before, 6000);
-        report.checks.push({ id: "boot", title: "Boots into its firmware", ...boot });
+        report.checks.push({ id: "boot", title: "Boots into its firmware", status: boot.status, detail: boot.detail, ...(boot.hint ? { hint: boot.hint } : {}) });
         report.counts[boot.status] = (report.counts[boot.status] || 0) + 1;
+        // an amplifier can't be seen electrically — if the firmware that drives it is running
+        // and told us its address, hand the user its own controls
+        const fa = protocol.firmwareAudio, b = boot.banner || {};
+        if (fa && fittedFromUi()[fa.part] !== false && b.name && fa.match.test(b.name)) {
+          const links = vet.audioLinks(protocol, b.ip || b.apip);
+          report.checks.push({ id: "audio", title: `Audio — via ${b.name}`, status: "info",
+            detail: b.ip ? `firmware is up at ${b.ip}${b.wiring ? ` (wiring ${b.wiring})` : ""}` : "firmware is up (no LAN address seen — try its soft-AP)",
+            hint: "The I²S amplifier can't be measured from here. \"Make it sing\" plays a chiptune through it (it interrupts a stream); if you hear it, the amp, its wiring and the speaker are good.", links });
+          report.counts.info = (report.counts.info || 0) + 1;
+        }
         report.verdict = report.counts.fail ? "needs-rework" : report.counts.warn ? "check" : "healthy";
       }
     } else { try { await transport.disconnect(); } catch {} }
@@ -237,7 +247,7 @@ async function waitFresh(before, ms) {
 
 // --- rendering -----------------------------------------------------------------
 const ICON = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
-const GROUP = (c) => c.id === "boot" ? "Boot" : c.id === "declared" ? "Identity" : c.id === "ir" ? "Pins" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
+const GROUP = (c) => c.id === "boot" || c.id === "audio" ? "Boot" : c.id === "declared" ? "Identity" : c.id === "ir" ? "Pins" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
 function render(r) {
   $("report").hidden = false;
   $("summary").className = `vet-summary verdict-${r.verdict}`;
@@ -251,7 +261,8 @@ function render(r) {
     const g = GROUP(c);
     if (g !== group) { group = g; const h = document.createElement("div"); h.className = "tag-head"; h.innerHTML = `<span class="tag-name">${g}</span><span class="tag-rule"></span>`; wrap.append(h); }
     const row = document.createElement("div"); row.className = `vet-row vet-${c.status}`;
-    row.innerHTML = `<span class="vet-icon">${ICON[c.status]}</span><div class="vet-body"><div class="vet-title">${escapeHtml(c.title)}</div><div class="vet-detail">${escapeHtml(c.detail)}</div>${c.hint ? `<div class="vet-hint">↳ ${escapeHtml(c.hint)}</div>` : ""}</div>`;
+    const links = (c.links || []).map((l) => `<a class="vet-link" href="${escapeHtml(l.href)}" target="_blank" rel="noopener">${escapeHtml(l.label)} ↗</a>`).join(" ");
+    row.innerHTML = `<span class="vet-icon">${ICON[c.status]}</span><div class="vet-body"><div class="vet-title">${escapeHtml(c.title)}</div><div class="vet-detail">${escapeHtml(c.detail)}</div>${c.hint ? `<div class="vet-hint">↳ ${escapeHtml(c.hint)}</div>` : ""}${links ? `<div class="vet-links">${links}</div>` : ""}</div>`;
     wrap.append(row);
   }
 }
