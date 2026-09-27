@@ -25,7 +25,7 @@ async function test(name, fn) { try { await fn(); console.log(`  ok    ${name}`)
 // ------------------------------------------------------------------ a register-level board
 // parts: { [gpio]: "pullup" | "low" | "high" }   bridges: [[a,b],…]   radio: "sx126x" | null
 const GPIO = 0x60004000, OUT = [GPIO + 0x04, GPIO + 0x10], EN = [GPIO + 0x20, GPIO + 0x2c];
-function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PROTOCOLS.newsheen.radio, psramCap = 2, flashCap = 0, env = "newsheen-puck" } = {}) {
+function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PROTOCOLS.newsheen.radio, psramCap = 2, flashCap = 0, env = "newsheen-puck", rssi = () => -118 } = {}) {
   const regs = new Map(); let ops = 0;
   const out = [0, 0], en = [0, 0];
   const mux = (p) => regs.get(0x60009004 + 4 * p) ?? 0;
@@ -33,10 +33,10 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
   const isOut = (p) => (en[bank(p)] & bit(p)) !== 0, outLvl = (p) => (out[bank(p)] & bit(p)) ? 1 : 0;
   const peers = (p) => bridges.flatMap(([a, b]) => (a === p ? [b] : b === p ? [a] : []));
   // SX126x slave on the SPI pins
-  const R = radioPins; const spi = { nss: 1, sck: 0, byteIdx: 0, bits: 0, rx: 0, cmd: null, miso: 0, resp: 0 };
+  const R = radioPins; const spi = { nss: 1, sck: 0, byteIdx: 0, bits: 0, rx: 0, cmd: null, miso: 0, resp: 0, args: [], mhz: 915 };
   const REG320 = [..."SX1261 V2D 2D02\0"].map((c) => c.charCodeAt(0));
   const STATUS = (2 << 4) | (1 << 1);
-  const respByte = (k) => (spi.cmd === 0x1d && k >= 4 ? (REG320[k - 4] ?? 0) : STATUS);
+  const respByte = (k) => (spi.cmd === 0x1d && k >= 4 ? (REG320[k - 4] ?? 0) : spi.cmd === 0x15 && k === 2 ? Math.round(-2 * rssi(spi.mhz)) & 0xff : spi.cmd === 0x17 && k >= 2 ? 0 : STATUS);   // GetDeviceErrors: none
   const loadBit = () => { spi.miso = (spi.resp >> (7 - spi.bits)) & 1; };
   function level(p) {
     if (isOut(p)) return outLvl(p);
@@ -51,7 +51,11 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
     if (spi.nss === 1 && nss === 0) { spi.byteIdx = 0; spi.bits = 0; spi.rx = 0; spi.cmd = null; spi.resp = respByte(0); loadBit(); }
     if (spi.nss === 0 && nss === 0 && spi.sck === 0 && sck === 1) {           // rising edge: sample MOSI
       spi.rx = ((spi.rx << 1) | level(R.mosi)) & 0xff; spi.bits++;
-      if (spi.bits === 8) { if (spi.byteIdx === 0) spi.cmd = spi.rx; spi.byteIdx++; spi.bits = 0; spi.rx = 0; spi.resp = respByte(spi.byteIdx); }
+      if (spi.bits === 8) {
+        if (spi.byteIdx === 0) { spi.cmd = spi.rx; spi.args = []; } else spi.args.push(spi.rx);
+        if (spi.cmd === 0x86 && spi.args.length === 4) spi.mhz = Math.round((((spi.args[0] << 24) | (spi.args[1] << 16) | (spi.args[2] << 8) | spi.args[3]) >>> 0) * 32e6 / 33554432 / 1e6);
+        spi.byteIdx++; spi.bits = 0; spi.rx = 0; spi.resp = respByte(spi.byteIdx);
+      }
     }
     if (spi.nss === 0 && spi.sck === 1 && sck === 0) loadBit();               // falling edge: next MISO bit
     spi.nss = nss; spi.sck = sck;
@@ -88,7 +92,7 @@ const by = (r, id) => r.checks.find((c) => c.id === id);
 
 console.log("synthetic");
 await test("healthy puck: every check passes, radio identified, no bridges, verdict healthy", async () => {
-  const r = await vet.runExam(FakeBoard({ parts: HEALTHY }), P, { chip: chipInfo, doBeacon: false });
+  const r = await vet.runExam(FakeBoard({ parts: HEALTHY, rssi: (mhz) => (mhz === 869 ? -90 : -116) }), P, { chip: chipInfo, doBeacon: false });
   const bad = r.checks.filter((c) => c.status === "fail" || c.status === "warn");
   assert.deepEqual(bad, [], JSON.stringify(bad));
   assert.equal(r.verdict, "healthy");
@@ -105,6 +109,19 @@ await test("BUG #2 (IR receiver unpowered / wrong pinout): GPIO4 floats -> fail"
   const parts = { ...HEALTHY }; delete parts[4];
   const r = await vet.runExam(FakeBoard({ parts }), P, { chip: chipInfo, doBeacon: false });
   assert.equal(by(r, "gpio4").status, "fail"); assert.match(by(r, "gpio4").hint, /VCC-middle/);
+});
+await test("antenna: a strong band lifts RSSI -> pass; flat floor -> warn; skipped when the radio failed", async () => {
+  const withAnt = FakeBoard({ parts: HEALTHY, rssi: (mhz) => (mhz === 881 ? -84 : -117 + (mhz % 3)) });
+  let r = await vet.runExam(withAnt, P, { chip: chipInfo, doBeacon: false });
+  assert.equal(by(r, "antenna").status, "pass"); assert.match(by(r, "antenna").detail, /881 MHz at -84 dBm/);
+  assert.equal(by(r, "antenna").sweep.length, 9);
+  const noAnt = FakeBoard({ parts: HEALTHY, rssi: () => -118 });
+  r = await vet.runExam(noAnt, P, { chip: chipInfo, doBeacon: false });
+  assert.equal(by(r, "antenna").status, "warn"); assert.match(by(r, "antenna").hint, /Never transmit/);
+  assert.equal(r.verdict, "check");
+  const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
+  r = await vet.runExam(FakeBoard({ parts, radio: null }), P, { chip: chipInfo, doBeacon: false });
+  assert.equal(by(r, "antenna"), undefined, "no antenna check without a live radio");
 });
 await test("radio module missing: BUSY/DIO1 float, MISO never driven -> radio fail + warns", async () => {
   const parts = { ...HEALTHY }; delete parts[47]; delete parts[21];
@@ -184,7 +201,7 @@ async function readConsole(dev, ms) {
 const icon = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
 function printReport(r) {
   console.log(`\n${r.board} — ${r.verdict.toUpperCase()}  (${r.counts.pass} pass, ${r.counts.warn} warn, ${r.counts.fail} fail, ${r.ms} ms)`);
-  for (const c of r.checks) console.log(`  ${icon[c.status]} ${c.title}: ${c.detail}${c.hint ? `\n      ↳ ${c.hint}` : ""}`);
+  for (const c of r.checks) console.log(`  ${icon[c.status]} ${c.title}: ${c.detail}${c.raw ? `\n      sweep (MHz:max dBm) ${c.raw}` : ""}${c.hint ? `\n      ↳ ${c.hint}` : ""}`);
 }
 
 if (opt("--rom")) {

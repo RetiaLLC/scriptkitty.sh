@@ -234,6 +234,65 @@ export async function radioChecks(io, protocol) {
   return out;
 }
 
+// ---------------------------------------------------------------- antenna (RX-only)
+// An antenna is the only way ambient RF reaches the receiver. Tune across the bands that
+// carry strong downlinks nearly everywhere people solder boards (US/EU cellular, the ISM
+// band itself), sit in RX and sample instantaneous RSSI. An open RF port gives a flat
+// noise floor (~-110…-120 dBm at 500 kHz); an antenna lifts at least one band well above
+// it. This never transmits. A quiet room looks like a missing antenna, so a flat floor
+// is reported as "can't tell", not as a failure.
+const ANTENNA_BANDS_MHZ = [739, 751, 869, 881, 894, 915, 933, 945, 957];
+const RX_BW_500K = 0x06;
+
+export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_BANDS_MHZ } = {}) {
+  const r = protocol.radio;
+  if (!r || r.type !== "sx126x") return null;
+  const { pads, xfer } = await spiSession(io, r);
+  const busyLow = async () => { for (let i = 0; i < 40; i++) { if (r.busy == null || !(await pads.read(r.busy))) return true; } return false; };
+  const cmd = async (bytes) => { await busyLow(); return xfer(bytes); };
+  const sweep = [];
+  let errors = null;
+  try {
+    if (r.rfsw != null) await pads.drive(r.rfsw, 1);                          // power the module's antenna switch
+    await cmd([0x80, 0x00]);                                                   // SetStandby(STDBY_RC)
+    if (r.tcxoV) {                                                             // SetDio3AsTcxoCtrl: 1.6/1.7/1.8/2.2/2.4/2.7/3.0/3.3 V
+      const code = { 1.6: 0, 1.7: 1, 1.8: 2, 2.2: 3, 2.4: 4, 2.7: 5, 3.0: 6, 3.3: 7 }[r.tcxoV] ?? 2;
+      await cmd([0x97, code, 0x00, 0x01, 0x40]);                               // 5 ms start-up
+    }
+    await cmd([0x89, 0x7f]);                                                   // Calibrate all
+    await sleep(10); await busyLow();
+    await cmd([0x07, 0x00, 0x00]);                                             // ClearDeviceErrors: XOSC_START_ERR is always raised once after a TCXO setup
+    if (r.dio2Switch !== false) await cmd([0x9d, 0x01]);                       // SetDio2AsRfSwitchCtrl
+    await cmd([0x8a, 0x01]);                                                   // packet type LoRa
+    await cmd([0x8b, 0x07, RX_BW_500K, 0x01, 0x00]);                           // SF7 / 500 kHz / CR 4/5
+    for (const mhz of bands) {
+      const f = Math.round((mhz * 1e6) * 33554432 / 32e6) >>> 0;              // f * 2^25 / 32 MHz
+      await cmd([0x86, (f >>> 24) & 0xff, (f >>> 16) & 0xff, (f >>> 8) & 0xff, f & 0xff]);
+      await cmd([0x82, 0xff, 0xff, 0xff]);                                     // SetRx continuous
+      await sleep(4);
+      const vals = [];
+      for (let i = 0; i < samples; i++) { const rr = await xfer([0x15, 0x00, 0x00]); vals.push(-rr[2] / 2); }
+      sweep.push({ mhz, max: Math.max(...vals), mean: vals.reduce((a, b) => a + b, 0) / vals.length });
+      await cmd([0x80, 0x00]);
+    }
+    const e = await cmd([0x17, 0x00, 0x00, 0x00]); errors = (e[2] << 8) | e[3];   // GetDeviceErrors
+  } finally { try { await xfer([0x80, 0x00]); } catch {} await pads.restore(); }
+  const floor = Math.min(...sweep.map((b) => b.mean));
+  const peakBand = sweep.reduce((a, b) => (b.max > a.max ? b : a), sweep[0]);
+  const lift = peakBand.max - floor;
+  const fmt = sweep.map((b) => `${b.mhz}:${Math.round(b.max)}`).join(" ");
+  const errTxt = errors ? ` (radio reports errors 0x${errors.toString(16)}:${errors & 0x20 ? " XOSC start" : ""}${errors & 0x40 ? " PLL lock" : ""}${errors & 0x08 ? " ADC calib" : ""}${errors & 0x01 ? " RC64k" : ""}${errors & 0x02 ? " RC13M" : ""}${errors & 0x04 ? " PLL calib" : ""}${errors & 0x10 ? " image calib" : ""}${errors & 0x100 ? " PA ramp" : ""})` : "";
+  let status, detail, hint;
+  if (peakBand.max >= -95 || lift >= 10) {
+    status = errors & 0x60 ? "warn" : "pass"; detail = `hears ambient RF: ${peakBand.mhz} MHz at ${Math.round(peakBand.max)} dBm, floor ${Math.round(floor)} dBm${errTxt}`;
+    if (errors & 0x60) hint = "The radio heard the antenna but flagged its oscillator/PLL — check the module's TCXO supply and crystal; re-run once.";
+  } else {
+    status = "warn"; detail = `flat noise floor ${Math.round(floor)}…${Math.round(peakBand.max)} dBm across ${sweep.length} bands${errTxt}`;
+    hint = `No off-air signal reached the receiver. Either the antenna is missing / not soldered to ${r.antPad || "the ANT pad"}, or this spot is RF-quiet — move near a window or a phone and re-run. Never transmit until this passes.`;
+  }
+  return { ...check("antenna", "Antenna installed (RX-only listen)", status, detail, hint), sweep, floor, lift, errors, raw: fmt };
+}
+
 // ---------------------------------------------------------------- I2C
 export async function i2cChecks(io, protocol, fingerprint = {}) {
   const out = [];
@@ -301,13 +360,16 @@ export function analyzeBootLog(text, { vanishedAfterMs = null, windowMs = 6000 }
 }
 
 // ---------------------------------------------------------------- the exam
-export async function runExam(io, protocol, { chip = {}, images = null, onStep = () => {}, doBridges = true, doRadio = true, doI2c = true, doBeacon = true } = {}) {
+export async function runExam(io, protocol, { chip = {}, images = null, onStep = () => {}, doBridges = true, doRadio = true, doAntenna = true, doI2c = true, doBeacon = true } = {}) {
   const t0 = Date.now();
   const checks = [];
   onStep("identity"); checks.push(...await identityChecks(io, protocol, chip));
   onStep("pins");     const pins = await pinChecks(io, protocol); checks.push(...pins.checks);
   if (doBridges) { onStep("bridges"); checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); }
-  if (doRadio)   { onStep("radio");   checks.push(...await radioChecks(io, protocol)); }
+  if (doRadio) {
+    onStep("radio"); const radio = await radioChecks(io, protocol); checks.push(...radio);
+    if (doAntenna && radio.some((c) => c.id === "radio" && c.status === "pass")) { onStep("antenna"); const a = await antennaCheck(io, protocol); if (a) checks.push(a); }
+  }
   if (doI2c)     { onStep("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint)); }
   onStep("firmware"); const fw = await firmwareCheck(io, images); if (fw) checks.push(fw);
   if (doBeacon)  { onStep("beacon");  const b = await beacon(io, protocol); if (b) checks.push(b); }

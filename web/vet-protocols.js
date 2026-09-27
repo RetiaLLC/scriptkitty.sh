@@ -67,7 +67,9 @@ export const PROTOCOLS = {
     // pins the bridge test may drive at the weakest strength (never radio outputs 21/47,
     // never the IR open-collector's neighbours' partner… it's fine: 4 is open-collector)
     driveSafe: [4, 5, 6, 7, 8, 15, 16, 17, 18, 9, 10, 11, 12, 13, 14, 48, 35, 36, 37, 38, 39, 40, 41, 42, 1, 2],
-    radio: { type: "sx126x", nss: 10, mosi: 11, miso: 12, sck: 13, busy: 47, nrst: 9, dio1: 21, part: "Wio-SX1262 (U6)" },
+    // Wio-SX1262: TCXO on DIO3 (1.8 V), DIO2 drives the T/R switch, RF_SW (GPIO14) powers it;
+    // ANT1 is a bare pad for a quarter-wave wire.
+    radio: { type: "sx126x", nss: 10, mosi: 11, miso: 12, sck: 13, busy: 47, nrst: 9, dio1: 21, rfsw: 14, tcxoV: 1.8, dio2Switch: true, part: "Wio-SX1262 (U6)", antPad: "ANT1 (wire antenna pad)" },
     i2c: [{ sda: 35, scl: 36, name: "sensor header J3", expectDevices: [] }],
     beacon: { gpio: 48, name: "debug LED D14" },
     known: [

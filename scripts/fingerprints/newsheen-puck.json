@@ -48,7 +48,8 @@
   "bridges": "none among 23 adjacent pairs",
   "i2c": "35/36 pulled up, no devices",
   "boot": "one clean boot (boot:0x29 SPI_FAST_FLASH_BOOT), no resets in 6 s, chatty firmware console",
-  "ms": 2588
+  "ms": 2588,
+  "antenna": "RX-only sweep (SF7/500 kHz, RF_SW GPIO14 high, DIO2 switch, TCXO 1.8 V): 739 MHz -87..-91 dBm, 957 MHz -91/-93, 869-894 -94..-98, floor -102 dBm (915 MHz) -> PASS; two runs consistent; XOSC_START_ERR seen before ClearDeviceErrors was added, clean after"
  },
  "notes": [
   "GPIO16 floats: this unit has the U5 DIR fix (or a fixed revision) \u2014 BUG #1 absent here",

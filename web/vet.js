@@ -130,8 +130,8 @@ async function diagnose({ touched = false } = {}) {
       }
     }
     const protocol = PROTOCOLS[key];
-    const steps = ["identity", "pins", "bridges", "radio", "i2c", "firmware", "beacon"];
-    const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
+    const steps = ["identity", "pins", "bridges", "radio", "antenna", "i2c", "firmware", "beacon"];
+    const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", antenna: "Listening for off-air RF through the antenna (receive only)", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
     status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the exam…`);
     const report = await vet.runExam(io, protocol, {
       chip, doBeacon: $("blink").checked,
@@ -212,7 +212,7 @@ async function waitFresh(before, ms) {
 
 // --- rendering -----------------------------------------------------------------
 const ICON = { pass: "✓", warn: "!", fail: "✗", info: "·", skip: "–" };
-const GROUP = (c) => c.id === "boot" ? "Boot" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
+const GROUP = (c) => c.id === "boot" ? "Boot" : c.id.startsWith("gpio") ? "Pins" : c.id.startsWith("bridge") ? "Solder bridges" : c.id.startsWith("i2c") ? "I2C" : c.id === "radio" || c.id === "antenna" ? "Radio" : c.id === "firmware" || c.id === "beacon" ? "Firmware" : "Identity";
 function render(r) {
   $("report").hidden = false;
   $("summary").className = `vet-summary verdict-${r.verdict}`;
