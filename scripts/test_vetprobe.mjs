@@ -78,8 +78,13 @@ function FakeBoard({ parts = {}, bridges = [], radio = "sx126x", radioPins = PRO
       if (a === 0x60007054) return (psramCap << 3) >>> 0;
       return regs.get(a) ?? 0xa00;
     },
-    async writeReg(a, v) {
-      ops++; v >>>= 0;
+    async writeRegs(list) {
+      ops++;
+      for (const [a, v, m] of list) if (m !== 0) await this.apply(a, v);
+    },
+    async writeReg(a, v) { ops++; await this.apply(a, v); },
+    async apply(a, v) {
+      v >>>= 0;
       const tbl = { [GPIO + 0x08]: ["out", 0, 1], [GPIO + 0x0c]: ["out", 0, 0], [GPIO + 0x14]: ["out", 1, 1], [GPIO + 0x18]: ["out", 1, 0],
                     [GPIO + 0x24]: ["en", 0, 1], [GPIO + 0x28]: ["en", 0, 0], [GPIO + 0x30]: ["en", 1, 1], [GPIO + 0x34]: ["en", 1, 0] };
       const t = tbl[a];
@@ -233,6 +238,7 @@ async function romIo(dev, stub, noReset) {
     hello,
     readReg: async (a) => (await rpc({ op: "r", a })).v,
     writeReg: async (a, v, m) => { const r = await rpc({ op: "w", a, v: v >>> 0, ...(m != null ? { m: m >>> 0 } : {}) }); if (r.ok === false) throw new Error(r.error); },
+    ...(argv.includes("--no-batch") ? {} : { writeRegs: async (list) => { const r = await rpc({ op: "W", l: list.map(([a, v, m, d]) => [a >>> 0, v >>> 0, (m ?? 0xffffffff) >>> 0, d | 0]) }); if (r.ok === false) throw new Error(r.error); } }),
     ...(stub ? { readFlash: async (a, n) => new Uint8Array(Buffer.from((await rpc({ op: "f", a, n })).d, "base64")) } : {}),
     close: async () => { try { await rpc({ op: "q" }); } catch {} child.kill(); },
   };

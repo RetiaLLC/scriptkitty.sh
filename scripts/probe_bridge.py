@@ -16,7 +16,7 @@ against a real board, since Node has no Web Serial. Line-oriented over stdin/std
 RESEARCH/TEST TOOL — not used by the site or CI.
 """
 import base64
-import json
+import json, struct
 import sys
 import threading
 
@@ -77,6 +77,13 @@ def esptool_mode(port, stub, reset=True, before="default_reset"):
                 esp.write_reg(req["a"], req["v"], req.get("m", 0xFFFFFFFF))
                 out(json.dumps({"ok": True}))
             except Exception as e:  # a reset write may kill the link mid-reply
+                out(json.dumps({"ok": False, "error": str(e)}))
+        elif req["op"] == "W":                      # batched WRITE_REG: [[addr, value, mask, delay_us], ...] in ONE
+            try:                                    # loader command (the stub loops over 16-byte tuples, delay first)
+                data = b"".join(struct.pack("<IIII", a & 0xFFFFFFFF, v & 0xFFFFFFFF, m & 0xFFFFFFFF, d & 0xFFFFFFFF) for a, v, m, d in req["l"])
+                esp.check_command("write target memory", esp.ESP_CMDS["WRITE_REG"], data)
+                out(json.dumps({"ok": True}))
+            except Exception as e:
                 out(json.dumps({"ok": False, "error": str(e)}))
         elif req["op"] == "f":
             with contextlib.redirect_stdout(sys.stderr):

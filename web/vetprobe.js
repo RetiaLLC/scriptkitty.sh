@@ -20,39 +20,57 @@ const EFUSE_RD_MAC_SPI_SYS_3 = 0x60007050, EFUSE_RD_MAC_SPI_SYS_4 = 0x60007054;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Pad control with bookkeeping so every pin we touch goes back exactly as found.
+// Writes are QUEUED and sent to the flasher stub in batches: one loader command carries many
+// [addr, value, mask, delay_us] tuples and the stub applies them back to back, sleeping
+// delay_us before each one. A USB round-trip costs milliseconds in a browser, so the
+// bit-banged buses below are built from queued edges and only flushed when a level has to
+// be read. Without io.writeRegs (older bridges) everything degrades to one write per op.
+export const DATE_REGS = { "esp32-s3": 0x60000080, "esp32-s2": 0x3f400080, "esp32-c3": 0x60000080, "esp32": 0x3ff40078 };
+let DATE_REG = DATE_REGS["esp32-s3"];      // a mask-0 write to UART_DATE_REG is esptool's own "just delay" no-op
+const BATCH_MAX = 32;                       // tuples per command (512 B) — far below the stub's buffer
 class Pads {
-  constructor(io) { this.io = io; this.saved = new Map(); }
+  constructor(io) { this.io = io; this.saved = new Map(); this.q = []; }
+  queue(addr, value, delayUs = 0) { this.q.push([addr >>> 0, value >>> 0, 0xffffffff, delayUs | 0]); }
+  delayUs(us) { this.q.push([DATE_REG, 0, 0, us | 0]); }
+  async flush() {
+    const q = this.q; if (!q.length) return; this.q = [];
+    if (this.io.writeRegs) { for (let i = 0; i < q.length; i += BATCH_MAX) await this.io.writeRegs(q.slice(i, i + BATCH_MAX)); return; }
+    let pending = 0;                                                     // fallback: sub-ms spacing is already guaranteed by the link
+    for (const [a, v, m, d] of q) { pending += d; if (m !== 0) { if (pending >= 1000) await sleep(Math.ceil(pending / 1000)); pending = 0; await this.io.writeReg(a, v); } }
+    if (pending >= 1000) await sleep(Math.ceil(pending / 1000));
+  }
+  async sleep(ms) { await this.flush(); await sleep(ms); }               // a wait only means something once the queue is on the board
   async claim(pin) {
     if (this.saved.has(pin)) return;
     this.saved.set(pin, [await this.io.readReg(ioMux(pin)), await this.io.readReg(funcOutSel(pin))]);
-    await this.io.writeReg(funcOutSel(pin), 0x100);                    // plain GPIO output signal
+    this.queue(funcOutSel(pin), 0x100);                                  // plain GPIO output signal
   }
   async input(pin, pull = 0) {                                           // high-Z input, optional internal pull
     await this.claim(pin);
-    await this.io.writeReg(EN_W1TC[bank(pin)], bit(pin));
-    await this.io.writeReg(ioMux(pin), MCU_SEL_GPIO | FUN_IE | pull);
+    this.queue(EN_W1TC[bank(pin)], bit(pin));
+    this.queue(ioMux(pin), MCU_SEL_GPIO | FUN_IE | pull);
   }
   async drive(pin, level) {                                              // push-pull at the weakest strength
     await this.claim(pin);
-    await this.io.writeReg(ioMux(pin), MCU_SEL_GPIO | FUN_IE);
-    await this.io.writeReg((level ? OUT_W1TS : OUT_W1TC)[bank(pin)], bit(pin));
-    await this.io.writeReg(EN_W1TS[bank(pin)], bit(pin));
+    this.queue(ioMux(pin), MCU_SEL_GPIO | FUN_IE);
+    this.queue((level ? OUT_W1TS : OUT_W1TC)[bank(pin)], bit(pin));
+    this.queue(EN_W1TS[bank(pin)], bit(pin));
   }
-  async set(pin, level) { await this.io.writeReg((level ? OUT_W1TS : OUT_W1TC)[bank(pin)], bit(pin)); }
-  async read(pin) { return (((await this.io.readReg(IN[bank(pin)])) >>> 0) & bit(pin)) !== 0; }
+  async set(pin, level, delayUs = 0) { this.queue((level ? OUT_W1TS : OUT_W1TC)[bank(pin)], bit(pin), delayUs); }
+  async read(pin) { await this.flush(); return (((await this.io.readReg(IN[bank(pin)])) >>> 0) & bit(pin)) !== 0; }
   async restore() {
     for (const [pin, [mux, sel]] of this.saved) {
-      await this.io.writeReg(EN_W1TC[bank(pin)], bit(pin));
-      await this.io.writeReg(ioMux(pin), mux);
-      await this.io.writeReg(funcOutSel(pin), sel);
+      this.queue(EN_W1TC[bank(pin)], bit(pin));
+      this.queue(ioMux(pin), mux);
+      this.queue(funcOutSel(pin), sel);
     }
     this.saved.clear();
+    await this.flush();
   }
 }
 
 const check = (id, title, status, detail, hint) => ({ id, title, status, detail: detail || "", ...(hint ? { hint } : {}) });
 
-// ---------------------------------------------------------------- identity
 export function flashSizeMb(flashId) {
   const sizeId = (flashId >> 16) & 0xff;
   if (sizeId < 0x12 || sizeId > 0x20) return null;
@@ -180,18 +198,23 @@ async function spiSession(io, r) {
   await pads.drive(r.nss, 1); await pads.drive(r.sck, 0); await pads.drive(r.mosi, 0);
   await pads.input(r.miso, 0);
   if (r.busy != null) await pads.input(r.busy, 0);
-  const xfer = async (bytes) => {
-    await pads.set(r.nss, 0);
+  // readFrom = index of the first byte whose reply matters: earlier bytes (opcode, address)
+  // are clocked out blind inside one batch; later ones cost a read per bit. Mode 0, ~1 µs edges.
+  const xfer = async (bytes, readFrom = 0) => {
+    await pads.set(r.nss, 0, 1);
     const rx = [];
-    for (const byte of bytes) {
+    for (let k = 0; k < bytes.length; k++) {
       let v = 0;
       for (let i = 7; i >= 0; i--) {
-        await pads.set(r.mosi, (byte >> i) & 1);
-        await pads.set(r.sck, 1); v = (v << 1) | (await pads.read(r.miso) ? 1 : 0); await pads.set(r.sck, 0);
+        await pads.set(r.mosi, (bytes[k] >> i) & 1);
+        await pads.set(r.sck, 1, 1);
+        if (k >= readFrom) v = (v << 1) | (await pads.read(r.miso) ? 1 : 0);
+        await pads.set(r.sck, 0, 1);
       }
       rx.push(v);
     }
-    await pads.set(r.nss, 1);
+    await pads.set(r.nss, 1, 1);
+    await pads.flush();
     return rx;
   };
   return { pads, xfer };
@@ -206,7 +229,7 @@ export async function radioChecks(io, protocol, fingerprint = {}) {
   const { pads, xfer } = await spiSession(io, r);
   try {
     // reset pulse through NRST (external pull-up releases it), then wait for BUSY to drop
-    if (r.nrst != null) { await pads.drive(r.nrst, 0); await sleep(5); await pads.input(r.nrst, 0); }
+    if (r.nrst != null) { await pads.drive(r.nrst, 0); await pads.sleep(5); await pads.input(r.nrst, 0); }
     let busyTrace = [];
     if (r.busy != null) {
       for (let i = 0; i < 20; i++) { const b = await pads.read(r.busy); busyTrace.push(b ? 1 : 0); if (!b && i >= 2) break; }
@@ -219,9 +242,9 @@ export async function radioChecks(io, protocol, fingerprint = {}) {
     const misoDriven = d === u;
 
     if (r.type === "sx126x") {
-      const st = await xfer([0xc0, 0x00]);
+      const st = await xfer([0xc0, 0x00], 1);
       const status = st[1], mode = (status >> 4) & 7, cmd = (status >> 1) & 7;
-      const id = await xfer([0x1d, 0x03, 0x20, 0x00, ...new Array(16).fill(0)]).then((b) => b.slice(4));
+      const id = await xfer([0x1d, 0x03, 0x20, 0x00, ...new Array(16).fill(0)], 4).then((b) => b.slice(4));
       const idStr = String.fromCharCode(...id).replace(/\0.*$/, "");
       const alive = /^SX126/.test(idStr);
       const modeName = { 2: "STDBY_RC", 3: "STDBY_XOSC", 4: "FS", 5: "RX", 6: "TX" }[mode] || `mode ${mode}`;
@@ -233,7 +256,7 @@ export async function radioChecks(io, protocol, fingerprint = {}) {
               : moduleSilent ? `Every line the module would drive (BUSY GPIO${r.busy}, DIO1 GPIO${r.dio1}, MISO GPIO${r.miso}) floats: ${r.part || "the radio module"} is not fitted, or has no 3V3/GND. If this unit is meant to have LoRa, populate/solder it; if it's a no-radio build, ignore the radio section.`
               : `The module is powered but not answering: check its SPI joints (MISO GPIO${r.miso}, NSS GPIO${r.nss}, SCK GPIO${r.sck}, MOSI GPIO${r.mosi}) and that BUSY (GPIO${r.busy}) drops after reset.`));
     } else if (r.type === "sx127x") {
-      const v = (await xfer([0x42, 0x00]))[1];
+      const v = (await xfer([0x42, 0x00], 1))[1];
       const alive = v === 0x12;
       out.push(check("radio", `LoRa radio — ${r.part || "SX127x"}`, alive ? "pass" : "fail",
         alive ? `RegVersion 0x12 (SX1276/RFM95)` : `RegVersion 0x${v.toString(16)} (${misoDriven ? "MISO driven" : "MISO never driven"})`,
@@ -258,7 +281,7 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
   if (!r || r.type !== "sx126x") return null;
   const { pads, xfer } = await spiSession(io, r);
   const busyLow = async () => { for (let i = 0; i < 40; i++) { if (r.busy == null || !(await pads.read(r.busy))) return true; } return false; };
-  const cmd = async (bytes) => { await busyLow(); return xfer(bytes); };
+  const cmd = async (bytes) => { await busyLow(); return xfer(bytes, Infinity); };          // reply not needed
   const sweep = [];
   let errors = null;
   try {
@@ -269,7 +292,7 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
       await cmd([0x97, code, 0x00, 0x01, 0x40]);                               // 5 ms start-up
     }
     await cmd([0x89, 0x7f]);                                                   // Calibrate all
-    await sleep(10); await busyLow();
+    await pads.sleep(10); await busyLow();
     await cmd([0x07, 0x00, 0x00]);                                             // ClearDeviceErrors: XOSC_START_ERR is always raised once after a TCXO setup
     if (r.dio2Switch !== false) await cmd([0x9d, 0x01]);                       // SetDio2AsRfSwitchCtrl
     await cmd([0x8a, 0x01]);                                                   // packet type LoRa
@@ -278,14 +301,14 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
       const f = Math.round((mhz * 1e6) * 33554432 / 32e6) >>> 0;              // f * 2^25 / 32 MHz
       await cmd([0x86, (f >>> 24) & 0xff, (f >>> 16) & 0xff, (f >>> 8) & 0xff, f & 0xff]);
       await cmd([0x82, 0xff, 0xff, 0xff]);                                     // SetRx continuous
-      await sleep(4);
+      await pads.sleep(4);
       const vals = [];
-      for (let i = 0; i < samples; i++) { const rr = await xfer([0x15, 0x00, 0x00]); vals.push(-rr[2] / 2); }
+      for (let i = 0; i < samples; i++) { const rr = await xfer([0x15, 0x00, 0x00], 2); vals.push(-rr[2] / 2); }
       sweep.push({ mhz, max: Math.max(...vals), mean: vals.reduce((a, b) => a + b, 0) / vals.length });
       await cmd([0x80, 0x00]);
     }
-    const e = await cmd([0x17, 0x00, 0x00, 0x00]); errors = (e[2] << 8) | e[3];   // GetDeviceErrors
-  } finally { try { await xfer([0x80, 0x00]); } catch {} await pads.restore(); }
+    await busyLow(); const e = await xfer([0x17, 0x00, 0x00, 0x00], 2); errors = (e[2] << 8) | e[3];   // GetDeviceErrors
+  } finally { try { await xfer([0x80, 0x00], Infinity); } catch {} await pads.restore(); }
   const floor = Math.min(...sweep.map((b) => b.mean));
   const peakBand = sweep.reduce((a, b) => (b.max > a.max ? b : a), sweep[0]);
   const lift = peakBand.max - floor;
@@ -306,13 +329,42 @@ export async function antennaCheck(io, protocol, { samples = 8, bands = ANTENNA_
 }
 
 // ---------------------------------------------------------------- I2C
+// Open-drain bit-bang from queued edges: START, the 8 address bits and the ACK clock go out
+// in one batch (~150 kHz SCL from the stub's microsecond delays), one read samples the ACK,
+// and STOP rides along with the next address — about 2 round-trips per address instead of ~35.
+// The output latch stays low; "drive low" = output-enable, "release" = high-Z + pull-up.
+export async function i2cScan(io, sda, scl, addrs) {
+  const pads = new Pads(io);
+  const lo = (p, d = 0) => pads.queue(EN_W1TS[bank(p)], bit(p), d);
+  const hi = (p, d = 0) => pads.queue(EN_W1TC[bank(p)], bit(p), d);
+  const found = [];
+  try {
+    for (const p of [sda, scl]) { await pads.input(p, 0); pads.queue(OUT_W1TC[bank(p)], bit(p)); }
+    for (const addr of addrs) {
+      lo(sda, 3); lo(scl, 3);                                            // START (bus idles high)
+      const byte = (addr << 1) & 0xff;                                   // write direction
+      let sdaLow = true;
+      for (let i = 7; i >= 0; i--) {
+        const want = !((byte >> i) & 1);                                 // true = pull SDA low
+        if (want !== sdaLow) { (want ? lo : hi)(sda, 1); sdaLow = want; }
+        hi(scl, 3); lo(scl, 3);
+      }
+      if (sdaLow) hi(sda, 1);                                            // release for the ACK slot
+      hi(scl, 3);
+      const ack = !(await pads.read(sda));
+      lo(scl, 3); lo(sda, 2); hi(scl, 3); hi(sda, 3);                    // STOP
+      if (ack) found.push(addr);
+    }
+  } finally { await pads.restore(); }
+  return found;
+}
+
 export async function i2cChecks(io, protocol, fingerprint = {}) {
   const out = [];
   for (const bus of protocol.i2c || []) {
     const up = fingerprint[bus.sda] === "HIGH" && fingerprint[bus.scl] === "HIGH";
     if (!up) { out.push(check(`i2c-${bus.sda}`, `I2C scan — ${bus.name}`, "skip", "bus not pulled up (see the SDA/SCL pin checks)")); continue; }
-    const found = [];
-    for (let a = 0x08; a < 0x78; a++) if (await i2cAck(io, bus.sda, bus.scl, a)) found.push(a);
+    const found = await i2cScan(io, bus.sda, bus.scl, Array.from({ length: 0x78 - 0x08 }, (_, i) => 0x08 + i));
     const hex = found.map((a) => "0x" + a.toString(16).padStart(2, "0"));
     const expected = bus.expectDevices || [];
     const missing = expected.filter((a) => !found.includes(a));
@@ -369,7 +421,7 @@ export async function beacon(io, protocol, { blinks = 3, ms = 120 } = {}) {
   const b = protocol.beacon;
   if (!b) return null;
   const pads = new Pads(io);
-  try { for (let i = 0; i < blinks; i++) { await pads.drive(b.gpio, 1); await sleep(ms); await pads.drive(b.gpio, 0); await sleep(ms); } }
+  try { for (let i = 0; i < blinks; i++) { await pads.drive(b.gpio, 1); await pads.sleep(ms); await pads.drive(b.gpio, 0); await pads.sleep(ms); } }
   finally { await pads.restore(); }
   return check("beacon", `Blinked ${b.name}`, "info", `${blinks}× — if it stayed dark, check the LED and its resistor`);
 }
@@ -466,23 +518,27 @@ export function audioLinks(protocol, ip) {
 // ---------------------------------------------------------------- the exam
 export async function runExam(io, protocol, { chip = {}, images = null, fitted = {}, onStep = () => {}, doBridges = true, doRadio = true, doAntenna = true, doI2c = true, doBeacon = true } = {}) {
   const t0 = Date.now();
+  DATE_REG = DATE_REGS[protocol.mcu] || DATE_REGS["esp32-s3"];
+  const timings = {}; let cur = null, tCur = 0;
+  const step = (name) => { if (cur) timings[cur] = Date.now() - tCur; cur = name; tCur = Date.now(); onStep(name); };
   const checks = [];
   const declaredAbsent = Object.entries(protocol.optionalParts || {}).filter(([k]) => fitted[k] === false).map(([, name]) => name);
   if (declaredAbsent.length) checks.push(check("declared", "Declared not fitted", "info", declaredAbsent.join(", ")));
-  onStep("identity"); checks.push(...await identityChecks(io, protocol, chip));
-  onStep("pins");     const pins = await pinChecks(io, protocol, fitted); checks.push(...pins.checks);
-  if (doBridges) { onStep("bridges"); checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); }
+  step("identity"); checks.push(...await identityChecks(io, protocol, chip));
+  step("pins");     const pins = await pinChecks(io, protocol, fitted); checks.push(...pins.checks);
+  if (doBridges) { step("bridges"); checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); }
   if (doRadio && protocol.radio && fitted.radio === false) {
     checks.push(check("radio", `LoRa radio — ${protocol.radio.part || "module"}`, "info", "declared not fitted — radio and antenna checks skipped"));
   } else if (doRadio) {
-    onStep("radio"); const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio);
-    if (doAntenna && radio.some((c) => c.id === "radio" && c.status === "pass")) { onStep("antenna"); const a = await antennaCheck(io, protocol); if (a) checks.push(a); }
+    step("radio"); const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio);
+    if (doAntenna && radio.some((c) => c.id === "radio" && c.status === "pass")) { step("antenna"); const a = await antennaCheck(io, protocol); if (a) checks.push(a); }
   }
-  if (doI2c)     { onStep("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint)); }
-  onStep("firmware"); const fw = await firmwareCheck(io, images); if (fw) checks.push(fw);
-  if (doBeacon)  { onStep("beacon");  const b = await beacon(io, protocol); if (b) checks.push(b); }
+  if (doI2c)     { step("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint)); }
+  step("firmware"); const fw = await firmwareCheck(io, images); if (fw) checks.push(fw);
+  if (doBeacon)  { step("beacon");  const b = await beacon(io, protocol); if (b) checks.push(b); }
   const counts = { pass: 0, warn: 0, fail: 0, info: 0, skip: 0 };
   for (const c of checks) counts[c.status] = (counts[c.status] || 0) + 1;
   const verdict = counts.fail ? "needs-rework" : counts.warn ? "check" : "healthy";
-  return { board: protocol.name, line: protocol.line, chip, fitted, checks, counts, verdict, fingerprint: pins.fingerprint, ms: Date.now() - t0 };
+  if (cur) timings[cur] = Date.now() - tCur;
+  return { board: protocol.name, line: protocol.line, chip, fitted, checks, counts, verdict, fingerprint: pins.fingerprint, timings, ops: io.stats ? { ...io.stats } : undefined, ms: Date.now() - t0 };
 }

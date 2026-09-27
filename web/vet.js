@@ -118,11 +118,23 @@ async function diagnose({ touched = false } = {}) {
     const chip = { chipName };
     try { chip.mac = await loader.chip.readMac(loader); } catch {}
     try { chip.flashId = await loader.readFlashId(); } catch {}
+    const stats = { reads: 0, writes: 0, batches: 0, batched: 0 };
     const io = {
-      readReg: (a) => loader.readReg(a),
-      writeReg: (a, v, m) => (m == null ? loader.writeReg(a, v) : loader.writeReg(a, v, m)),
+      stats,
+      readReg: (a) => { stats.reads++; return loader.readReg(a); },
+      writeReg: (a, v, m) => { stats.writes++; return m == null ? loader.writeReg(a, v) : loader.writeReg(a, v, m); },
+      // many register writes in ONE loader command: the flasher stub walks the
+      // [addr, value, mask, delay_us] tuples back to back (this is how esptool itself does
+      // write_reg's delay_after_us). One USB round-trip instead of one per edge.
+      writeRegs: (list) => {
+        stats.batches++; stats.batched += list.length;
+        const pkt = new Uint8Array(16 * list.length), dv = new DataView(pkt.buffer);
+        list.forEach(([a, v, m = 0xffffffff, d = 0], i) => { dv.setUint32(16 * i, a >>> 0, true); dv.setUint32(16 * i + 4, v >>> 0, true); dv.setUint32(16 * i + 8, m >>> 0, true); dv.setUint32(16 * i + 12, d >>> 0, true); });
+        return loader.checkCommand("write target memory", loader.ESP_WRITE_REG, pkt);
+      },
       readFlash: async (a, n) => { const d = await loader.readFlash(a, n); try { await transport.read(250); } catch {} return d; },
     };
+    if (typeof loader.checkCommand !== "function" || loader.ESP_WRITE_REG == null) delete io.writeRegs;
     let key = $("protocol").value, why = "";
     if (key === "auto") {
       const mcu = /ESP32-S3/i.test(chipName) ? "esp32-s3" : /ESP32-S2/i.test(chipName) ? "esp32-s2" : /ESP8266/i.test(chipName) ? "esp8266" : null;
@@ -279,7 +291,7 @@ function render(r) {
   $("report").hidden = false;
   $("summary").className = `vet-summary verdict-${r.verdict}`;
   $("summary").innerHTML = `<div class="vet-verdict">${r.verdict === "healthy" ? "Healthy" : r.verdict === "check" ? "Check" : "Needs rework"}</div>` +
-    `<div class="vet-counts">${r.counts.pass} pass · ${r.counts.warn} warn · ${r.counts.fail} fail · ${r.chip.chipName ? escapeHtml(r.chip.chipName) : ""}${r.chip.mac ? " · " + escapeHtml(r.chip.mac) : ""} · ${r.ms} ms</div>`;
+    `<div class="vet-counts">${r.counts.pass} pass · ${r.counts.warn} warn · ${r.counts.fail} fail · ${r.chip.chipName ? escapeHtml(r.chip.chipName) : ""}${r.chip.mac ? " · " + escapeHtml(r.chip.mac) : ""} · ${escapeHtml(timingText(r))}</div>`;
   const wrap = $("checks"); wrap.replaceChildren();
   let group = null;
   const order = ["Identity", "Radio", "Pins", "Solder bridges", "I2C", "Firmware", "Boot"];
@@ -293,9 +305,16 @@ function render(r) {
     wrap.append(row);
   }
 }
+function timingText(r) {
+  const secs = (ms) => `${(ms / 1000).toFixed(ms >= 10000 ? 0 : 1)} s`;
+  const slow = Object.entries(r.timings || {}).filter(([, ms]) => ms >= 1000).map(([k, ms]) => `${k} ${secs(ms)}`);
+  return `${secs(r.ms)}${slow.length ? " (" + slow.join(", ") + ")" : ""}`;
+}
 function reportText(r) {
   const absent = Object.entries(r.fitted || {}).filter(([, v]) => v === false).map(([k]) => k);
-  const lines = [`${r.board} — ${r.verdict} (${r.counts.pass} pass, ${r.counts.warn} warn, ${r.counts.fail} fail)`, `${r.chip.chipName || ""} ${r.chip.mac || ""}`.trim(), ...(absent.length ? [`declared not fitted: ${absent.join(", ")}`] : []), ""];
+  const link = r.ops ? `link: ${r.ops.reads} reads, ${r.ops.writes} writes, ${r.ops.batches} batches carrying ${r.ops.batched} writes` : null;
+  const timing = r.timings ? "timing: " + Object.entries(r.timings).map(([k, ms]) => `${k} ${(ms / 1000).toFixed(1)} s`).join(", ") + ` — total ${(r.ms / 1000).toFixed(1)} s` : null;
+  const lines = [`${r.board} — ${r.verdict} (${r.counts.pass} pass, ${r.counts.warn} warn, ${r.counts.fail} fail)`, `${r.chip.chipName || ""} ${r.chip.mac || ""}`.trim(), ...(absent.length ? [`declared not fitted: ${absent.join(", ")}`] : []), ...(timing ? [timing] : []), ...(link ? [link] : []), ""];
   for (const c of r.checks) lines.push(`${ICON[c.status]} ${c.title}: ${c.detail}${c.hint ? `\n    -> ${c.hint}` : ""}`);
   return lines.join("\n");
 }
