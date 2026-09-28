@@ -120,6 +120,7 @@ async function diagnose({ touched = false } = {}) {
   running = true; $("diagnose").disabled = true;
   $("report").hidden = true;
   mascot("working", "CAT scan…", "Hold still. This takes a few seconds.");
+  let report = null, phaseNow = "connecting";
   try {
     const { ESPLoader, Transport } = await loadEsptool();
     let port;
@@ -203,12 +204,18 @@ async function diagnose({ touched = false } = {}) {
     const steps = ["identity", "pins", "bridges", "radio", "antenna", "i2c", "firmware", "beacon"];
     const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", antenna: "Listening for off-air RF through the antenna (receive only)", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
     status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the CAT scan…`);
-    const report = await vet.runExam(io, protocol, {
+    phaseNow = "the CAT scan";
+    report = await vet.runExam(io, protocol, {
       chip, images: await IMAGES, fitted: fittedFromUi(), doBeacon: $("blink").checked,
       onStep: (s) => { progress(steps.indexOf(s) / steps.length); status(`${escapeHtml(protocol.name)} — ${labels[s] || s}…`); },
     });
     progress(1);
+    lastReport = report; render(report);      // show the findings NOW; the interactive/boot steps below only add to them
 
+    // These run AFTER the scan and touch serial again (a remote listen; a reset + console read
+    // that re-enumerates a native-USB board). A glitch here must never discard the findings above.
+    try {
+    phaseNow = "the IR remote test";
     // interactive: the IR receiver only proves itself when it sees light. Rest level can't
     // separate "unpowered" from "no internal pull-up", so ask for a remote.
     if ($("irTest").checked && protocol.ir && (fittedFromUi()[protocol.ir.part] !== false)) {
@@ -224,6 +231,7 @@ async function diagnose({ touched = false } = {}) {
       report.verdict = report.counts.fail ? "needs-rework" : report.counts.warn ? "check" : "healthy";
     }
 
+    phaseNow = "the boot check";
     // boot check: hand the board back to its firmware and watch the console
     if ($("bootCheck").checked && /esp32-s3/i.test(protocol.mcu)) {
       status("Rebooting the board into its firmware and watching it boot…");
@@ -256,18 +264,30 @@ async function diagnose({ touched = false } = {}) {
         report.verdict = report.counts.fail ? "needs-rework" : report.counts.warn ? "check" : "healthy";
       }
     } else { try { await transport.disconnect(); } catch {} }
+    } catch (e) {
+      console.warn("[vet] post-scan step glitched:", e);
+      report.checks.push({ id: "boot", title: "Boot check", status: "info", detail: `skipped \u2014 the USB link dropped during ${phaseNow}`, hint: "The CAT scan findings above are complete; only the post-scan boot/IR watch was cut short. On a native-USB board the reset re-enumerates the port \u2014 re-plug it and it'll be back in its firmware." });
+      report.counts.info = (report.counts.info || 0) + 1;
+      report.verdict = report.counts.fail ? "needs-rework" : report.counts.warn ? "check" : "healthy";
+    }
     grantedPort = null;
     lastReport = report;
     render(report);
-    const phase = report.verdict === "healthy" ? "healthy" : report.verdict === "check" ? "check" : "rework";
+    const verdictPhase = report.verdict === "healthy" ? "healthy" : report.verdict === "check" ? "check" : "rework";
     const line = report.verdict === "healthy" ? "Healthy cat" : report.verdict === "check" ? "Mostly fine — a few things to look at" : `Needs rework — ${report.counts.fail} finding${report.counts.fail === 1 ? "" : "s"}`;
     status(`<b>${escapeHtml(protocol.name)}</b>: ${escapeHtml(line)}.`, report.verdict === "healthy" ? "ok" : report.verdict === "check" ? "ok" : "err");
-    finish(phase, line, "Scroll down for the findings. Hints point at the part to check.");
+    finish(verdictPhase, line, "Scroll down for the findings. Hints point at the part to check.");
   } catch (e) {
     console.error("[vet]", e);
     grantedPort = null;
-    status(`The exam stopped: ${escapeHtml(e.message)}`, "err");
-    finish("rework", "Exam interrupted");
+    if (report && report.checks && report.checks.length) {
+      lastReport = report; render(report);
+      status(`The CAT scan finished; ${escapeHtml(phaseNow)} glitched (${escapeHtml(e.message)}). Findings are below.`, report.verdict === "needs-rework" ? "err" : "ok");
+      finish(report.verdict === "needs-rework" ? "rework" : report.verdict === "check" ? "check" : "healthy", "CAT scan complete", "Scroll down for the findings.");
+    } else {
+      status(`The exam stopped during ${escapeHtml(phaseNow)}: ${escapeHtml(e.message)}`, "err");
+      finish("rework", "Exam interrupted");
+    }
   }
 }
 function finish(phase, title = "Diagnose my cat", sub) { running = false; $("diagnose").disabled = !HAS_SERIAL; progress(null); mascot(phase, title, sub); }
