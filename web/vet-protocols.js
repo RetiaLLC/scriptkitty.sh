@@ -237,12 +237,15 @@ export const PROTOCOLS = {
       { gpio: 42, expect: "float", refs: ["SW5"], name: "trackball LEFT (SW5, bottom pad)", onLOW: { status: "fail", hint: "Reads pressed — stuck switch or bridge to GND." } },
       ...s3ZeroCommon({ bottomUsed: [17, 18, 41, 42] }),
     ],
-    driveSafe: [1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 17, 18, 38, 39, 40, 41, 42],
+    driveSafe: [1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 17, 18, 41, 42],
     // The S3-Zero "full" footprint has a HIDDEN bottom row of castellations soldered under the
     // module (this edge, top->bottom). They bridge during reflow — the usual cause of a stuck
-    // trackball button (40/41/42/45 run here) — and can't be seen or wicked from the top.
+    // trackball button (40/41/42/45 run here). GPIO38/39/40 are the S3's JTAG pins, DRIVEN by the
+    // chip while the flasher stub is running, so the bridge test never drives them: driving fights
+    // the JTAG and can corrupt the USB-serial stream mid-scan on a native-USB board. Each pair is
+    // driven from its safe neighbour and the JTAG pin is only read as the listener.
     bridgeRows: [{ pins: [45, 42, 41, 40, 39, 38, 18, 17], under: true,
-      hint: "Known Nibble Zero fault: a solder bridge on the ESP32-S3-Zero's bottom-row pads, hidden UNDER the module (the trackball lines 40/41/42/45 run along this edge) — the usual cause of a stuck button. You can't wick a short you can't reach: reflow the module off with hot air, clean the pads, and set it back down straight (a skewed module is the tell)." }],
+      hint: "Known Nibble Zero fault: a solder bridge on the ESP32-S3-Zero's bottom-row pads, hidden UNDER the module (the trackball lines 40/41/42/45 run along this edge) — the usual cause of a stuck button. You can't wick a short you can't reach: reflow the module off on a hot plate (mind the screen), clean the pads, and set it back down straight — a skewed module is the tell." }],
     radio: { type: "sx126x", nss: 10, mosi: 11, miso: 13, sck: 12, busy: 5, nrst: 6, dio1: 4, rfsw: 3, tcxoV: 1.8, dio2Switch: true,
       alt: { sck: 13, miso: 12 }, part: "Wio-SX1262 (U3)", antPad: "the Wio-SX1262's u.FL (IPEX) — the antenna arrives on a pigtail", refs: ["U3"], antRefs: ["U3"] },
     i2c: [{ sda: 8, scl: 7, name: "OLED P1 (0.96\", 128×64) + Qwiic J1", expectDevices: [0x3c], part: "display", refs: ["P1"] }],
@@ -251,7 +254,7 @@ export const PROTOCOLS = {
     known: [
       "Measured 2026-09-21/22 (two units, 3c:0f:02:e5:3d:70 and 3c:0f:02:e4:ec:34, pin-for-pin identical): 6/7/8/10 HIGH, 4/5 LOW, 21 HIGH; SSD1306 answers at 0x3C (status 0x45); SX1262 IDs with SCK 12 / MISO 13.",
       "Trackball UP (GPIO40) and RIGHT (GPIO45) sit on JTAG/strap pins and are not judged.",
-      "Known fault: the S3-Zero's bottom-row castellations (17/18/38/39/40/41/42/45), hidden under the module, bridge during reflow and stick a button. The bridge test now drives that row; RIGHT (45, a strap) can't be driven, so a 45-bridge shows only as GPIO42 held high in the rest levels. Fix = hot-air the module off and reseat it straight.",
+      "Known fault: the S3-Zero's bottom-row castellations (17/18/38/39/40/41/42/45), hidden under the module, bridge during reflow and stick a button. The bridge test drives the safe pins (17/18/41/42) and reads the JTAG pins (38/39/40) as listeners — it never drives 38/39/40, since the chip drives them in stub mode and fighting them can corrupt the serial stream mid-scan. RIGHT (45, a strap) can't be probed, so a 45-bridge shows only as GPIO42 held high in the rest levels. Fix = hot-plate the module off (mind the screen) and reseat it straight.",
     ],
   },
 

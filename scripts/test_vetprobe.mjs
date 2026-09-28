@@ -294,7 +294,7 @@ await test("Nibble Zero: a bridge on the hidden bottom-row pads under the module
   const br = by(r, "bridge-42-41");
   assert.ok(br && br.status === "fail", "bottom-row bridge 41<->42 detected: " + JSON.stringify(r.checks.filter((c) => c.id.startsWith("bridge")).map((c) => c.id)));
   assert.match(br.detail, /under the module/);
-  assert.match(br.hint, /stuck button/i); assert.match(br.hint, /hot air/i);
+  assert.match(br.hint, /stuck button/i); assert.match(br.hint, /hot plate/i);
   assert.equal(r.verdict, "needs-rework");
 });
 
