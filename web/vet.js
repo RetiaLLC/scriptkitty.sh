@@ -39,6 +39,8 @@ function renderParts(key) {
     for (const k of p.defaultAbsent || []) absent.add(k);
   }
   $("parts").replaceChildren();
+  const irCtl = $("irTestCtl"); if (irCtl) irCtl.hidden = !(key && PROTOCOLS[key] && PROTOCOLS[key].ir);
+
   for (const [k, name] of Object.entries(parts)) {
     const l = document.createElement("label"); l.className = "ctl ctl-check"; l.title = "Untick if this unit is a build without this part";
     const on = k in prev ? prev[k] : !(absent.size && absent.has(k) && protos.length === 1);
@@ -179,6 +181,11 @@ async function diagnose({ touched = false } = {}) {
       if (key) { const declared = fittedFromUi(); renderParts(key); for (const i of document.querySelectorAll("#parts input[data-part]")) if (i.dataset.part in declared) i.checked = declared[i.dataset.part]; }
       if (!key) {
         try { await transport.disconnect(); } catch {}
+        // The vet works through the ESP32-S3 ROM register map. An ESP8266 has no internal
+        // pull-downs and a different register layout, so the pin check can't run on it at all;
+        // the ESP32-S2 is register-compatible but its address map isn't wired up yet.
+        if (mcu === "esp8266") { status("This looks like a Wi-Fi Nugget (ESP8266). The vet is ESP32-S3 only — the ESP8266 has no internal pull-downs and a different register map, so the soldering check can't run on it.", "err"); return finish("check", "ESP8266 — not supported"); }
+        if (mcu === "esp32-s2") { status("This looks like a USB Nugget (ESP32-S2). The vet is ESP32-S3 only for now — S2 support is on the way. Meanwhile you can still flash it from the Flash tab.", "err"); return finish("check", "ESP32-S2 — not yet"); }
         status(`No vet protocol for this board yet (${escapeHtml(why)}). Pick one explicitly if you know what it is.`, "err");
         return finish("check", "No protocol");
       }

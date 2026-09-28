@@ -256,6 +256,22 @@ await test("every Nibble protocol (and the Nugget) scores healthy on its measure
     if (dev) assert.match(by(r, `i2c-${dev.sda}`).detail, /0x3c/, key + " display");
   }
 });
+
+await test("DEF CON badge scores healthy on its netlist-derived fingerprint (SX1276 radio, header I2C, no display)", async () => {
+  const proto = PROTOCOLS["defcon-badge"], parts = partsFrom(FP("defcon-badge"));
+  const badgeChip = { chipName: "ESP32-S3 (QFN56) (revision v0.2)", mac: "a4:cb:8f:11:22:33", flashId: 0x172020 };   // 8 MB
+  const b = FakeBoard({ parts, radio: "sx127x", radioPins: proto.radio, i2cDevice: null, rssi: (mhz) => (mhz === 915 ? -80 : -115), flashCap: 1 });
+  const r = await vet.runExam(b, proto, { chip: badgeChip, doBeacon: false });
+  const bad = r.checks.filter((c) => c.status === "fail" || c.status === "warn" || c.status === "skip").map((c) => `${c.id}: ${c.detail}`);
+  assert.deepEqual(bad, [], bad.join(" | "));
+  assert.equal(r.verdict, "healthy");
+  assert.equal(by(r, "flash").status, "pass"); assert.match(by(r, "flash").detail, /8 MB/);
+  assert.equal(by(r, "radio").status, "pass", "RFM95 SX1276 identifies over SPI");
+  assert.equal(by(r, "antenna").status, "pass");
+  assert.match(by(r, "bridges").detail, /none among \d+ neighbouring pairs/);
+  // GPIO3 (LEFT button, a strap) must be silently skipped, not judged.
+  assert.equal(by(r, "gpio3"), undefined, "strap pin GPIO3 is never probed");
+});
 await test("Nibble Zero radio on Connect-style SCK/MISO -> identified via the swapped pair, warn names the swap, antenna still runs", async () => {
   const proto = PROTOCOLS["nibble-zero"], parts = partsFrom(FP("nibble-zero-workbench5"));
   const b = FakeBoard({ parts, radioPins: { ...proto.radio, sck: 13, miso: 12 }, i2cDevice: { sda: 8, scl: 7, addr: 0x3c }, rssi: (mhz) => (mhz === 869 ? -85 : -115) });
@@ -270,6 +286,18 @@ await test("Nibble Zero with no display answering -> I2C fail naming the OLED; d
   r = await vet.runExam(FakeBoard({ parts, radioPins: proto.radio }), proto, { chip: zeroChip, fitted: { display: false }, doBeacon: false });
   assert.equal(by(r, "i2c-8").status, "pass"); assert.match(by(r, "i2c-8").detail, /declared not fitted/);
 });
+await test("Nibble Zero: a bridge on the hidden bottom-row pads under the module is caught with the stuck-button/reflow hint", async () => {
+  const proto = PROTOCOLS["nibble-zero"], parts = partsFrom(FP("nibble-zero-workbench5"));
+  const dev = proto.i2c.find((b) => b.expectDevices?.length);
+  const b = FakeBoard({ parts, radio: "sx126x", radioPins: proto.radio, i2cDevice: { sda: dev.sda, scl: dev.scl, addr: 0x3c }, bridges: [[41, 42]], rssi: (mhz) => (mhz === 915 ? -80 : -115), flashCap: 2 });
+  const r = await vet.runExam(b, proto, { chip: zeroChip, doBeacon: false });
+  const br = by(r, "bridge-42-41");
+  assert.ok(br && br.status === "fail", "bottom-row bridge 41<->42 detected: " + JSON.stringify(r.checks.filter((c) => c.id.startsWith("bridge")).map((c) => c.id)));
+  assert.match(br.detail, /under the module/);
+  assert.match(br.hint, /stuck button/i); assert.match(br.hint, /hot air/i);
+  assert.equal(r.verdict, "needs-rework");
+});
+
 await test("Nibble OG: a dead RFM95 (MISO silent) fails with the module-not-answering hint; no-pull-up I2C is info, not skip", async () => {
   const proto = PROTOCOLS["nibble-og-s3"], parts = partsFrom(FP("nibble-og-s3"));
   const r = await vet.runExam(FakeBoard({ parts, radio: null, radioPins: proto.radio }), proto, { chip: zeroChip, doBeacon: false });

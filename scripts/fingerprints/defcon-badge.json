@@ -1,0 +1,9 @@
+{
+  "unit": "synthetic — netlist + Meshtastic variant.h derived; no DEF CON badge measured on a bench yet",
+  "source": "RetiaLLC/DefconBadge2026 hardware/kicad/2024_def_con_badge_v1 + firmware/meshtastic/variant.h",
+  "pull_follow": {
+    "HIGH": [4, 5, 6, 7, 8, 38, 48],
+    "LOW": [21],
+    "float": [9, 11, 12, 13, 17, 18, 35, 36]
+  }
+}

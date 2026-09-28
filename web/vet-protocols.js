@@ -237,7 +237,12 @@ export const PROTOCOLS = {
       { gpio: 42, expect: "float", refs: ["SW5"], name: "trackball LEFT (SW5, bottom pad)", onLOW: { status: "fail", hint: "Reads pressed — stuck switch or bridge to GND." } },
       ...s3ZeroCommon({ bottomUsed: [17, 18, 41, 42] }),
     ],
-    driveSafe: [1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 17, 18, 41, 42],
+    driveSafe: [1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 17, 18, 38, 39, 40, 41, 42],
+    // The S3-Zero "full" footprint has a HIDDEN bottom row of castellations soldered under the
+    // module (this edge, top->bottom). They bridge during reflow — the usual cause of a stuck
+    // trackball button (40/41/42/45 run here) — and can't be seen or wicked from the top.
+    bridgeRows: [{ pins: [45, 42, 41, 40, 39, 38, 18, 17], under: true,
+      hint: "Known Nibble Zero fault: a solder bridge on the ESP32-S3-Zero's bottom-row pads, hidden UNDER the module (the trackball lines 40/41/42/45 run along this edge) — the usual cause of a stuck button. You can't wick a short you can't reach: reflow the module off with hot air, clean the pads, and set it back down straight (a skewed module is the tell)." }],
     radio: { type: "sx126x", nss: 10, mosi: 11, miso: 13, sck: 12, busy: 5, nrst: 6, dio1: 4, rfsw: 3, tcxoV: 1.8, dio2Switch: true,
       alt: { sck: 13, miso: 12 }, part: "Wio-SX1262 (U3)", antPad: "the Wio-SX1262's u.FL (IPEX) — the antenna arrives on a pigtail", refs: ["U3"], antRefs: ["U3"] },
     i2c: [{ sda: 8, scl: 7, name: "OLED P1 (0.96\", 128×64) + Qwiic J1", expectDevices: [0x3c], part: "display", refs: ["P1"] }],
@@ -246,6 +251,7 @@ export const PROTOCOLS = {
     known: [
       "Measured 2026-09-21/22 (two units, 3c:0f:02:e5:3d:70 and 3c:0f:02:e4:ec:34, pin-for-pin identical): 6/7/8/10 HIGH, 4/5 LOW, 21 HIGH; SSD1306 answers at 0x3C (status 0x45); SX1262 IDs with SCK 12 / MISO 13.",
       "Trackball UP (GPIO40) and RIGHT (GPIO45) sit on JTAG/strap pins and are not judged.",
+      "Known fault: the S3-Zero's bottom-row castellations (17/18/38/39/40/41/42/45), hidden under the module, bridge during reflow and stick a button. The bridge test now drives that row; RIGHT (45, a strap) can't be driven, so a 45-bridge shows only as GPIO42 held high in the rest levels. Fix = hot-air the module off and reseat it straight.",
     ],
   },
 
@@ -312,5 +318,86 @@ export const PROTOCOLS = {
     optionalParts: { radio: "LoRa add-on (RFM95)", display: "OLED (SSD1306 at 0x3C)" },
     defaultAbsent: ["radio"],
     known: ["Buttons 11/12/13/18 float on the shipped board although the v3.14 schematic shows 10K pull-ups.", "Radio pins are the nugget-bluetooth-rmf95 Meshtastic variant's; the add-on itself has not been examined."],
+  },
+
+  // ------------------------------------------------------------------ DEF CON badge
+  // 2024 Retia DEF CON badge — RetiaLLC/DefconBadge2026 hardware/kicad/2024_def_con_badge_v1.
+  // ESP32-S3-WROOM-1 (8 MB), ILI9341 2.4" TFT + XPT2046 touch + microSD + RFM95W (SX1276) all on
+  // one SPI bus (SCK 13 / MISO 12 / MOSI 11), gated through 0R networks RN1-RN8. Pins resolved
+  // against the Meshtastic variant.h (firmware/meshtastic/variant.h) — the 0R sheet net names
+  // ("/buttons/ESP32_GPIOxx") do NOT reflect the wired function. NOT yet measured on a unit:
+  // rest-level expectations are the netlist's; the JTAG-capable / 0R-jumper pins are reported
+  // without judgement until a badge is examined.
+  "defcon-badge": {
+    name: "DEF CON badge (2024, ESP32-S3-WROOM-1)",
+    line: "defcon-badge",
+    mcu: "esp32-s3",
+    module: { name: "ESP32-S3-WROOM-1 (8 MB)", flashMb: 8, pinOrder: WROOM1_PIN_ORDER, refs: ["U1"] },
+    layout: "defcon-badge",
+    pins: [
+      // d-pad + A/B: each switch has a 10K pull-up (R10-R15) and a 0.01uF debounce cap -> rest HIGH.
+      { gpio: 4, expect: "HIGH", refs: ["SW4", "R11"], name: "UP button SW4 (10K R11)",
+        onFLOAT: { status: "fail", hint: "10K pull-up R11 missing/open." },
+        onLOW: { status: "fail", hint: "SW4 stuck closed, or C8/SW4 shorted to GND." } },
+      { gpio: 5, expect: "HIGH", refs: ["SW5", "R12"], name: "DOWN button SW5 (10K R12)",
+        onFLOAT: { status: "fail", hint: "10K pull-up R12 missing/open." },
+        onLOW: { status: "fail", hint: "SW5 stuck closed, or C9/SW5 shorted to GND." } },
+      { gpio: 6, expect: "HIGH", refs: ["SW6", "R13"], name: "RIGHT button SW6 (10K R13)",
+        onFLOAT: { status: "fail", hint: "10K pull-up R13 missing/open." },
+        onLOW: { status: "fail", hint: "SW6 stuck closed, or C10/SW6 shorted to GND." } },
+      { gpio: 7, expect: "HIGH", refs: ["SW7", "R14"], name: "B button SW7 (10K R14)",
+        onFLOAT: { status: "fail", hint: "10K pull-up R14 missing/open." },
+        onLOW: { status: "fail", hint: "SW7 stuck closed, or C11/SW7 shorted to GND." } },
+      { gpio: 8, expect: "HIGH", refs: ["SW8", "R15"], name: "A button SW8 (10K R15)",
+        onFLOAT: { status: "fail", hint: "10K pull-up R15 missing/open." },
+        onLOW: { status: "fail", hint: "SW8 stuck closed, or C12/SW8 shorted to GND." } },
+      // LEFT button SW3 is on GPIO3 (a strapping pin) -> in the UNSAFE set, never probed. See known[].
+      // LoRa RFM95W (SX1276) — CS/RESET pulled up 10K; shares the SPI bus; DIO0 is the module output.
+      { gpio: 48, expect: "HIGH", refs: ["U2", "R8"], name: "LoRa NSS/CS (10K R8, via RN2)", part: "radio",
+        onFLOAT: { status: "fail", hint: "R8 (10K) missing/open, or RN2 CS jumper unpopulated — the radio is selected at random." },
+        onLOW: { status: "fail", hint: "NSS held low — short at R8 / RFM95 pin 5, or a bridge to GND." } },
+      { gpio: 38, expect: "HIGH", refs: ["U2", "R7"], name: "LoRa RESET (10K R7, via RN2)", part: "radio",
+        onFLOAT: { status: "fail", hint: "R7 (10K) missing/open, or RN2 RESET jumper unpopulated — the radio never leaves reset." },
+        onLOW: { status: "fail", hint: "RESET held low — short at R7 / RFM95 pin 6." } },
+      { gpio: 21, expect: "held", refs: ["U2"], name: "LoRa DIO0/IRQ (module output, via RN2)", part: "radio",
+        onFLOAT: { status: "warn", hint: "Nothing drives DIO0 — RFM95W not fitted, unpowered, or its pin 14 / the RN2 jumper open." } },
+      { gpio: 11, expect: "float", refs: ["U1", "U2", "U3"], name: "shared SPI MOSI (radio / TFT / SD / accessory)" },
+      { gpio: 12, expect: "float", refs: ["U1", "U2", "U3"], name: "shared SPI MISO" },
+      { gpio: 13, expect: "float", refs: ["U1", "U2", "U3"], name: "shared SPI SCK" },
+      // I2C accessory headers J5/J6 — no onboard device, no onboard pull-ups.
+      { gpio: 35, expect: "float", refs: ["J5", "J6"], name: "I2C SDA (accessory headers J5/J6)" },
+      { gpio: 36, expect: "float", refs: ["J5", "J6"], name: "I2C SCL (accessory headers J5/J6)" },
+      // NeoPixels / LED / buzzer.
+      { gpio: 17, expect: "float", name: "NeoPixel data (10x WS2812)" },
+      { gpio: 2, expect: "any", refs: ["R3"], name: "debug LED (green, 330R R3)" },
+      { gpio: 9, expect: "float", refs: ["R6"], name: "buzzer (330R R6)" },
+      // TFT control + 0R-jumper / JTAG-capable pins: driven only by firmware, or reconfigurable
+      // jumpers — level is not board-determined at ROM rest, so reported without judgement until
+      // a badge is measured (39/40/41/42 are also the S3 JTAG quartet).
+      { gpio: 47, expect: "any", refs: ["U3"], name: "TFT CS (idle high under firmware)" },
+      { gpio: 40, expect: "any", refs: ["U3"], name: "TFT DC / JTAG MTDO" },
+      { gpio: 41, expect: "any", refs: ["U3"], name: "TFT RST / JTAG MTDI" },
+      { gpio: 42, expect: "any", name: "spare (RN7 jumper) / JTAG MTMS" },
+      { gpio: 39, expect: "any", name: "SD/aux (RN6 jumper) / JTAG MTCK" },
+      { gpio: 10, expect: "any", name: "SD card CS (unused by badge firmware)" },
+      { gpio: 14, expect: "any", name: "touch/aux (RN5 jumper)" },
+      { gpio: 37, expect: "any", name: "accessory SPI (RN8 jumper)" },
+      { gpio: 18, expect: "float", name: "unconnected module pin" },
+      { gpio: 15, expect: "any", name: "GPIO15 — 32.768 kHz crystal (XTAL_32K_P)" },
+      { gpio: 16, expect: "any", name: "GPIO16 — 32.768 kHz crystal (XTAL_32K_N)" },
+    ],
+    // bridge test may drive the confidently-known pins at weakest strength; never DIO0 (21, radio
+    // output), never the JTAG-capable quartet (39-42) or the 32K crystal (15/16).
+    driveSafe: [2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 35, 36, 37, 38, 47, 48],
+    radio: { type: "sx127x", nss: 48, mosi: 11, miso: 12, sck: 13, nrst: 38, dio0: 21,
+      part: "RFM95W-915S2 (U2)", antPad: "J1 (u.FL / IPEX) or TP1 (wire antenna pad)", antRefs: ["J1", "TP1"], refs: ["U2"] },
+    i2c: [{ sda: 35, scl: 36, name: "accessory headers J5/J6", optionalPullups: true, expectDevices: [], refs: ["J5", "J6"] }],
+    beacon: { gpio: 2, name: "debug LED (green)", refs: ["R3"] },
+    optionalParts: { radio: "LoRa module (RFM95W / SX1276)" },
+    known: [
+      "Pins from the Meshtastic variant.h (firmware/meshtastic/variant.h): SPI 13/12/11, LoRa CS 48 / RESET 38 / DIO0 21, TFT CS 47 / DC 40 / RST 41, I2C 35/36, NeoPixel 17 (x10), LED 2, buzzer 9, buttons SW3-8 on 3/4/5/6/7/8.",
+      "NOT yet measured on a badge — rest-level expectations are the netlist's; the RFM95 antenna sweep uses the SX1276 path (thresholds are the SX1262 ones for now).",
+      "LEFT button (SW3) is on GPIO3, a strapping pin, so it is never probed. GPIO39-42 are the S3 JTAG quartet and are reported without judgement until measured.",
+    ],
   },
 };

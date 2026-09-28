@@ -1,0 +1,403 @@
+{
+ "board": "DEF CON badge (2024, ESP32-S3-WROOM-1)",
+ "line": "defcon-badge",
+ "chip": {
+  "chipName": "ESP32-S3 (QFN56) (revision v0.2)",
+  "mac": "a4:cb:8f:2d:1e:40",
+  "flashId": 1515552
+ },
+ "fitted": {
+  "radio": true
+ },
+ "checks": [
+  {
+   "id": "chip",
+   "title": "Chip",
+   "status": "pass",
+   "detail": "ESP32-S3 (QFN56) (revision v0.2) · MAC a4:cb:8f:2d:1e:40"
+  },
+  {
+   "id": "flash",
+   "title": "Flash",
+   "status": "pass",
+   "detail": "8 MB (XMC)"
+  },
+  {
+   "id": "psram",
+   "title": "PSRAM (eFuse)",
+   "status": "info",
+   "detail": "2 MB"
+  },
+  {
+   "id": "gpio4",
+   "title": "GPIO4 — UP button SW4 (10K R11)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 4,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio5",
+   "title": "GPIO5 — DOWN button SW5 (10K R12)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 5,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio6",
+   "title": "GPIO6 — RIGHT button SW6 (10K R13)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 6,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio7",
+   "title": "GPIO7 — B button SW7 (10K R14)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 7,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio8",
+   "title": "GPIO8 — A button SW8 (10K R15)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 8,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio48",
+   "title": "GPIO48 — LoRa NSS/CS (10K R8, via RN2)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 48,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio38",
+   "title": "GPIO38 — LoRa RESET (10K R7, via RN2)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 38,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio21",
+   "title": "GPIO21 — LoRa DIO0/IRQ (module output, via RN2)",
+   "status": "pass",
+   "detail": "driven LOW",
+   "gpio": 21,
+   "level": "LOW"
+  },
+  {
+   "id": "gpio11",
+   "title": "GPIO11 — shared SPI MOSI (radio / TFT / SD / accessory)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 11,
+   "level": "float"
+  },
+  {
+   "id": "gpio12",
+   "title": "GPIO12 — shared SPI MISO",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 12,
+   "level": "float"
+  },
+  {
+   "id": "gpio13",
+   "title": "GPIO13 — shared SPI SCK",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 13,
+   "level": "float"
+  },
+  {
+   "id": "gpio35",
+   "title": "GPIO35 — I2C SDA (accessory headers J5/J6)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 35,
+   "level": "float"
+  },
+  {
+   "id": "gpio36",
+   "title": "GPIO36 — I2C SCL (accessory headers J5/J6)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 36,
+   "level": "float"
+  },
+  {
+   "id": "gpio17",
+   "title": "GPIO17 — NeoPixel data (10x WS2812)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 17,
+   "level": "float"
+  },
+  {
+   "id": "gpio2",
+   "title": "GPIO2 — debug LED (green, 330R R3)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 2,
+   "level": "float"
+  },
+  {
+   "id": "gpio9",
+   "title": "GPIO9 — buzzer (330R R6)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 9,
+   "level": "float"
+  },
+  {
+   "id": "gpio47",
+   "title": "GPIO47 — TFT CS (idle high under firmware)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 47,
+   "level": "float"
+  },
+  {
+   "id": "gpio40",
+   "title": "GPIO40 — TFT DC / JTAG MTDO",
+   "status": "info",
+   "detail": "float",
+   "gpio": 40,
+   "level": "float"
+  },
+  {
+   "id": "gpio41",
+   "title": "GPIO41 — TFT RST / JTAG MTDI",
+   "status": "info",
+   "detail": "float",
+   "gpio": 41,
+   "level": "float"
+  },
+  {
+   "id": "gpio42",
+   "title": "GPIO42 — spare (RN7 jumper) / JTAG MTMS",
+   "status": "info",
+   "detail": "float",
+   "gpio": 42,
+   "level": "float"
+  },
+  {
+   "id": "gpio39",
+   "title": "GPIO39 — SD/aux (RN6 jumper) / JTAG MTCK",
+   "status": "info",
+   "detail": "float",
+   "gpio": 39,
+   "level": "float"
+  },
+  {
+   "id": "gpio10",
+   "title": "GPIO10 — SD card CS (unused by badge firmware)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 10,
+   "level": "float"
+  },
+  {
+   "id": "gpio14",
+   "title": "GPIO14 — touch/aux (RN5 jumper)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 14,
+   "level": "float"
+  },
+  {
+   "id": "gpio37",
+   "title": "GPIO37 — accessory SPI (RN8 jumper)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 37,
+   "level": "float"
+  },
+  {
+   "id": "gpio18",
+   "title": "GPIO18 — unconnected module pin",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 18,
+   "level": "float"
+  },
+  {
+   "id": "gpio15",
+   "title": "GPIO15 — GPIO15 — 32.768 kHz crystal (XTAL_32K_P)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 15,
+   "level": "float"
+  },
+  {
+   "id": "gpio16",
+   "title": "GPIO16 — GPIO16 — 32.768 kHz crystal (XTAL_32K_N)",
+   "status": "info",
+   "detail": "float",
+   "gpio": 16,
+   "level": "float"
+  },
+  {
+   "id": "bridges",
+   "title": "Solder bridges (adjacent module pins)",
+   "status": "pass",
+   "detail": "none among 20 neighbouring pairs"
+  },
+  {
+   "id": "radio",
+   "title": "LoRa radio — RFM95W-915S2 (U2)",
+   "status": "pass",
+   "detail": "RegVersion 0x12 (SX1276 / RFM95)",
+   "alive": true,
+   "radio": {
+    "type": "sx127x",
+    "nss": 48,
+    "mosi": 11,
+    "miso": 12,
+    "sck": 13,
+    "nrst": 38,
+    "dio0": 21,
+    "part": "RFM95W-915S2 (U2)",
+    "antPad": "J1 (u.FL / IPEX) or TP1 (wire antenna pad)",
+    "antRefs": [
+     "J1",
+     "TP1"
+    ],
+    "refs": [
+     "U2"
+    ]
+   }
+  },
+  {
+   "id": "antenna",
+   "title": "Antenna installed (RX-only listen)",
+   "status": "pass",
+   "detail": "hears ambient RF: 915 MHz at -78 dBm, floor -114 dBm (SX1276 RegRssiValue sweep — thresholds borrowed from the SX1262 calibration)",
+   "sweep": [
+    {
+     "mhz": 739,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 751,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 869,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 881,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 894,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 915,
+     "max": -78,
+     "mean": -78
+    },
+    {
+     "mhz": 933,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 945,
+     "max": -114,
+     "mean": -114
+    },
+    {
+     "mhz": 957,
+     "max": -114,
+     "mean": -114
+    }
+   ],
+   "floor": -114,
+   "lift": 36,
+   "errors": 0,
+   "raw": "739:-114 751:-114 869:-114 881:-114 894:-114 915:-78 933:-114 945:-114 957:-114"
+  },
+  {
+   "id": "i2c-35",
+   "title": "I2C scan — accessory headers J5/J6",
+   "status": "info",
+   "detail": "no pull-ups on this bus — none are fitted on this board (an accessory brings its own), nothing to scan"
+  },
+  {
+   "id": "firmware",
+   "title": "Installed firmware",
+   "status": "info",
+   "detail": "PlatformIO env \"newsheen-puck\""
+  }
+ ],
+ "counts": {
+  "pass": 21,
+  "warn": 0,
+  "fail": 0,
+  "info": 14,
+  "skip": 0
+ },
+ "verdict": "healthy",
+ "fingerprint": {
+  "2": "float",
+  "4": "HIGH",
+  "5": "HIGH",
+  "6": "HIGH",
+  "7": "HIGH",
+  "8": "HIGH",
+  "9": "float",
+  "10": "float",
+  "11": "float",
+  "12": "float",
+  "13": "float",
+  "14": "float",
+  "15": "float",
+  "16": "float",
+  "17": "float",
+  "18": "float",
+  "21": "LOW",
+  "35": "float",
+  "36": "float",
+  "37": "float",
+  "38": "HIGH",
+  "39": "float",
+  "40": "float",
+  "41": "float",
+  "42": "float",
+  "47": "float",
+  "48": "HIGH"
+ },
+ "timings": {
+  "identity": 1,
+  "pins": 1,
+  "bridges": 2,
+  "radio": 18,
+  "antenna": 79,
+  "i2c": 0,
+  "firmware": 1
+ },
+ "ops": {
+  "reads": 0,
+  "writes": 0,
+  "batches": 0,
+  "batched": 0
+ },
+ "ms": 102,
+ "protocolKey": "defcon-badge",
+ "demo": true
+}

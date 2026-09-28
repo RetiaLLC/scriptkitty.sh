@@ -103,20 +103,30 @@ export function renderBoard(el, layout, highlights, { onPick = () => {}, title =
 export function sweepChartSvg(c) {
   const bands = c?.sweep || [];
   if (!bands.length) return "";
-  const W = 380, H = 118, L = 36, R = 6, T = 10, B = 24, min = -120, max = -50, thr = -95;
-  const y = (dbm) => T + ((max - Math.max(min, Math.min(max, dbm))) / (max - min)) * (H - T - B);
+  // wide viewBox so the axis text stays small next to the bars; a legend row up top keeps the
+  // threshold/floor labels off the bars (they used to overprint the right-hand bars).
+  const W = 460, H = 150, L = 40, R = 12, T = 30, B = 26, min = -120, max = -50, thr = -95;
+  const plotH = H - T - B;
+  const y = (dbm) => T + ((max - Math.max(min, Math.min(max, dbm))) / (max - min)) * plotH;
   const bw = (W - L - R) / bands.length;
   const peak = Math.max(...bands.map((b) => b.max));
   let s = `<svg class="vet-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="RSSI per band">`;
-  for (const g of [-60, -80, -100]) s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(g).toFixed(1)}" y2="${y(g).toFixed(1)}"/><text class="tick" x="${L - 4}" y="${(y(g) + 3).toFixed(1)}" text-anchor="end">${g}</text>`;
-  if (c.floor != null) s += `<line class="floor" x1="${L}" x2="${W - R}" y1="${y(c.floor).toFixed(1)}" y2="${y(c.floor).toFixed(1)}"/><text class="floor-label" x="${L + 3}" y="${(y(c.floor) - 3).toFixed(1)}">floor ${Math.round(c.floor)} dBm</text>`;
-  s += `<line class="thr" x1="${L}" x2="${W - R}" y1="${y(thr).toFixed(1)}" y2="${y(thr).toFixed(1)}"/><text class="thr-label" x="${W - R}" y="${(y(thr) - 3).toFixed(1)}" text-anchor="end">antenna heard ≥ ${thr} dBm</text>`;
+  // legend row (above the plot): threshold swatch + label, then the floor swatch + label
+  s += `<line class="thr" x1="${L}" x2="${L + 16}" y1="12" y2="12"/><text class="thr-label" x="${L + 21}" y="15">heard ≥ ${thr} dBm</text>`;
+  if (c.floor != null) s += `<line class="floor" x1="${L + 150}" x2="${L + 166}" y1="12" y2="12"/><text class="floor-label" x="${L + 171}" y="15">floor ${Math.round(c.floor)} dBm</text>`;
+  // horizontal gridlines with left-edge dBm ticks
+  for (const g of [-60, -80, -100]) s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(g).toFixed(1)}" y2="${y(g).toFixed(1)}"/><text class="tick" x="${L - 5}" y="${(y(g) + 3).toFixed(1)}" text-anchor="end">${g}</text>`;
+  s += `<text class="axis" x="${L - 5}" y="${(T - 4).toFixed(1)}" text-anchor="end">dBm</text>`;
+  // threshold + floor lines across the plot (labels live in the legend, not on the bars)
+  s += `<line class="thr" x1="${L}" x2="${W - R}" y1="${y(thr).toFixed(1)}" y2="${y(thr).toFixed(1)}"/>`;
+  if (c.floor != null) s += `<line class="floor" x1="${L}" x2="${W - R}" y1="${y(c.floor).toFixed(1)}" y2="${y(c.floor).toFixed(1)}"/>`;
+  // bars + MHz labels
   bands.forEach((b, i) => {
     const x = L + i * bw + 3, top = y(b.max), hot = b.max >= thr || (c.lift >= 10 && b.max === peak);
-    s += `<rect class="bar${hot ? " bar-hot" : ""}" x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${(bw - 6).toFixed(1)}" height="${(H - B - top).toFixed(1)}"><title>${b.mhz} MHz — max ${Math.round(b.max)} dBm, mean ${Math.round(b.mean)} dBm</title></rect>`;
-    s += `<text class="tick" x="${(x + (bw - 6) / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${b.mhz}</text>`;
+    s += `<rect class="bar${hot ? " bar-hot" : ""}" x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${(bw - 6).toFixed(1)}" height="${(H - B - top).toFixed(1)}" rx="1"><title>${b.mhz} MHz — max ${Math.round(b.max)} dBm, mean ${Math.round(b.mean)} dBm</title></rect>`;
+    s += `<text class="tick" x="${(x + (bw - 6) / 2).toFixed(1)}" y="${H - 9}" text-anchor="middle">${b.mhz}</text>`;
   });
-  s += `<text class="axis" x="${W - R}" y="${H - 8}" text-anchor="end"></text><text class="axis" x="${L - 4}" y="${T - 2}" text-anchor="end">dBm</text></svg>`;
+  s += `<text class="axis" x="${(L + (W - L - R) / 2).toFixed(1)}" y="${H - 1}" text-anchor="middle">MHz</text></svg>`;
   return s;
 }
 

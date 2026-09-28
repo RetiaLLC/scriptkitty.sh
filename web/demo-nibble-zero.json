@@ -1,0 +1,438 @@
+{
+ "board": "Nibble Zero (ESP32-S3-Zero + Wio-SX1262 + 0.96\" OLED)",
+ "line": "nibble",
+ "chip": {
+  "chipName": "ESP32-S3 (QFN56) (revision v0.2)",
+  "mac": "d4:05:92:48:70:54",
+  "flashId": 1458208
+ },
+ "fitted": {
+  "radio": true,
+  "display": true
+ },
+ "checks": [
+  {
+   "id": "chip",
+   "title": "Chip",
+   "status": "pass",
+   "detail": "ESP32-S3 (QFN56) (revision v0.2) · MAC d4:05:92:48:70:54"
+  },
+  {
+   "id": "flash",
+   "title": "Flash",
+   "status": "pass",
+   "detail": "4 MB (XMC)"
+  },
+  {
+   "id": "psram",
+   "title": "PSRAM (eFuse)",
+   "status": "pass",
+   "detail": "2 MB, in-package flash code 2"
+  },
+  {
+   "id": "gpio6",
+   "title": "GPIO6 — Wio-SX1262 NRST (10K RN1)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 6,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio10",
+   "title": "GPIO10 — Wio-SX1262 NSS (10K RN1)",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 10,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio5",
+   "title": "GPIO5 — Wio-SX1262 BUSY (module output)",
+   "status": "pass",
+   "detail": "driven low",
+   "gpio": 5,
+   "level": "LOW"
+  },
+  {
+   "id": "gpio4",
+   "title": "GPIO4 — Wio-SX1262 DIO1 (IRQ output)",
+   "status": "pass",
+   "detail": "driven LOW",
+   "gpio": 4,
+   "level": "LOW"
+  },
+  {
+   "id": "gpio11",
+   "title": "GPIO11 — SPI MOSI (→ Wio pin 3)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 11,
+   "level": "float"
+  },
+  {
+   "id": "gpio12",
+   "title": "GPIO12 — SPI SCK (→ Wio pin 4)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 12,
+   "level": "float"
+  },
+  {
+   "id": "gpio13",
+   "title": "GPIO13 — SPI MISO (Wio pin 2, idle)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 13,
+   "level": "float"
+  },
+  {
+   "id": "gpio7",
+   "title": "GPIO7 — I2C SCL (10K RN1) → OLED P1, Qwiic J1",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 7,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio8",
+   "title": "GPIO8 — I2C SDA (10K RN1) → OLED P1, Qwiic J1",
+   "status": "pass",
+   "detail": "pulled up",
+   "gpio": 8,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio9",
+   "title": "GPIO9 — CS_ACCESSORY (J2 header)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 9,
+   "level": "float"
+  },
+  {
+   "id": "gpio1",
+   "title": "GPIO1 — button A (SW1) — no pull-up, firmware uses INPUT_PULLUP",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 1,
+   "level": "float"
+  },
+  {
+   "id": "gpio2",
+   "title": "GPIO2 — button B / trackball press (SW2) — no pull-up",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 2,
+   "level": "float"
+  },
+  {
+   "id": "gpio17",
+   "title": "GPIO17 — WS2812 D7 data-in (bottom pad 23)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 17,
+   "level": "float"
+  },
+  {
+   "id": "gpio18",
+   "title": "GPIO18 — J3 header spare (bottom pad 24)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 18,
+   "level": "float"
+  },
+  {
+   "id": "gpio41",
+   "title": "GPIO41 — trackball DOWN (SW4, bottom pad)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 41,
+   "level": "float"
+  },
+  {
+   "id": "gpio42",
+   "title": "GPIO42 — trackball LEFT (SW5, bottom pad)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 42,
+   "level": "float"
+  },
+  {
+   "id": "gpio21",
+   "title": "GPIO21 — S3-Zero onboard WS2812 data (module-internal; reads high on every module measured)",
+   "status": "info",
+   "detail": "HIGH",
+   "gpio": 21,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio14",
+   "title": "GPIO14 — S3-Zero bottom pad (unused on this board)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 14,
+   "level": "float"
+  },
+  {
+   "id": "gpio15",
+   "title": "GPIO15 — S3-Zero bottom pad (unused on this board)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 15,
+   "level": "float"
+  },
+  {
+   "id": "gpio16",
+   "title": "GPIO16 — S3-Zero bottom pad (unused on this board)",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 16,
+   "level": "float"
+  },
+  {
+   "id": "gpio33",
+   "title": "GPIO33 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 33,
+   "level": "float"
+  },
+  {
+   "id": "gpio34",
+   "title": "GPIO34 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 34,
+   "level": "float"
+  },
+  {
+   "id": "gpio35",
+   "title": "GPIO35 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 35,
+   "level": "float"
+  },
+  {
+   "id": "gpio36",
+   "title": "GPIO36 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 36,
+   "level": "float"
+  },
+  {
+   "id": "gpio37",
+   "title": "GPIO37 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 37,
+   "level": "float"
+  },
+  {
+   "id": "gpio47",
+   "title": "GPIO47 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 47,
+   "level": "float"
+  },
+  {
+   "id": "gpio48",
+   "title": "GPIO48 — not bonded out on the S3-Zero",
+   "status": "pass",
+   "detail": "floats",
+   "gpio": 48,
+   "level": "float"
+  },
+  {
+   "id": "gpio38",
+   "title": "GPIO38 — S3-Zero bottom pad — JTAG pin in ROM mode",
+   "status": "info",
+   "detail": "LOW (ROM-mode JTAG level, not a board signal)",
+   "gpio": 38,
+   "level": "LOW"
+  },
+  {
+   "id": "gpio39",
+   "title": "GPIO39 — S3-Zero bottom pad — JTAG pin in ROM mode",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)",
+   "gpio": 39,
+   "level": "HIGH"
+  },
+  {
+   "id": "gpio40",
+   "title": "GPIO40 — S3-Zero bottom pad — JTAG pin in ROM mode",
+   "status": "info",
+   "detail": "HIGH (ROM-mode JTAG level, not a board signal)",
+   "gpio": 40,
+   "level": "HIGH"
+  },
+  {
+   "id": "bridges",
+   "title": "Solder bridges (adjacent module pins)",
+   "status": "pass",
+   "detail": "none among 8 neighbouring pairs"
+  },
+  {
+   "id": "radio",
+   "title": "LoRa radio — Wio-SX1262 (U3)",
+   "status": "pass",
+   "detail": "answers: \"SX1261 V2D 2D02\", STDBY_RC, BUSY released",
+   "alive": true,
+   "radio": {
+    "type": "sx126x",
+    "nss": 10,
+    "mosi": 11,
+    "miso": 13,
+    "sck": 12,
+    "busy": 5,
+    "nrst": 6,
+    "dio1": 4,
+    "rfsw": 3,
+    "tcxoV": 1.8,
+    "dio2Switch": true,
+    "alt": {
+     "sck": 13,
+     "miso": 12
+    },
+    "part": "Wio-SX1262 (U3)",
+    "antPad": "the Wio-SX1262's u.FL (IPEX) — the antenna arrives on a pigtail",
+    "refs": [
+     "U3"
+    ],
+    "antRefs": [
+     "U3"
+    ]
+   }
+  },
+  {
+   "id": "antenna",
+   "title": "Antenna installed (RX-only listen)",
+   "status": "pass",
+   "detail": "hears ambient RF: 915 MHz at -80 dBm, floor -113 dBm",
+   "sweep": [
+    {
+     "mhz": 739,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 751,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 869,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 881,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 894,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 915,
+     "max": -80,
+     "mean": -80
+    },
+    {
+     "mhz": 933,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 945,
+     "max": -113,
+     "mean": -113
+    },
+    {
+     "mhz": 957,
+     "max": -113,
+     "mean": -113
+    }
+   ],
+   "floor": -113,
+   "lift": 33,
+   "errors": 0,
+   "raw": "739:-113 751:-113 869:-113 881:-113 894:-113 915:-80 933:-113 945:-113 957:-113"
+  },
+  {
+   "id": "i2c-8",
+   "title": "I2C scan — OLED P1 (0.96\", 128×64) + Qwiic J1",
+   "status": "pass",
+   "detail": "devices at 0x3c"
+  },
+  {
+   "id": "firmware",
+   "title": "Installed firmware",
+   "status": "info",
+   "detail": "PlatformIO env \"newsheen-puck\""
+  }
+ ],
+ "counts": {
+  "pass": 33,
+  "warn": 0,
+  "fail": 0,
+  "info": 5,
+  "skip": 0
+ },
+ "verdict": "healthy",
+ "fingerprint": {
+  "1": "float",
+  "2": "float",
+  "4": "LOW",
+  "5": "LOW",
+  "6": "HIGH",
+  "7": "HIGH",
+  "8": "HIGH",
+  "9": "float",
+  "10": "HIGH",
+  "11": "float",
+  "12": "float",
+  "13": "float",
+  "14": "float",
+  "15": "float",
+  "16": "float",
+  "17": "float",
+  "18": "float",
+  "21": "HIGH",
+  "33": "float",
+  "34": "float",
+  "35": "float",
+  "36": "float",
+  "37": "float",
+  "38": "LOW",
+  "39": "HIGH",
+  "40": "HIGH",
+  "41": "float",
+  "42": "float",
+  "47": "float",
+  "48": "float"
+ },
+ "timings": {
+  "identity": 0,
+  "pins": 1,
+  "bridges": 1,
+  "radio": 8,
+  "antenna": 65,
+  "i2c": 4,
+  "firmware": 1
+ },
+ "ops": {
+  "reads": 0,
+  "writes": 0,
+  "batches": 0,
+  "batched": 0
+ },
+ "ms": 81,
+ "protocolKey": "nibble-zero",
+ "demo": true
+}

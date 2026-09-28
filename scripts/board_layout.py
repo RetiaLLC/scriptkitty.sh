@@ -13,13 +13,14 @@ import json, math, re, sys
 LABELS = {   # friendly names: per-board ref names (REF_LABELS[key]) first, then by value pattern
     "value": [(r"ESP32-S3-WROOM", "ESP32-S3"), (r"WIO-SX1262", "LoRa radio"), (r"TSOP", "IR receiver"), (r"SN74LVC1T45", "level shifter"),
               (r"AMS1117", "3.3 V reg"), (r"USB_C", "USB-C"), (r"WS2812", ""), (r"^LED$", "LED"), (r"SW_Push|SW_SPST", ""), (r"RFM95", "LoRa radio"),
-              (r"ESP32-S3-ZERO", "ESP32-S3-Zero"), (r"HS96L03|HS91L02|SSD1306", "OLED"), (r"SolderJumper", "JP")],
+              (r"ESP32-S3-ZERO", "ESP32-S3-Zero"), (r"HS96L03|HS91L02|SSD1306", "OLED"), (r"MSP2402|ILI9341", "TFT"), (r"SolderJumper", "JP")],
     "ref": {"ANT1": "ANT"},
 }
 REF_LABELS = {
     "newsheen": {"J3": "J3 header", "SW3": "button", "SW1": "reset", "SW2": "boot", "R21": "R21", "D14": "LED", "JP1": "JP1"},
     "nibble-zero": {"SW1": "A", "SW2": "B", "SW3": "up", "SW4": "down", "SW5": "left", "SW6": "right", "RN1": "RN1", "R4": "LED R4", "D7": "WS2812", "J1": "Qwiic", "J2": "J2", "J3": "J3", "P1": "OLED"},
-}
+
+    "defcon-badge": {"SW2": "boot", "SW3": "left", "SW4": "up", "SW5": "down", "SW6": "right", "SW7": "B", "SW8": "A", "U2": "LoRa radio", "U3": "TFT", "J1": "ANT", "J5": "I2C", "J6": "I2C", "J3": "accessory", "J7": "USB-C", "LS1": "buzzer"},}
 
 def tokenize(s): return re.findall(r'\(|\)|"(?:[^"\\]|\\.)*"|[^\s()"]+', s)
 def parse(tokens):
@@ -52,7 +53,7 @@ def arc_svg(s, m, e):
 def outline_path(pcb):
     segs, circles = [], []
     for g in pcb:
-        if not (isinstance(g, list) and g and g[0] in ("gr_line", "gr_arc", "gr_circle", "gr_rect")): continue
+        if not (isinstance(g, list) and g and g[0] in ("gr_line", "gr_arc", "gr_circle", "gr_rect", "gr_curve")): continue
         ly = find(g, "layer")
         if not ly or ly[0][1] != "Edge.Cuts": continue
         if g[0] == "gr_circle":
@@ -60,6 +61,12 @@ def outline_path(pcb):
         if g[0] == "gr_rect":
             a, b = pt(g, "start"), pt(g, "end")
             segs += [{"s": a, "e": (b[0], a[1]), "m": None}, {"s": (b[0], a[1]), "e": b, "m": None}, {"s": b, "e": (a[0], b[1]), "m": None}, {"s": (a[0], b[1]), "e": a, "m": None}]
+            continue
+        if g[0] == "gr_curve":
+            cps = []
+            for ptsn in find(g, "pts"):
+                for q in find(ptsn, "xy"): cps.append((num(q[1]), num(q[2])))
+            if len(cps) >= 4: segs.append({"s": cps[0], "e": cps[3], "m": None, "c1": cps[1], "c2": cps[2]})
             continue
         segs.append({"s": pt(g, "start"), "e": pt(g, "end"), "m": pt(g, "mid") if g[0] == "gr_arc" else None})
     def close(a, b): return math.hypot(a[0]-b[0], a[1]-b[1]) < 0.02
@@ -70,7 +77,10 @@ def outline_path(pcb):
             cur = chain[-1]["e"]; hit = None
             for i, sg in enumerate(segs):
                 if close(sg["s"], cur): hit = segs.pop(i); break
-                if close(sg["e"], cur): sg = segs.pop(i); hit = {"s": sg["e"], "e": sg["s"], "m": sg["m"]}; break
+                if close(sg["e"], cur):
+                    sg = segs.pop(i); hit = {"s": sg["e"], "e": sg["s"], "m": sg["m"]}
+                    if "c1" in sg: hit["c1"], hit["c2"] = sg["c2"], sg["c1"]
+                    break
             if not hit: break
             chain.append(hit)
         loops.append(chain)
@@ -79,12 +89,15 @@ def outline_path(pcb):
         for sg in chain:
             xs += [sg["s"][0], sg["e"][0]]; ys += [sg["s"][1], sg["e"][1]]
             if sg["m"]: xs.append(sg["m"][0]); ys.append(sg["m"][1])
+            if sg.get("c1"): xs += [sg["c1"][0], sg["c2"][0]]; ys += [sg["c1"][1], sg["c2"][1]]
         return (min(xs), min(ys), max(xs), max(ys))
     if loops:
         chain = max(loops, key=lambda c: (lambda b: (b[2]-b[0]) * (b[3]-b[1]))(loop_bbox(c)))
         d = f"M {chain[0]['s'][0]:.3f} {chain[0]['s'][1]:.3f}"
         for sg in chain:
-            if sg["m"]:
+            if sg.get("c1"):
+                d += f" C {sg['c1'][0]:.3f} {sg['c1'][1]:.3f} {sg['c2'][0]:.3f} {sg['c2'][1]:.3f} {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
+            elif sg["m"]:
                 r, large, sweep = arc_svg(sg["s"], sg["m"], sg["e"])
                 d += f" A {r:.3f} {r:.3f} 0 {large} {sweep} {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
             else: d += f" L {sg['e'][0]:.3f} {sg['e'][1]:.3f}"
@@ -95,6 +108,18 @@ def outline_path(pcb):
         (cx, cy), r = max(circles, key=lambda c: c[1])
         return f"M {cx-r:.3f} {cy:.3f} a {r:.3f} {r:.3f} 0 1 0 {2*r:.3f} 0 a {r:.3f} {r:.3f} 0 1 0 {-2*r:.3f} 0 Z", (cx-r-0.5, cy-r-0.5, cx+r+0.5, cy+r+0.5)
     return "", (0, 0, 10, 10)
+
+def _layer_pts(fp, want):
+    xs, ys = [], []
+    for k in ("fp_line", "fp_rect", "fp_circle", "fp_arc", "fp_poly"):
+        for e in find(fp, k):
+            l2 = find(e, "layer")
+            if not l2 or not re.search(want, l2[0][1]): continue
+            for corner in ("start", "end", "center", "mid"):
+                for q in find(e, corner): xs.append(num(q[1])); ys.append(num(q[2]))
+            for ptsn in find(e, "pts"):
+                for q in find(ptsn, "xy"): xs.append(num(q[1])); ys.append(num(q[2]))
+    return xs, ys
 
 def gpio_of(net):
     if not net: return None
@@ -121,21 +146,33 @@ def board(path, key=None):
         if not at or not ref: continue
         layer = "B" if ly and ly[0][1].startswith("B") else "F"
         x, y = num(at[0][1]), num(at[0][2]); rot = num(at[0][3]) if len(at[0]) > 3 else 0.0
-        xs, ys = [], []
-        for k in ("fp_line", "fp_rect", "fp_circle", "fp_arc", "fp_poly"):
-            for e in find(fp, k):
-                l2 = find(e, "layer")
-                if not l2 or not re.search(r"CrtYd", l2[0][1]): continue
-                for corner in ("start", "end", "center", "mid"):
-                    for q in find(e, corner): xs.append(num(q[1])); ys.append(num(q[2]))
-                for pts in find(e, "pts"):
-                    for q in find(pts, "xy"): xs.append(num(q[1])); ys.append(num(q[2]))
-        w = round(max(xs) - min(xs), 2) if xs else None; h = round(max(ys) - min(ys), 2) if ys else None
         plist = find(fp, "pad")
-        if w is None and plist:   # test points etc.: size from the pad
+        # size from the component BODY (Fab, then Silk, then Courtyard) unioned with the pad
+        # span, so a connector-footprint OLED shows as its screen and a header as its strip.
+        bxs, bys = _layer_pts(fp, r"\.Fab")
+        if not bxs: bxs, bys = _layer_pts(fp, r"SilkS")
+        if not bxs: bxs, bys = _layer_pts(fp, r"CrtYd")
+        pxs, pys = [], []
+        for pd in plist:
+            pat = find(pd, "at"); psz = find(pd, "size")
+            if not pat: continue
+            lx, ly = num(pat[0][1]), num(pat[0][2])
+            sw = (num(psz[0][1]) / 2) if psz else 0.5; sh = (num(psz[0][2]) / 2) if psz else 0.5
+            pxs += [lx - sw, lx + sw]; pys += [ly - sh, ly + sh]
+        xs = bxs + pxs; ys = bys + pys
+        dispx, dispy = x, y                                                    # part-box centre; x,y stays the true footprint origin for the pads below
+        if xs:
+            w = round(max(xs) - min(xs), 2); h = round(max(ys) - min(ys), 2)
+            cxl = (max(xs) + min(xs)) / 2; cyl = (max(ys) + min(ys)) / 2      # local centre of the body box
+            rr = math.radians(rot)
+            dispx = round(x + cxl * math.cos(rr) + cyl * math.sin(rr), 3)     # draw the body box over the body, not the footprint origin
+            dispy = round(y - cxl * math.sin(rr) + cyl * math.cos(rr), 3)
+        elif plist:
             sz = find(plist[0], "size"); w = h = round(max(num(sz[0][1]), num(sz[0][2])), 2) if sz else 1.2
+        else:
+            w = h = None
         shape = "circle" if (w and h and abs(w - h) < 0.05 and len(plist) <= 1) else "rect"
-        parts.append({"ref": ref, "value": val, "layer": layer, "x": round(x, 3), "y": round(y, 3), "rot": rot, "w": w, "h": h, "shape": shape, "label": label_for(ref, val, key)})
+        parts.append({"ref": ref, "value": val, "layer": layer, "x": round(dispx, 3), "y": round(dispy, 3), "rot": rot, "w": w, "h": h, "shape": shape, "label": label_for(ref, val, key)})
         r = math.radians(rot)
         for p in plist:
             pat = find(p, "at")

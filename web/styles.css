@@ -634,3 +634,20 @@ esp-web-install-button[install-unsupported] { display: block; }
 .board-side .board-svg { max-height: 360px; }
 .board-side figcaption { margin-top: 6px; font: 600 11.5px var(--mono); color: var(--secondary); text-align: center; }
 .board-B .board-face { fill: #0d251d; }
+
+/* --- Resources page --- */
+.res-lead { color: var(--muted); margin: 0 0 22px; max-width: 60ch; }
+.res-section { margin: 0 0 30px; }
+.res-section h2 { font-size: 14px; letter-spacing: .04em; text-transform: uppercase; color: var(--dim); margin: 0 0 12px; }
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.res-card { display: block; padding: 15px 16px; border: 1px solid var(--border, rgba(255,255,255,.1)); border-radius: 12px; background: var(--bg-elev, #121a26); text-decoration: none; transition: border-color .15s ease, background .15s ease, transform .15s ease; }
+.res-card:hover { border-color: rgba(110, 168, 255, .5); background: var(--bg-elev-2, #16202e); transform: translateY(-1px); }
+.res-card .res-h { display: flex; align-items: baseline; gap: 8px; }
+.res-card .res-name { font-weight: 700; font-size: 15px; color: var(--text); }
+.res-card .res-host { font-family: var(--mono); font-size: 11px; color: var(--accent-2, #6ea8ff); margin-left: auto; }
+.res-card .res-desc { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.res-card .res-tag { display: inline-block; margin-top: 8px; font-family: var(--mono); font-size: 10px; color: var(--dim); border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 6px; padding: 1px 6px; }
+
+/* S3-only support note on the vet hero */
+.hero-note { font-size: 12.5px; line-height: 1.5; color: var(--dim); margin: 10px 0 0; max-width: 64ch; padding-left: 10px; border-left: 2px solid var(--border, rgba(255,255,255,.14)); }
+.hero-note b { color: var(--muted); }

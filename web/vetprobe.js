@@ -154,15 +154,19 @@ export async function pinChecks(io, protocol, fitted = {}) {
 // Adjacent module pins: drive one weakly, see whether the other follows in BOTH directions
 // (a pulled-up neighbour follows "high" on its own; only a real short also follows "low").
 export function adjacentPairs(protocol) {
-  const order = protocol.module?.pinOrder || [];
   const drive = new Set(protocol.driveSafe || []);
   const readable = (p) => Number.isInteger(p) && !UNSAFE.has(p);
   const pairs = [];
-  for (let i = 0; i + 1 < order.length; i++) {
-    const a = order[i], b = order[i + 1];
-    if (!readable(a) || !readable(b)) continue;
-    if (drive.has(a)) pairs.push([a, b]); else if (drive.has(b)) pairs.push([b, a]);
-  }
+  const addRow = (order, hint, under) => {
+    for (let i = 0; i + 1 < order.length; i++) {
+      const a = order[i], b = order[i + 1];
+      if (!readable(a) || !readable(b)) continue;
+      if (drive.has(a)) pairs.push({ a, b, hint, under });
+      else if (drive.has(b)) pairs.push({ a: b, b: a, hint, under });
+    }
+  };
+  addRow(protocol.module?.pinOrder || []);                       // the module's edge castellations
+  for (const row of protocol.bridgeRows || []) addRow(row.pins || [], row.hint, row.under);   // extra rows (e.g. the pads hidden under the module)
   return pairs;
 }
 
@@ -172,7 +176,7 @@ export async function bridgeChecks(io, protocol, fingerprint = {}) {
   const pads = new Pads(io);
   const bridged = [];
   try {
-    for (const [a, b] of pairs) {
+    for (const { a, b, hint, under } of pairs) {
       const follows = {};
       for (const level of [1, 0]) {
         await pads.input(b, level ? FUN_PD : FUN_PU);                // pull the listener the other way
@@ -181,13 +185,14 @@ export async function bridgeChecks(io, protocol, fingerprint = {}) {
         follows[level] = (await pads.read(b)) === !!level;
         await pads.input(a, 0);
       }
-      if (follows[1] && follows[0]) bridged.push([a, b]);
+      if (follows[1] && follows[0]) bridged.push({ a, b, hint, under });
     }
   } finally { await pads.restore(); }
-  const fmt = ([a, b]) => `GPIO${a} ↔ GPIO${b}`;
+  const fmt = (a, b) => `GPIO${a} ↔ GPIO${b}`;
   const checks = bridged.length
-    ? bridged.map(([a, b]) => check(`bridge-${a}-${b}`, `Solder bridge ${fmt([a, b])}`, "fail", "the second pin follows the first both high and low",
-        `Adjacent castellations on the module — reflow / wick between them.`))
+    ? bridged.map(({ a, b, hint, under }) => check(`bridge-${a}-${b}`, `Solder bridge ${fmt(a, b)}`, "fail",
+        under ? "the second pin follows the first both ways — a short under the module" : "the second pin follows the first both high and low",
+        hint || `Adjacent castellations on the module — reflow / wick between them.`))
     : [check("bridges", "Solder bridges (adjacent module pins)", "pass", `none among ${pairs.length} neighbouring pairs`)];
   return { checks, bridged, pairs: pairs.length };
 }
