@@ -298,6 +298,17 @@ await test("Nibble Zero: a bridge on the hidden bottom-row pads under the module
   assert.equal(r.verdict, "needs-rework");
 });
 
+await test("Nibble Zero: a LEFT<->RIGHT bridge under the module (GPIO42<->GPIO45, RIGHT is a strap) is caught", async () => {
+  const proto = PROTOCOLS["nibble-zero"], parts = partsFrom(FP("nibble-zero-workbench5"));
+  const dev = proto.i2c.find((b) => b.expectDevices?.length);
+  // 45 (RIGHT) is a strap the bridge test can't DRIVE — it must still READ it as the listener
+  const b = FakeBoard({ parts, radio: "sx126x", radioPins: proto.radio, i2cDevice: { sda: dev.sda, scl: dev.scl, addr: 0x3c }, bridges: [[42, 45]], rssi: (mhz) => (mhz === 915 ? -80 : -115), flashCap: 2 });
+  const r = await vet.runExam(b, proto, { chip: zeroChip, doBeacon: false });
+  const br = r.checks.find((c) => c.id === "bridge-42-45" || c.id === "bridge-45-42");
+  assert.ok(br && br.status === "fail", "LEFT<->RIGHT under-module bridge caught: " + JSON.stringify(r.checks.filter((c) => c.id.startsWith("bridge")).map((c) => c.id)));
+  assert.equal(r.verdict, "needs-rework");
+});
+
 await test("a mid-scan serial glitch no longer aborts the whole CAT scan (per-step resilience)", async () => {
   const boom = () => { throw new Error("Serial data stream stopped: Possible serial noise or corruption"); };
   const dead = { readReg: async () => boom(), writeReg: async () => boom(), writeRegs: async () => boom(), readFlash: async () => boom() };

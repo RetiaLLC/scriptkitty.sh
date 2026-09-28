@@ -11,7 +11,7 @@
 // (~5 mA) so a pin shorted to a rail is not harmed.
 import {
   pullFollow, i2cAck, appInfoFromFlash,
-  GPIO, ioMux, funcOutSel, FUN_PD, FUN_PU, FUN_IE, MCU_SEL_GPIO, bank, bit, UNSAFE, EN_W1TS, EN_W1TC, IN,
+  GPIO, ioMux, funcOutSel, FUN_PD, FUN_PU, FUN_IE, MCU_SEL_GPIO, bank, bit, UNSAFE, NO_TOUCH, EN_W1TS, EN_W1TC, IN,
 } from "./boardprobe.js";
 
 const OUT_W1TS = [GPIO + 0x08, GPIO + 0x14];
@@ -155,14 +155,17 @@ export async function pinChecks(io, protocol, fitted = {}) {
 // (a pulled-up neighbour follows "high" on its own; only a real short also follows "low").
 export function adjacentPairs(protocol) {
   const drive = new Set(protocol.driveSafe || []);
-  const readable = (p) => Number.isInteger(p) && !UNSAFE.has(p);
+  const canDrive = (p) => drive.has(p) && !NO_TOUCH.has(p);
+  const canRead = (p) => Number.isInteger(p) && !NO_TOUCH.has(p);   // straps/JTAG are fine to READ, just never DRIVE
   const pairs = [];
   const addRow = (order, hint, under) => {
     for (let i = 0; i + 1 < order.length; i++) {
-      const a = order[i], b = order[i + 1];
-      if (!readable(a) || !readable(b)) continue;
-      if (drive.has(a)) pairs.push({ a, b, hint, under });
-      else if (drive.has(b)) pairs.push({ a: b, b: a, hint, under });
+      const x = order[i], y = order[i + 1];
+      if (!Number.isInteger(x) || !Number.isInteger(y)) continue;   // non-numeric entries (GND/USB) break adjacency
+      // Drive whichever pin is safe to drive and READ the other — so a bridge to an
+      // un-drivable neighbour (a strap like RIGHT=GPIO45, or a JTAG pin) is still caught.
+      if (canDrive(x) && canRead(y)) pairs.push({ a: x, b: y, hint, under });
+      else if (canDrive(y) && canRead(x)) pairs.push({ a: y, b: x, hint, under });
     }
   };
   addRow(protocol.module?.pinOrder || []);                       // the module's edge castellations

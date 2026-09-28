@@ -133,6 +133,10 @@ export const bit = (pin) => (1 << (pin % 32)) >>> 0;
 // Never probed: 0/3/45/46 straps, 19/20 USB D-/D+, 26-32 in-package flash + PSRAM,
 // 43/44 UART0 (the ROM drives TX).
 export const UNSAFE = new Set([0, 3, 19, 20, 26, 27, 28, 29, 30, 31, 32, 43, 44, 45, 46]);
+// Pins unsafe to even READ during a bridge test (touching them can drop the link or the
+// flash access the stub relies on): USB D-/D+ and the in-package SPI flash/PSRAM. Everything
+// else — straps, JTAG, UART — is safe as a read-only bridge LISTENER (never driven).
+export const NO_TOUCH = new Set([19, 20, 26, 27, 28, 29, 30, 31, 32]);
 
 // Pull-follow test, entirely passive (only the chip's ~45 k internal pulls are switched,
 // nothing is driven): sample every pin with pull-DOWN on, again with pull-UP on.
