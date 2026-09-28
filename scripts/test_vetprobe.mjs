@@ -298,6 +298,16 @@ await test("Nibble Zero: a bridge on the hidden bottom-row pads under the module
   assert.equal(r.verdict, "needs-rework");
 });
 
+await test("a mid-scan serial glitch no longer aborts the whole CAT scan (per-step resilience)", async () => {
+  const boom = () => { throw new Error("Serial data stream stopped: Possible serial noise or corruption"); };
+  const dead = { readReg: async () => boom(), writeReg: async () => boom(), writeRegs: async () => boom(), readFlash: async () => boom() };
+  let r;
+  await assert.doesNotReject(async () => { r = await vet.runExam(dead, PROTOCOLS["nibble-zero"], { chip: zeroChip, doBeacon: false }); }, "the exam must not throw when the link dies");
+  assert.ok(r && Array.isArray(r.checks), "still returns a report");
+  assert.ok(r.checks.some((c) => c.status === "warn" && /couldn't complete/.test(c.detail)), "records the step(s) that couldn't complete: " + JSON.stringify(r.checks.map((c) => c.id + ":" + c.status)));
+  assert.notEqual(r.verdict, "healthy", "an incomplete scan is never reported healthy");
+});
+
 await test("Bluetooth Nugget + LoRa backpack: DIO0 idling low and a v6 backpack driving GPIO14 are not false faults", async () => {
   const proto = PROTOCOLS["bluetooth-nugget"];
   const parts = { ...partsFrom(FP("bluetooth-nugget")), 4: "pullup", 9: "pullup", 16: "low", 14: "high" };   // add-on fitted: NRST/NSS pulled up, DIO0 idle low, v6 drives GPIO14

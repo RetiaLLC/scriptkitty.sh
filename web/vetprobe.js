@@ -723,19 +723,35 @@ export async function runExam(io, protocol, { chip = {}, images = null, fitted =
   const checks = [];
   const declaredAbsent = Object.entries(protocol.optionalParts || {}).filter(([k]) => fitted[k] === false).map(([, name]) => name);
   if (declaredAbsent.length) checks.push(check("declared", "Declared not fitted", "info", declaredAbsent.join(", ")));
-  step("identity"); checks.push(...await identityChecks(io, protocol, chip));
-  step("pins");     const pins = await pinChecks(io, protocol, fitted); checks.push(...pins.checks);
-  if (doBridges) { step("bridges"); checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); }
+  // Resilience: heavy bit-bang steps (radio/antenna/i2c) can stress a marginal board or cable
+  // and drop the USB-serial link. A glitch in one step is recorded as "couldn't complete" and
+  // the scan carries on — earlier results survive and the report shows exactly where it dropped,
+  // instead of the whole CAT scan aborting with a bare serial error.
+  const glitchy = (e) => /stream stopped|noise|corrupt|timeout|disconnect|closed|\bbreak\b/i.test((e && e.message) || String(e));
+  const runStep = async (id, title, fn) => {
+    step(id);
+    try { return await fn(); }
+    catch (e) {
+      checks.push(check(id, title, "warn", `couldn't complete — ${((e && e.message) || String(e)).slice(0, 90)}`,
+        glitchy(e) ? "The USB serial link dropped during this step. Re-run the CAT scan; if it always stops here, try a different USB cable or port — this board's link is marginal."
+                   : "Re-run the CAT scan."));
+      return undefined;
+    }
+  };
+  await runStep("identity", "Identity", async () => { checks.push(...await identityChecks(io, protocol, chip)); });
+  let pins = { checks: [], fingerprint: {} };
+  await runStep("pins", "Rest levels", async () => { pins = await pinChecks(io, protocol, fitted); checks.push(...pins.checks); });
+  if (doBridges) await runStep("bridges", "Solder bridges", async () => { checks.push(...(await bridgeChecks(io, protocol, pins.fingerprint)).checks); });
   if (doRadio && protocol.radio && fitted.radio === false) {
     checks.push(check("radio", `LoRa radio — ${protocol.radio.part || "module"}`, "info", "declared not fitted — radio and antenna checks skipped"));
   } else if (doRadio) {
-    step("radio"); const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio);
-    const rc = radio.find((c) => c.id === "radio");
-    if (doAntenna && rc?.alive) { step("antenna"); const a = await antennaCheck(io, protocol, { radio: rc.radio }); if (a) checks.push(a); }
+    let rc = null;
+    await runStep("radio", "LoRa radio", async () => { const radio = await radioChecks(io, protocol, pins.fingerprint); checks.push(...radio); rc = radio.find((c) => c.id === "radio"); });
+    if (doAntenna && rc?.alive) await runStep("antenna", "Antenna", async () => { const a = await antennaCheck(io, protocol, { radio: rc.radio }); if (a) checks.push(a); });
   }
-  if (doI2c)     { step("i2c");     checks.push(...await i2cChecks(io, protocol, pins.fingerprint, fitted)); }
-  step("firmware"); const fw = await firmwareCheck(io, images); if (fw) checks.push(fw);
-  if (doBeacon)  { step("beacon");  const b = await beacon(io, protocol); if (b) checks.push(b); }
+  if (doI2c) await runStep("i2c", "I2C scan", async () => { checks.push(...await i2cChecks(io, protocol, pins.fingerprint, fitted)); });
+  await runStep("firmware", "Firmware", async () => { const fw = await firmwareCheck(io, images); if (fw) checks.push(fw); });
+  if (doBeacon) await runStep("beacon", "Beacon LED", async () => { const b = await beacon(io, protocol); if (b) checks.push(b); });
   // a declared part that nothing in this exam can see must not pass by silence: it stays a
   // warning until a live test (tone, level, firmware, remote) replaces it by id
   for (const [key, name] of Object.entries(protocol.optionalParts || {})) {
