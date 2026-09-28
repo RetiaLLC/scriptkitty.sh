@@ -248,12 +248,13 @@ export function classifyS3FourMeg(fp, { oled = null } = {}) {
   // so a provisional guess here is cheap to be wrong about.
   let models = [];
   if (og) models = ["Nibble OG (S3)"];
-  // Zero vs Screen Connect: same radio, same display bus. The one Screen Connect measured
-  // has pull-ups on the A/B buttons and both Zeros don't — enough to order the two, not
-  // to drop one. Firmware/catalog evidence narrows it further when available.
-  else if (oled === true) models = abPullups ? ["Nibble Screen Connect", "Nibble Zero"] : ["Nibble Zero", "Nibble Screen Connect"];
-  // Screenless SX1262 board = Connect (measured: no I2C pull-ups at all on the Connect).
-  else if (sx1262Family && oled === false) models = ["Nibble Connect"];
+  // The Connect has NO I2C pull-ups; the Zero and Screen Connect both carry them (RN1 /
+  // discrete 10Ks on GPIO7/8). That passive signal — not the live OLED ACK, which can
+  // false-negative on a slow SSD1306 or a marginal pull-up and demote a Zero to a Connect —
+  // is what separates them. The OLED ACK and the A/B button pull-ups only ORDER Zero vs
+  // Screen Connect; firmware/catalog evidence narrows further when available.
+  else if (nibbleBus) models = abPullups ? ["Nibble Screen Connect", "Nibble Zero"] : ["Nibble Zero", "Nibble Screen Connect"];
+  else if (sx1262Family) models = ["Nibble Connect"];   // SX1262 radio, no I2C pull-ups = Connect
   return { line: "nibble", models, evidence };
 }
 
@@ -275,10 +276,12 @@ export async function probeS3FourMeg(io, { images = null } = {}) {
   const first = classifyS3FourMeg(fingerprint);
   // The display probe drives pins, so it only runs where it can change the answer and
   // where the passive pass already proved a pulled-up bus: SX1262-family Nibbles.
-  if (first.line === "nibble" && !first.models.length) {
-    const bus = fingerprint[7] === "HIGH" && fingerprint[8] === "HIGH";
-    oled = bus ? await i2cAck(counted, 8, 7, OLED_ADDR) : false;   // no pulled-up bus -> nothing to ACK
-  }
+  if (first.line === "nibble" && fingerprint[7] === "HIGH" && fingerprint[8] === "HIGH") {
+    // Pulled-up bus (a Zero / Screen Connect). Confirm the panel is alive — a few tries, since
+    // one probe can false-negative on a slow SSD1306. The classifier uses the pull-ups, not this.
+    oled = false;
+    for (let t = 0; t < 3 && !oled; t++) oled = await i2cAck(counted, 8, 7, OLED_ADDR);
+  } else if (first.line === "nibble") oled = false;
   let { line, models, evidence } = classifyS3FourMeg(fingerprint, { oled });
   let source = line ? "pins" : null, env = null, elfSha = null, installed = null;
 

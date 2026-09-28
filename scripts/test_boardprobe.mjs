@@ -110,8 +110,14 @@ await test("classifyS3FourMeg: every board signature, plus the ambiguous cases",
   // measured on a real Nibble Zero, 2026-09-21
   const zero = { 4: "LOW", 5: "LOW", 6: "HIGH", 7: "HIGH", 8: "HIGH", 10: "HIGH", 21: "HIGH" };
   assert.deepEqual(c(zero, { oled: true }), ["nibble", ["Nibble Zero", "Nibble Screen Connect"]]);
-  assert.deepEqual(c(zero, { oled: false }), ["nibble", ["Nibble Connect"]]);
-  assert.deepEqual(c(zero), ["nibble", []]);
+  // the fix: GPIO7/8 pulled up (RN1 / discrete 10Ks) marks a Zero/Screen Connect even when the
+  // OLED ACK false-negatives — a pulled-up bus must NOT be demoted to a screenless Connect.
+  assert.deepEqual(c(zero, { oled: false }), ["nibble", ["Nibble Zero", "Nibble Screen Connect"]]);
+  assert.deepEqual(c(zero), ["nibble", ["Nibble Zero", "Nibble Screen Connect"]]);
+  // a real Connect: the SX1262 reset/select pull-ups (6/10) but NO I2C pull-ups (7/8 float)
+  const connect = { 4: "LOW", 5: "LOW", 6: "HIGH", 10: "HIGH", 21: "HIGH" };
+  assert.deepEqual(c(connect), ["nibble", ["Nibble Connect"]]);
+  assert.deepEqual(c(connect, { oled: false }), ["nibble", ["Nibble Connect"]]);
   // measured on a real Nibble Screen Connect, 2026-09-24: same as a Zero plus A/B pull-ups
   const sc = { ...zero, 1: "HIGH", 2: "HIGH" };
   assert.deepEqual(c(sc, { oled: true }), ["nibble", ["Nibble Screen Connect", "Nibble Zero"]]);
@@ -237,10 +243,17 @@ await test("s3ResetToApp: exact esptool register sequence, masked latch clear fi
 });
 
 await test("probeS3FourMeg: firmware narrows the model but can never override the pins", async () => {
+  // A real Nibble Zero: the I2C pull-ups on GPIO7/8 mark it as a Zero/Screen Connect even though
+  // fakeChip has no I2C slave to ACK the OLED. Firmware then narrows to the exact model. (This is
+  // the production bug the pull-up-based classifier fixes: a Zero must not read as a Connect.)
   const zeroPins = { 4: "low", 5: "low", 6: "pullup", 7: "pullup", 8: "pullup", 10: "pullup", 21: "pullup" };
-  // I2C slave model is out of scope for fakeChip, so SDA just stays high -> no ACK -> "Connect" guess…
   let r = await probe.probeS3FourMeg({ ...fakeChip(zeroPins), ...fakeFlash("nibble-zero-connect", 6000) });
-  assert.deepEqual([r.line, r.models, r.source, r.env], ["nibble", ["Nibble Connect"], "pins", "nibble-zero-connect"], "single model from pins: env read but can't widen it");
+  assert.deepEqual([r.line, r.models, r.source, r.env], ["nibble", ["Nibble Zero"], "pins+firmware", "nibble-zero-connect"], "Zero pins (I2C pull-ups) + Zero firmware -> Nibble Zero, no OLED ACK required");
+  // A real Connect (SX1262 pull-ups, NO I2C pull-ups) carrying Zero firmware: the pins give one
+  // confident model, and firmware is read and reported but can never override it — hardware wins.
+  const connectFw = { 4: "low", 5: "low", 6: "pullup", 10: "pullup", 21: "pullup" };
+  r = await probe.probeS3FourMeg({ ...fakeChip(connectFw), ...fakeFlash("nibble-zero-connect", 6000) });
+  assert.deepEqual([r.line, r.models, r.source, r.env], ["nibble", ["Nibble Connect"], "pins", "nibble-zero-connect"], "single model from pins: env read but can't override it");
   // …pins that match nothing: firmware may name the board
   r = await probe.probeS3FourMeg({ ...fakeChip({}), ...fakeFlash("nibble-screen-connect", 6000) });
   assert.deepEqual([r.line, r.models, r.source], ["nibble", ["Nibble Screen Connect"], "firmware"]);
