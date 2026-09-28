@@ -110,7 +110,7 @@ $("pickBoard").addEventListener("click", async () => {
     grantedPort = p;
     const i = (p.getInfo && p.getInfo()) || {};
     const hx = (n) => (n || 0).toString(16).padStart(4, "0");
-    status(`Board selected${i.usbVendorId != null ? ` (USB ${hx(i.usbVendorId)}:${hx(i.usbProductId)})` : ""}. Press Diagnose to examine it.`, "ok");
+    status(`Board selected${i.usbVendorId != null ? ` (USB ${hx(i.usbVendorId)}:${hx(i.usbProductId)})` : ""}. Press CAT scan to run it.`, "ok");
   } catch { status("No board chosen — keeping the current one.", "err"); }
 });
 let lastReport = null, lastKey = null;
@@ -119,7 +119,7 @@ async function diagnose({ touched = false } = {}) {
   if (!HAS_SERIAL || running) return;
   running = true; $("diagnose").disabled = true;
   $("report").hidden = true;
-  mascot("working", "Examining…", "Hold still. This takes a few seconds.");
+  mascot("working", "CAT scan…", "Hold still. This takes a few seconds.");
   try {
     const { ESPLoader, Transport } = await loadEsptool();
     let port;
@@ -202,7 +202,7 @@ async function diagnose({ touched = false } = {}) {
     const protocol = PROTOCOLS[key]; lastKey = key;
     const steps = ["identity", "pins", "bridges", "radio", "antenna", "i2c", "firmware", "beacon"];
     const labels = { identity: "Reading chip, flash and eFuses", pins: "Measuring rest levels on every pin", bridges: "Looking for solder bridges between neighbouring pins", radio: "Asking the LoRa radio to identify itself", antenna: "Listening for off-air RF through the antenna (receive only)", i2c: "Scanning the I2C header", firmware: "Reading the installed firmware", beacon: "Blinking the debug LED" };
-    status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the exam…`);
+    status(`${escapeHtml(protocol.name)}${why ? " (" + escapeHtml(why) + ")" : ""} — starting the CAT scan…`);
     const report = await vet.runExam(io, protocol, {
       chip, images: await IMAGES, fitted: fittedFromUi(), doBeacon: $("blink").checked,
       onStep: (s) => { progress(steps.indexOf(s) / steps.length); status(`${escapeHtml(protocol.name)} — ${labels[s] || s}…`); },

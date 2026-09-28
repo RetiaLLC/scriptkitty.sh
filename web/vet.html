@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Diagnose my cat — scriptkitty.sh</title>
-  <meta name="description" content="A soldering check-up for Retia boards, straight from the browser: rest levels on every pin, solder bridges, the LoRa radio's ID, I2C buses, and whether the firmware boots." />
+  <meta name="description" content="A CAT scan for Retia boards, straight from the browser: a no-firmware soldering check-up — rest levels on every pin, solder bridges, the LoRa radio's ID, I2C buses, and whether the firmware boots." />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="scriptkitty.sh" />
   <meta property="og:url" content="https://scriptkitty.sh/vet.html" />
@@ -43,11 +43,11 @@
       The vet needs the Web Serial API — use a desktop browser that supports it (<b>Chrome</b>, <b>Edge</b>, or <b>Firefox</b> with Web Serial enabled).
     </div>
 
-    <section class="detect-hero" id="vetHero" aria-label="Diagnose your board">
+    <section class="detect-hero" id="vetHero" aria-label="Run a CAT scan on your board">
       <pre class="hero-cat" id="heroCat" aria-hidden="true"></pre>
       <div class="hero-body">
         <div class="hero-title" id="heroTitle">Diagnose my cat</div>
-        <p class="hero-sub" id="heroSub">A soldering check-up, no firmware needed. I'll connect over USB, look at every pin the way a multimeter would, ask the radio to identify itself, scan the I2C header, then reboot the board and see whether its firmware comes up.</p>
+        <p class="hero-sub" id="heroSub">A CAT scan for your board — a soldering check-up, no firmware needed. I'll connect over USB, look at every pin the way a multimeter would, ask the radio to identify itself, scan the I2C header, then reboot the board and see whether its firmware comes up.</p>
         <p class="hero-note" id="s3Note">Supports <b>ESP32-S3</b> boards only for now — Nuggets, Nibbles, the Pusheen puck and the DEF CON badge. The ESP32-S2 USB Nugget and the ESP8266 Wi-Fi Nugget aren't supported yet.</p>
         <div class="vet-controls">
           <label class="ctl">Patient
@@ -57,7 +57,7 @@
           <label class="ctl ctl-check" title="After the exam, reboot the board into its firmware and read the console for a few seconds"><input type="checkbox" id="bootCheck" checked /> Boot check</label>
           <label class="ctl ctl-check" title="Blink the board's debug LED during the exam so you can see it's alive"><input type="checkbox" id="blink" checked /> Blink LED</label>
           <label class="ctl ctl-check" id="irTestCtl" hidden title="After the pin checks, listen on the IR receiver for 8 s while you hold a remote at the board"><input type="checkbox" id="irTest" checked /> IR remote test</label>
-          <button class="btn hero-detect" id="diagnose" type="button">🩺 Diagnose</button>
+          <button class="btn hero-detect" id="diagnose" type="button">🩺 CAT scan</button>
           <button class="link-repick" id="pickBoard" type="button" title="Choose which connected board to examine — use this when more than one board is plugged in">Pick a different board</button>
         </div>
         <div class="hero-bar" id="heroBar" hidden><div class="hero-bar-fill" id="heroBarFill"></div></div>
@@ -72,7 +72,7 @@
       <div id="checks"></div>
       <div class="vet-actions">
         <button class="btn secondary" id="copy" type="button">Copy report</button>
-        <button class="btn secondary" id="again" type="button">Diagnose again</button>
+        <button class="btn secondary" id="again" type="button">Another CAT scan</button>
       </div>
     </section>
 
