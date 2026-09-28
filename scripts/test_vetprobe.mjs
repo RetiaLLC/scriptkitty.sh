@@ -134,7 +134,7 @@ await test("healthy puck: every check passes, radio identified, no bridges, verd
   const bad = r.checks.filter((c) => c.status === "fail" || c.status === "warn");
   assert.deepEqual(bad, [], JSON.stringify(bad));
   assert.equal(r.verdict, "healthy");
-  assert.match(by(r, "radio").detail, /SX1261 V2D 2D02.*STDBY_RC/);
+  assert.match(by(r, "radio").detail, /SX1261 V.*STDBY_RC/);
   assert.equal(by(r, "flash").detail, "16 MB (XMC)"); assert.equal(by(r, "psram").status, "pass");
   assert.match(by(r, "bridges").detail, /none among \d+ neighbouring pairs/);
   assert.match(by(r, "i2c-35").detail, /nothing fitted/); assert.match(by(r, "firmware").detail, /newsheen-puck/);

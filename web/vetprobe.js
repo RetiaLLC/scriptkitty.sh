@@ -268,7 +268,10 @@ async function probeRadio(io, r, fingerprint) {
     if (r.type === "sx126x") {
       const st = await xfer([0xc0, 0x00], 1);
       const status = st[1], mode = (status >> 4) & 7;
-      const id = await xfer([0x1d, 0x03, 0x20, 0x00, ...new Array(16).fill(0)], 4).then((b) => b.slice(4));
+      // read only 8 bytes of the version register (enough for "SX1261 V"): the full 16-byte
+      // read is ~128 back-to-back register reads in one burst — the heaviest in the scan, and
+      // enough to drop a marginal USB-serial-JTAG link. Halving it is easier on a shaky board.
+      const id = await xfer([0x1d, 0x03, 0x20, 0x00, ...new Array(8).fill(0)], 4).then((b) => b.slice(4));
       const idStr = String.fromCharCode(...id).replace(/\0.*$/, "");
       alive = /^SX126/.test(idStr);
       const modeName = { 2: "STDBY_RC", 3: "STDBY_XOSC", 4: "FS", 5: "RX", 6: "TX" }[mode] || `mode ${mode}`;
