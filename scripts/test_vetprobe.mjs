@@ -298,6 +298,16 @@ await test("Nibble Zero: a bridge on the hidden bottom-row pads under the module
   assert.equal(r.verdict, "needs-rework");
 });
 
+await test("Bluetooth Nugget + LoRa backpack: DIO0 idling low and a v6 backpack driving GPIO14 are not false faults", async () => {
+  const proto = PROTOCOLS["bluetooth-nugget"];
+  const parts = { ...partsFrom(FP("bluetooth-nugget")), 4: "pullup", 9: "pullup", 16: "low", 14: "high" };   // add-on fitted: NRST/NSS pulled up, DIO0 idle low, v6 drives GPIO14
+  const b = FakeBoard({ parts, radio: "sx127x", radioPins: proto.radio, i2cDevice: { sda: 35, scl: 36, addr: 0x3c }, rssi: (mhz) => (mhz === 915 ? -80 : -115) });
+  const r = await vet.runExam(b, proto, { chip: zeroChip, doBeacon: false, fitted: { radio: true, display: true } });
+  assert.equal(by(r, "gpio16").status, "pass", "DIO0 low with the add-on fitted is normal, not a bridge");
+  assert.equal(by(r, "gpio14").status, "info", "GPIO14 driven by the v6 backpack is reported, not a fault");
+  assert.equal(by(r, "radio").status, "pass", "RFM95 still IDs");
+});
+
 await test("Nibble OG: a dead RFM95 (MISO silent) fails with the module-not-answering hint; no-pull-up I2C is info, not skip", async () => {
   const proto = PROTOCOLS["nibble-og-s3"], parts = partsFrom(FP("nibble-og-s3"));
   const r = await vet.runExam(FakeBoard({ parts, radio: null, radioPins: proto.radio }), proto, { chip: zeroChip, doBeacon: false });

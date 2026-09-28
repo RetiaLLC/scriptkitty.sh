@@ -104,6 +104,15 @@ let running = false;
 $("diagnose").addEventListener("click", () => diagnose());
 $("again").addEventListener("click", () => diagnose());
 $("copy").addEventListener("click", () => { if (lastReport) navigator.clipboard.writeText(reportText(lastReport)).then(() => { $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy report"), 1500); }); });
+$("pickBoard").addEventListener("click", async () => {
+  try {
+    const p = await navigator.serial.requestPort();          // user gesture -> the browser's port chooser
+    grantedPort = p;
+    const i = (p.getInfo && p.getInfo()) || {};
+    const hx = (n) => (n || 0).toString(16).padStart(4, "0");
+    status(`Board selected${i.usbVendorId != null ? ` (USB ${hx(i.usbVendorId)}:${hx(i.usbProductId)})` : ""}. Press Diagnose to examine it.`, "ok");
+  } catch { status("No board chosen — keeping the current one.", "err"); }
+});
 let lastReport = null, lastKey = null;
 
 async function diagnose({ touched = false } = {}) {

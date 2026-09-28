@@ -305,10 +305,12 @@ export const PROTOCOLS = {
       { gpio: 15, expect: "any", name: "status LED" },
       { gpio: 4, expect: "float", name: "LoRa add-on RESET (10K when the RFM95 add-on is fitted)", part: "radio", onHIGH: { status: "pass", detail: "pulled up — LoRa add-on fitted" } },
       { gpio: 9, expect: "float", name: "LoRa add-on NSS (10K when fitted)", part: "radio", onHIGH: { status: "pass", detail: "pulled up — LoRa add-on fitted" } },
-      { gpio: 16, expect: "float", name: "LoRa add-on DIO0", part: "radio" },
+      { gpio: 16, expect: "held", name: "LoRa add-on DIO0 (RFM95 IRQ output)", part: "radio",
+        onFLOAT: { status: "warn", hint: "DIO0 floats — the RFM95 add-on isn't fitted, or its DIO0 line is open." } },
       ...[6, 7, 8].map((g) => ({ gpio: g, expect: "float", name: "LoRa add-on SPI", part: "radio" })),
       { gpio: 47, expect: "any", name: "S3 Mini onboard WS2812 data (module-internal; read low on the unit measured)" },
-      ...[1, 2, 5, 14, 17, 21, 33, 34, 37, 41, 42, 48].map((g) => ({ gpio: g, expect: "float", name: "unused module pin" })),
+      { gpio: 14, expect: "any", part: "radio", name: "header pin — a LoRa backpack may drive this (e.g. DIO1 / a control line on the v6 backpack)" },
+      ...[1, 2, 5, 17, 21, 33, 34, 37, 41, 42, 48].map((g) => ({ gpio: g, expect: "float", name: "unused module pin" })),
       ...[38, 39, 40].map((g) => ({ gpio: g, expect: "rom", name: "JTAG pin in ROM mode" })),
     ],
     driveSafe: [],
@@ -317,7 +319,7 @@ export const PROTOCOLS = {
     beacon: { gpio: 15, name: "status LED" },
     optionalParts: { radio: "LoRa add-on (RFM95)", display: "OLED (SSD1306 at 0x3C)" },
     defaultAbsent: ["radio"],
-    known: ["Buttons 11/12/13/18 float on the shipped board although the v3.14 schematic shows 10K pull-ups.", "Radio pins are the nugget-bluetooth-rmf95 Meshtastic variant's; the add-on itself has not been examined."],
+    known: ["Buttons 11/12/13/18 float on the shipped board although the v3.14 schematic shows 10K pull-ups.", "Radio pins are the nugget-bluetooth-rmf95 Meshtastic variant's.", "With a LoRa backpack fitted (tick \"has LoRa add-on\"): DIO0 (GPIO16) idles LOW = normal (it's the RFM95 IRQ output), and the v6 backpack drives GPIO14 high — both are reported, not faults. Bench-seen 2026-09-28 on a v6 backpack over USB."],
   },
 
   // ------------------------------------------------------------------ DEF CON badge
