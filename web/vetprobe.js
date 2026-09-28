@@ -736,7 +736,7 @@ export async function runExam(io, protocol, { chip = {}, images = null, fitted =
     try { return await fn(); }
     catch (e) {
       checks.push(check(id, title, "warn", `couldn't complete — ${((e && e.message) || String(e)).slice(0, 90)}`,
-        glitchy(e) ? "The USB serial link dropped during this step. Re-run the CAT scan; if it always stops here, try a different USB cable or port — this board's link is marginal."
+        glitchy(e) ? "The USB serial link dropped during this step. Re-run once — if it clears, it was a transient glitch. If it ALWAYS stops at this same step while other boards scan fine on this cable/port, the fault is THIS board: a power or solder problem near this part that browns out the chip when the part is exercised (for the radio, reflow the module and its reset/select pull-ups and check its 3V3/GND). A different cable/port only helps if every board is flaky here."
                    : "Re-run the CAT scan."));
       return undefined;
     }
